@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm src/utils/loans.js)",
+      "Bash(rmdir src/utils)",
+      "Bash(node -e ' *)",
+      "Bash(node \"C:/Users/SUJITH~1/AppData/Local/Temp/claude/c--Users-SujithThomas-Downloads-velzon-hub-velzon-hub/e9b7cb6b-8657-4f95-8fbc-ec97140b4d1d/scratchpad/gen.mjs\")"
+    ]
+  }
+}

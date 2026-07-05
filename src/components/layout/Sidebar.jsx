@@ -1,0 +1,160 @@
+import { useState, useMemo } from 'react' // useMemo used in VerticalMenu
+import { NavLink, useLocation } from 'react-router-dom'
+import SimpleBar from 'simplebar-react'
+import { menu } from '@/data/menu'
+import { useTheme } from '@/context/ThemeContext'
+
+/* Find the id-path of ancestors that contain the active route, so those
+   submenus start expanded. */
+function findActiveTrail(nodes, pathname, trail = []) {
+  for (const node of nodes) {
+    if (node.to && node.to === pathname) return [...trail]
+    if (node.children) {
+      const found = findActiveTrail(node.children, pathname, [...trail, node.id])
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function MenuNode({ node, level, openIds, toggle }) {
+  const { pathname } = useLocation()
+
+  if (node.isTitle) return <li className="menu-title">{node.label}</li>
+
+  // Leaf link
+  if (!node.children) {
+    return (
+      <li className="menu-item">
+        <NavLink
+          to={node.to || '#'}
+          end={node.to === '/'}
+          className={({ isActive }) => 'menu-link' + (isActive ? ' active' : '')}
+        >
+          {node.icon && <i className={`menu-icon ${node.icon}`} />}
+          <span className="menu-label">{node.label}</span>
+          {node.badge && (
+            <span className={`menu-badge badge bg-${node.badge.variant}`}>{node.badge.text}</span>
+          )}
+        </NavLink>
+      </li>
+    )
+  }
+
+  // Parent with children.
+  // The parent itself is a clickable link (navigates to its landing page); its
+  // submenu is always mounted and revealed on hover via CSS. `open` keeps the
+  // active section expanded on load. Plain call (not a hook) so we never call
+  // hooks conditionally after the early returns above.
+  const isOpen = openIds.includes(node.id)
+  const hasActiveChild = Boolean(findActiveTrail(node.children, pathname))
+
+  return (
+    <li className={'menu-item has-children' + (isOpen ? ' open' : '')}>
+      <NavLink
+        to={node.to || '#'}
+        end={node.to === '/'}
+        className={({ isActive }) => 'menu-link' + (isActive || hasActiveChild ? ' active' : '')}
+      >
+        {node.icon && <i className={`menu-icon ${node.icon}`} />}
+        <span className="menu-label">{node.label}</span>
+        {node.badge && (
+          <span className={`menu-badge badge bg-${node.badge.variant} me-2`}>{node.badge.text}</span>
+        )}
+        <i className="menu-arrow ri-arrow-right-s-line" />
+      </NavLink>
+      <ul className="submenu">
+        {node.children.map((child) => (
+          <MenuNode key={child.id} node={child} level={level + 1} openIds={openIds} toggle={toggle} />
+        ))}
+      </ul>
+    </li>
+  )
+}
+
+function VerticalMenu() {
+  const { pathname } = useLocation()
+  const initialOpen = useMemo(() => findActiveTrail(menu, pathname) || ['loans'], [pathname])
+  const [openIds, setOpenIds] = useState(initialOpen)
+
+  const toggle = (id) =>
+    setOpenIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+
+  return (
+    <ul className="menu-list">
+      {menu.map((node) => (
+        <MenuNode key={node.id} node={node} level={0} openIds={openIds} toggle={toggle} />
+      ))}
+    </ul>
+  )
+}
+
+/* Two-column: a slim icon rail + a panel showing the selected group's children. */
+function TwoColumn() {
+  const groups = menu.filter((m) => !m.isTitle)
+  const [activeId, setActiveId] = useState(groups[0]?.id)
+  const active = groups.find((g) => g.id === activeId)
+
+  return (
+    <>
+      <div className="twocolumn-rail">
+        <div className="rail-logo">
+          <span className="logo-mark"><i className="ri-flashlight-fill" /></span>
+        </div>
+        <SimpleBar style={{ flex: 1, width: '100%' }}>
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              className={'rail-item' + (g.id === activeId ? ' active' : '')}
+              title={g.label}
+              onClick={() => setActiveId(g.id)}
+            >
+              <i className={g.icon || 'ri-circle-line'} />
+            </button>
+          ))}
+        </SimpleBar>
+      </div>
+      <div className="twocolumn-panel">
+        <div className="panel-title">{active?.label}</div>
+        <SimpleBar style={{ maxHeight: 'calc(100vh - 70px)' }}>
+          <ul className="menu-list py-2">
+            {active?.children ? (
+              active.children.map((child) => (
+                <MenuNode key={child.id} node={child} level={0} openIds={[]} toggle={() => {}} />
+              ))
+            ) : (
+              <li>
+                <NavLink to={active?.to || '#'} className="menu-link">
+                  <span className="menu-label">{active?.label}</span>
+                </NavLink>
+              </li>
+            )}
+          </ul>
+        </SimpleBar>
+      </div>
+    </>
+  )
+}
+
+export default function Sidebar() {
+  const { settings } = useTheme()
+  const isTwoColumn = settings.layout === 'twocolumn'
+
+  return (
+    <aside className="app-sidebar">
+      {isTwoColumn ? (
+        <TwoColumn />
+      ) : (
+        <>
+          <div className="sidebar-logo">
+            <span className="logo-mark"><i className="ri-flashlight-fill" /></span>
+            <span className="logo-text">Hub</span>
+          </div>
+          <SimpleBar className="sidebar-menu" style={{ maxHeight: 'calc(100vh - 70px)' }}>
+            <VerticalMenu />
+          </SimpleBar>
+        </>
+      )}
+    </aside>
+  )
+}

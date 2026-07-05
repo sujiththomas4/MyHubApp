@@ -1,0 +1,209 @@
+/* ==========================================================================
+   theme.css — the reactive color layer
+   Everything here keys off data-* attributes on <html>, so flipping a setting
+   in the customizer re-skins the app instantly (no reload, no re-mount).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1) COLOR SCHEME  (data-bs-theme = light | dark)
+   We piggyback on Bootstrap 5.3's native dark mode and layer our own tokens.
+   -------------------------------------------------------------------------- */
+:root,
+[data-bs-theme='light'] {
+  --hub-body-bg: #f3f3f9;
+  --hub-body-color: #212529;
+  --hub-heading-color: #495057;
+  --hub-muted: #878a99;
+  --hub-card-bg: #ffffff;
+  --hub-border: #e9ebec;
+  --hub-hover-bg: #f3f6f9;
+  --hub-input-bg: #ffffff;
+}
+
+[data-bs-theme='dark'] {
+  --hub-body-bg: #1a1d21;
+  --hub-body-color: #ced4da;
+  --hub-heading-color: #ced4da;
+  --hub-muted: #858d98;
+  --hub-card-bg: #212529;
+  --hub-border: #32383e;
+  --hub-hover-bg: #2a2f34;
+  --hub-input-bg: #2a2f34;
+
+  --bs-body-bg: #1a1d21;
+  --bs-body-color: #ced4da;
+  --bs-border-color: #32383e;
+}
+
+/* --------------------------------------------------------------------------
+   2) ACCENT PRESETS  (data-preset)
+   Redefine Bootstrap's primary token + our own accent tokens. Because BS 5.3
+   buttons/badges read these via CSS vars (see component overrides below),
+   changing the preset recolors buttons, links, active nav, charts, etc.
+   -------------------------------------------------------------------------- */
+[data-preset='green'] {
+  --bs-primary: #0ab39c;
+  --bs-primary-rgb: 10, 179, 156;
+}
+[data-preset='default'] {
+  --bs-primary: #405189;
+  --bs-primary-rgb: 64, 81, 137;
+}
+[data-preset='blue'] {
+  --bs-primary: #3577f1;
+  --bs-primary-rgb: 53, 119, 241;
+}
+[data-preset='purple'] {
+  --bs-primary: #6559cc;
+  --bs-primary-rgb: 101, 89, 204;
+}
+[data-preset='orange'] {
+  --bs-primary: #f1963b;
+  --bs-primary-rgb: 241, 150, 59;
+}
+[data-preset='teal'] {
+  --bs-primary: #02a8b5;
+  --bs-primary-rgb: 2, 168, 181;
+}
+
+:root {
+  /* Fallback if no preset attribute is present. */
+  --hub-primary: var(--bs-primary, #0ab39c);
+  --hub-primary-shade: color-mix(in srgb, var(--bs-primary) 84%, black);
+  --hub-primary-tint: color-mix(in srgb, var(--bs-primary) 12%, transparent);
+}
+
+/* Buttons: compact Velzon scale (Bootstrap's default .btn is a large 1rem). */
+.btn {
+  --bs-btn-font-size: 0.8125rem;
+  --bs-btn-padding-y: 0.5rem;
+  --bs-btn-padding-x: 0.9rem;
+  --bs-btn-font-weight: 500;
+}
+.btn-sm {
+  --bs-btn-font-size: 0.75rem;
+  --bs-btn-padding-y: 0.28rem;
+  --bs-btn-padding-x: 0.6rem;
+}
+
+/* Wire BS component CSS-vars to the live primary so presets take effect. */
+.btn-primary {
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--bs-primary) 84%, black);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--bs-primary) 80%, black);
+  --bs-btn-active-bg: color-mix(in srgb, var(--bs-primary) 78%, black);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--bs-primary) 74%, black);
+  --bs-btn-disabled-bg: var(--bs-primary);
+  --bs-btn-disabled-border-color: var(--bs-primary);
+}
+.btn-soft-primary {
+  --bs-btn-color: var(--bs-primary);
+  --bs-btn-bg: color-mix(in srgb, var(--bs-primary) 12%, transparent);
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--bs-primary);
+  --bs-btn-hover-border-color: var(--bs-primary);
+}
+.text-primary { color: var(--bs-primary) !important; }
+.bg-primary { background-color: var(--bs-primary) !important; }
+.link-primary { color: var(--bs-primary) !important; }
+.badge.bg-primary { background-color: var(--bs-primary) !important; }
+.bg-primary-subtle {
+  background-color: color-mix(in srgb, var(--bs-primary) 15%, transparent) !important;
+}
+.text-primary-emphasis { color: var(--bs-primary) !important; }
+a { color: var(--bs-primary); }
+
+/* Soft/subtle status backgrounds used by widgets. */
+.bg-success-subtle { background-color: rgba(10, 179, 156, 0.15) !important; }
+.bg-info-subtle    { background-color: rgba(41, 156, 219, 0.15) !important; }
+.bg-warning-subtle { background-color: rgba(247, 184, 75, 0.18) !important; }
+.bg-danger-subtle  { background-color: rgba(240, 101, 72, 0.15) !important; }
+
+/* --------------------------------------------------------------------------
+   3) CHROME COLORS — SIDEBAR  (data-sidebar = light | dark | gradient)
+   -------------------------------------------------------------------------- */
+[data-sidebar='light'] {
+  --hub-sidebar-bg: #ffffff;
+  --hub-sidebar-item: #545a6d;
+  --hub-sidebar-item-hover: var(--bs-primary);
+  --hub-sidebar-item-active: var(--bs-primary);
+  --hub-sidebar-active-bg: color-mix(in srgb, var(--bs-primary) 10%, transparent);
+  --hub-sidebar-title: #7c8a96;
+  --hub-sidebar-border: #e9ebec;
+  --hub-sidebar-logo-bg: #ffffff;
+}
+[data-sidebar='dark'] {
+  --hub-sidebar-bg: #405189;
+  --hub-sidebar-item: #abb9e8;
+  --hub-sidebar-item-hover: #ffffff;
+  --hub-sidebar-item-active: #ffffff;
+  --hub-sidebar-active-bg: rgba(255, 255, 255, 0.15);
+  --hub-sidebar-title: #838fb9;
+  --hub-sidebar-border: rgba(255, 255, 255, 0.1);
+  --hub-sidebar-logo-bg: #3b4c85;
+}
+[data-sidebar='gradient'] {
+  --hub-sidebar-bg: linear-gradient(
+    to bottom,
+    var(--bs-primary),
+    color-mix(in srgb, var(--bs-primary) 55%, #405189)
+  );
+  --hub-sidebar-item: rgba(255, 255, 255, 0.75);
+  --hub-sidebar-item-hover: #ffffff;
+  --hub-sidebar-item-active: #ffffff;
+  --hub-sidebar-active-bg: rgba(255, 255, 255, 0.2);
+  --hub-sidebar-title: rgba(255, 255, 255, 0.55);
+  --hub-sidebar-border: rgba(255, 255, 255, 0.12);
+  --hub-sidebar-logo-bg: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   4) CHROME COLORS — TOPBAR  (data-topbar = light | dark)
+   -------------------------------------------------------------------------- */
+[data-topbar='light'] {
+  --hub-topbar-bg: #ffffff;
+  --hub-topbar-item: #495057;
+  --hub-topbar-item-hover-bg: #f3f6f9;
+  --hub-topbar-border: #e9ebec;
+  --hub-topbar-search-bg: #f3f3f9;
+}
+[data-topbar='dark'] {
+  --hub-topbar-bg: #405189;
+  --hub-topbar-item: rgba(255, 255, 255, 0.8);
+  --hub-topbar-item-hover-bg: rgba(255, 255, 255, 0.1);
+  --hub-topbar-border: rgba(255, 255, 255, 0.1);
+  --hub-topbar-search-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* In dark color-scheme, force chrome tokens to dark-friendly values. */
+[data-bs-theme='dark'][data-topbar='light'] {
+  --hub-topbar-bg: #212529;
+  --hub-topbar-item: #ced4da;
+  --hub-topbar-item-hover-bg: #2a2f34;
+  --hub-topbar-border: #32383e;
+  --hub-topbar-search-bg: #2a2f34;
+}
+[data-bs-theme='dark'][data-sidebar='light'] {
+  --hub-sidebar-bg: #212529;
+  --hub-sidebar-item: #ced4da;
+  --hub-sidebar-title: #858d98;
+  --hub-sidebar-border: #32383e;
+  --hub-sidebar-logo-bg: #212529;
+}
+
+/* Cards / borders map onto our tokens app-wide. */
+.card {
+  --bs-card-bg: var(--hub-card-bg);
+  --bs-card-border-color: var(--hub-border);
+  background-color: var(--hub-card-bg);
+  border-color: var(--hub-border);
+}
+.text-muted { color: var(--hub-muted) !important; }
+.border,
+.border-top,
+.border-bottom,
+.border-start,
+.border-end { border-color: var(--hub-border) !important; }
+.table { --bs-table-color: var(--hub-body-color); border-color: var(--hub-border); }

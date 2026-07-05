@@ -1,0 +1,33 @@
+{
+  "name": "velzon-hub",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A flexible admin hub (Vite + React) with a live theme customizer, inspired by the Velzon layout.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "apexcharts": "^4.5.0",
+    "bootstrap": "^5.3.3",
+    "react": "^18.3.1",
+    "react-apexcharts": "^1.7.0",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "remixicon": "^4.3.0",
+    "simplebar-react": "^3.2.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.11",
+    "vite": "^5.4.6"
+  }
+}

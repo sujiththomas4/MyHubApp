@@ -1,0 +1,72 @@
+/* ==========================================================================
+   index.css — base layer
+   Vendor imports + global design tokens + Poppins typography.
+   Load order matters: bootstrap first, then our theme/layout/component layers.
+   ========================================================================== */
+
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'remixicon/fonts/remixicon.css';
+@import 'simplebar-react/dist/simplebar.min.css';
+
+@import './theme.css';
+@import './layout.css';
+@import './components.css';
+
+/* --------------------------------------------------------------------------
+   Global tokens (structure only — colors live in theme.css so they can react
+   to data-* attributes).
+   -------------------------------------------------------------------------- */
+:root {
+  --hub-header-height: 70px;
+  --hub-sidebar-width: 250px;
+  --hub-sidebar-width-md: 180px;
+  --hub-sidebar-width-sm: 70px;
+  --hub-footer-height: 60px;
+  --hub-boxed-width: 1300px;
+
+  --hub-font: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   Typography — the same family the reference site uses.
+   -------------------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--hub-font);
+  font-size: 0.8125rem; /* 13px, matches the reference's dense admin scale */
+  font-weight: 400;
+  line-height: 1.5;
+  background-color: var(--hub-body-bg);
+  color: var(--hub-body-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--hub-font);
+  font-weight: 500;
+  color: var(--hub-heading-color);
+}
+
+a {
+  text-decoration: none;
+}
+
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
