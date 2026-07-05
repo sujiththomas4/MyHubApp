@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
-  plantationEntries, plantationIncomeCategories, plantationExpenseCategories, money, fmtDate,
+  plantationIncomeCategories, plantationExpenseCategories, money, fmtDate,
 } from '@/data/AppData'
+import { usePlantationEntries, addEntry as apiAddEntry, editEntry as apiEditEntry, removeEntry as apiRemoveEntry } from '@/data/plantationRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
@@ -86,10 +87,13 @@ export default function PlantationTracker() {
   const navigate = useNavigate()
   const tab = pathname.endsWith('/expense') ? 'expense' : 'income'
 
-  const [entries, setEntries] = useState(plantationEntries)
+  const liveEntries = usePlantationEntries()
+  const [entries, setEntries] = useState([])
   const [adding, setAdding] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+
+  useEffect(() => { setEntries(liveEntries) }, [liveEntries])
 
   const totals = useMemo(() => {
     const income = entries.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0)
@@ -101,9 +105,9 @@ export default function PlantationTracker() {
 
   const rows = entries.filter((e) => e.type === tab).sort((a, b) => b.date.localeCompare(a.date))
 
-  const addEntry = (e) => { setEntries((es) => [...es, e]); setAdding(false) }
-  const updateEntry = (e) => { setEntries((es) => es.map((x) => (x.id === e.id ? e : x))); setEditRow(null) }
-  const confirmDelete = () => { setEntries((es) => es.filter((x) => x.id !== deleteRow.id)); setDeleteRow(null) }
+  const addEntry = (e) => { setEntries((es) => [...es, e]); setAdding(false); apiAddEntry(e).catch(console.error) }
+  const updateEntry = (e) => { setEntries((es) => es.map((x) => (x.id === e.id ? e : x))); setEditRow(null); apiEditEntry(e).catch(console.error) }
+  const confirmDelete = () => { const id = deleteRow.id; setEntries((es) => es.filter((x) => x.id !== id)); setDeleteRow(null); apiRemoveEntry(id).catch(console.error) }
 
   const profit = totals.net >= 0
 

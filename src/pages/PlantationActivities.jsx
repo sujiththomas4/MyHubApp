@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { plantationActivities, fmtDate } from '@/data/AppData'
+import { fmtDate } from '@/data/AppData'
+import { usePlantationActivities, addActivity as apiAdd, editActivity as apiEdit, removeActivity as apiRemove } from '@/data/plantationRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
@@ -68,19 +69,22 @@ function ActivityForm({ initial, onSave, onCancel }) {
 }
 
 export default function PlantationActivities() {
-  const [items, setItems] = useState(plantationActivities)
+  const live = usePlantationActivities()
+  const [items, setItems] = useState([])
   const [adding, setAdding] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+
+  useEffect(() => { setItems(live) }, [live])
 
   const rows = [...items].sort((a, b) => b.dueDate.localeCompare(a.dueDate))
   const done = items.filter((a) => a.status === 'done').length
   const overdue = items.filter(isOverdue).length
 
-  const addItem = (a) => { setItems((xs) => [...xs, a]); setAdding(false) }
-  const updateItem = (a) => { setItems((xs) => xs.map((x) => (x.id === a.id ? a : x))); setEditRow(null) }
-  const confirmDelete = () => { setItems((xs) => xs.filter((x) => x.id !== deleteRow.id)); setDeleteRow(null) }
-  const toggleDone = (a) => setItems((xs) => xs.map((x) => (x.id === a.id ? { ...x, status: x.status === 'done' ? 'planned' : 'done' } : x)))
+  const addItem = (a) => { setItems((xs) => [...xs, a]); setAdding(false); apiAdd(a).catch(console.error) }
+  const updateItem = (a) => { setItems((xs) => xs.map((x) => (x.id === a.id ? a : x))); setEditRow(null); apiEdit(a).catch(console.error) }
+  const confirmDelete = () => { const id = deleteRow.id; setItems((xs) => xs.filter((x) => x.id !== id)); setDeleteRow(null); apiRemove(id).catch(console.error) }
+  const toggleDone = (a) => { const next = { ...a, status: a.status === 'done' ? 'planned' : 'done' }; setItems((xs) => xs.map((x) => (x.id === a.id ? next : x))); apiEdit(next).catch(console.error) }
 
   return (
     <div className="plantation">

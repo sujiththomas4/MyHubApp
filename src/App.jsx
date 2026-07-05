@@ -1,4 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
+import Login from '@/pages/Login'
 import MainLayout from '@/layouts/MainLayout'
 import Dashboard from '@/pages/Dashboard'
 import RuleBook from '@/pages/RuleBook'
@@ -25,6 +27,11 @@ import Placeholder from '@/pages/Placeholder'
  * a titled stub you can replace with a real screen later.
  */
 export default function App() {
+  const { ready, needsAuth } = useAuth()
+
+  if (!ready) return null // brief: restoring session
+  if (needsAuth) return <Login />
+
   return (
     <Routes>
       <Route element={<MainLayout />}>

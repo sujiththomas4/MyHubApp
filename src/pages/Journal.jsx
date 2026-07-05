@@ -1,9 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Assessment from '@/components/trading/Assessment'
 import { evaluate } from '@/components/trading/assessmentRules'
+import {
+  useJournalDays, useJournalTrades, useJournalNotes,
+  addDay as apiAddDay, setDayPremarket as apiSetPremarket,
+  addTrade as apiAddTrade, editTrade as apiEditTrade, removeTrade as apiRemoveTrade,
+  addNote as apiAddNote, editNote as apiEditNote, removeNote as apiRemoveNote,
+} from '@/data/journalRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import RichTextEditor from '@/components/ui/RichTextEditor'
+import ImageDropZone from '@/components/ui/ImageDropZone'
 
 /**
  * Journal.jsx  (DRAFT)
@@ -35,64 +42,6 @@ const fmtTime = (t) => {
 }
 
 // --- Mock seed data ----------------------------------------------------------
-const seed = [
-  {
-    date: '2026-07-03',
-    note: 'Choppy expiry-ish day. Stuck to plan mostly.',
-    premarket: {
-      dow: 'Bullish', crude: 'Bearish', dollar: 'Bearish', giftNifty: 'Bullish',
-      niftyPreOpen: 'Bullish', advances: '32', declines: '18',
-    },
-    trades: [
-      {
-        id: 't1', time: '09:32', instrument: 'NIFTY 24500 CE', side: 'Buy',
-        qty: 75, entry: 142.5, exit: 168.0, pnl: 1912,
-        answers: {
-          global: 'Bullish', oi: 'Strong Bullish', vix: 'Falling', bias15: 'Bullish', bias1h: 'Bullish',
-          sr: 'Support', fomo: 'No', maxqty: 'Yes', sl: 'Yes', avg: 'Yes',
-          maxQtyValue: '75', slValue: '120',
-        },
-      },
-      {
-        id: 't2', time: '13:05', instrument: 'BANKNIFTY 51500 PE', side: 'Buy',
-        qty: 30, entry: 210, exit: 176, pnl: -1020,
-        answers: {
-          global: 'Neutral', oi: 'Bullish → turning Bearish', vix: 'Rising', bias15: 'Bearish', bias1h: 'Bullish',
-          sr: 'Neither / mid-range', fomo: 'Yes', maxqty: 'Yes', sl: 'No', avg: 'Yes',
-          maxQtyValue: '30',
-        },
-      },
-    ],
-    notes: [
-      {
-        id: 'n1', time: '11:40', image: null,
-        text: 'PCR flipping around 1.0, market indecisive at the pivot. Waiting for a clean break.',
-        answers: { global: 'Neutral', oi: 'Neutral', vix: 'Rising', bias15: 'Neutral', bias1h: 'Bullish', sr: 'Neither / mid-range' },
-      },
-    ],
-  },
-  {
-    date: '2026-07-04',
-    note: 'One clean trade, walked away. Good discipline.',
-    premarket: {
-      dow: 'Bearish', crude: 'Bullish', dollar: 'Bullish', giftNifty: 'Bearish',
-      niftyPreOpen: 'Bearish', advances: '14', declines: '36',
-    },
-    trades: [
-      {
-        id: 't3', time: '10:12', instrument: 'NIFTY 24600 PE', side: 'Buy',
-        qty: 75, entry: 98, exit: 134, pnl: 2700,
-        answers: {
-          global: 'Bearish', oi: 'Strong Bearish', vix: 'High', bias15: 'Bearish', bias1h: 'Bearish',
-          sr: 'Resistance', fomo: 'No', maxqty: 'Yes', sl: 'Yes', avg: 'Yes',
-          maxQtyValue: '75', slValue: '80',
-        },
-      },
-    ],
-    notes: [],
-  },
-]
-
 const money = (n) => (n < 0 ? '-' : '') + '₹' + Math.abs(n).toLocaleString('en-IN')
 const pnlClass = (n) => (n > 0 ? 'text-success' : n < 0 ? 'text-danger' : 'text-muted')
 const rid = () => Math.random().toString(36).slice(2, 8)
@@ -323,7 +272,7 @@ function NoteRow({ note, onEdit, onDelete }) {
         <div className="flex-grow-1 text-truncate" style={{ maxWidth: 460 }}>
           {excerpt || <span className="text-muted fst-italic">No text</span>}
         </div>
-        {htmlHasImage(note.text) && <i className="ri-image-line text-muted" title="Has image" />}
+        {(note.image || htmlHasImage(note.text)) && <i className="ri-image-line text-muted" title="Has image" />}
         {hasAssessment && <i className="ri-radar-line text-muted" title="Has setup assessment" />}
         <div className="d-flex gap-1" onClick={(e) => e.stopPropagation()}>
           <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit note" onClick={onEdit}>
@@ -338,6 +287,9 @@ function NoteRow({ note, onEdit, onDelete }) {
         <div className="card-body border-top bg-light-subtle">
           {note.text && (
             <div className="rte-content mb-3" dangerouslySetInnerHTML={{ __html: note.text }} />
+          )}
+          {note.image && (
+            <img src={note.image} alt="attachment" className="rounded border mb-3 d-block" style={{ maxHeight: 320, maxWidth: '100%' }} />
           )}
           {hasAssessment && (
             <>
@@ -436,15 +388,16 @@ function TradeForm({ initial, onSave, onCancel }) {
 function NoteForm({ initial, onSave, onCancel }) {
   const [time, setTime] = useState(initial?.time || nowHM())
   const [text, setText] = useState(initial?.text || '')
+  const [image, setImage] = useState(initial?.image || null)
   const [answers, setAnswers] = useState(initial?.answers || {})
   const set = (id, value) => setAnswers((a) => ({ ...a, [id]: value }))
 
-  const save = () => onSave({ id: initial?.id || 'n' + rid(), time, text, answers })
+  const save = () => onSave({ id: initial?.id || 'n' + rid(), time, text, image, answers })
 
   return (
     <>
       <div className="row g-3">
-        {/* Left: time + observation */}
+        {/* Left: time + observation + attachment */}
         <div className="col-lg-6">
           <div className="mb-3" style={{ maxWidth: 220 }}>
             <TimeField value={time} onChange={setTime} />
@@ -454,12 +407,11 @@ function NoteForm({ initial, onSave, onCancel }) {
           <RichTextEditor
             value={text}
             onChange={setText}
-            placeholder="Type your market observation… paste or drop screenshots directly here."
+            placeholder="Type your market observation…"
           />
-          <small className="text-muted d-block mt-1">
-            <i className="ri-information-line me-1" />
-            Tip: paste a screenshot with Ctrl/Cmd+V, or use the image button in the toolbar.
-          </small>
+
+          <label className="form-label small mb-1 mt-3">Attachment (screenshot)</label>
+          <ImageDropZone value={image} onChange={setImage} minHeight={140} />
         </div>
 
         {/* Right: market observation (setup assessment) */}
@@ -481,13 +433,26 @@ function NoteForm({ initial, onSave, onCancel }) {
 
 // --- Page --------------------------------------------------------------------
 export default function Journal() {
-  const [days, setDays] = useState(seed)
-  const [activeDate, setActiveDate] = useState(seed[0].date)
+  const daysRaw = useJournalDays()
+  const tradesRaw = useJournalTrades()
+  const notesRaw = useJournalNotes()
+  const [activeDate, setActiveDate] = useState('')
   const [adding, setAdding] = useState(null) // null | 'trade' | 'note'
   const [editTrade, setEditTrade] = useState(null) // trade being edited
   const [deleteTradeItem, setDeleteTradeItem] = useState(null) // trade pending delete confirm
   const [editNote, setEditNote] = useState(null) // note being edited
   const [deleteNoteItem, setDeleteNoteItem] = useState(null) // note pending delete confirm
+
+  // Join days with their trades + notes (newest day first).
+  const days = useMemo(() => daysRaw.map((d) => ({
+    ...d,
+    trades: tradesRaw.filter((t) => t.day === d.date),
+    notes: notesRaw.filter((n) => n.day === d.date),
+  })), [daysRaw, tradesRaw, notesRaw])
+
+  useEffect(() => {
+    if ((!activeDate || !days.some((d) => d.date === activeDate)) && days.length) setActiveDate(days[0].date)
+  }, [days, activeDate])
 
   const activeDay = useMemo(() => days.find((d) => d.date === activeDate), [days, activeDate])
 
@@ -504,35 +469,18 @@ export default function Journal() {
   const newDay = () => {
     const now = new Date()
     const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    setDays((ds) => (ds.some((d) => d.date === iso)
-      ? ds
-      : [{ date: iso, note: '', premarket: {}, trades: [], notes: [] }, ...ds]))
+    if (!days.some((d) => d.date === iso)) apiAddDay({ date: iso, note: '', premarket: {} }).catch(console.error)
     setActiveDate(iso)
     setAdding(null)
   }
 
-  const patchDay = (fn) => setDays((ds) => ds.map((d) => (d.date === activeDate ? fn(d) : d)))
-  const addTrade = (trade) => { patchDay((d) => ({ ...d, trades: [...d.trades, trade] })); setAdding(null) }
-  const updateTrade = (trade) => {
-    patchDay((d) => ({ ...d, trades: d.trades.map((t) => (t.id === trade.id ? trade : t)) }))
-    setEditTrade(null)
-  }
-  const confirmDeleteTrade = () => {
-    const id = deleteTradeItem?.id
-    patchDay((d) => ({ ...d, trades: d.trades.filter((t) => t.id !== id) }))
-    setDeleteTradeItem(null)
-  }
-  const addNote = (note) => { patchDay((d) => ({ ...d, notes: [...(d.notes || []), note] })); setAdding(null) }
-  const updateNote = (note) => {
-    patchDay((d) => ({ ...d, notes: (d.notes || []).map((n) => (n.id === note.id ? note : n)) }))
-    setEditNote(null)
-  }
-  const confirmDeleteNote = () => {
-    const id = deleteNoteItem?.id
-    patchDay((d) => ({ ...d, notes: (d.notes || []).filter((n) => n.id !== id) }))
-    setDeleteNoteItem(null)
-  }
-  const setPremarket = (pm) => patchDay((d) => ({ ...d, premarket: pm }))
+  const addTrade = (trade) => { apiAddTrade({ ...trade, day: activeDate }).catch(console.error); setAdding(null) }
+  const updateTrade = (trade) => { apiEditTrade({ ...trade, day: activeDate }).catch(console.error); setEditTrade(null) }
+  const confirmDeleteTrade = () => { apiRemoveTrade(deleteTradeItem?.id).catch(console.error); setDeleteTradeItem(null) }
+  const addNote = (note) => { apiAddNote({ ...note, day: activeDate }).catch(console.error); setAdding(null) }
+  const updateNote = (note) => { apiEditNote({ ...note, day: activeDate }).catch(console.error); setEditNote(null) }
+  const confirmDeleteNote = () => { apiRemoveNote(deleteNoteItem?.id).catch(console.error); setDeleteNoteItem(null) }
+  const setPremarket = (pm) => apiSetPremarket(activeDate, pm).catch(console.error)
 
   return (
     <div className="journal">

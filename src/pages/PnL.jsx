@@ -1,6 +1,7 @@
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
-import { brokers, brokerModules, brokerStats, compoundedReturn, money, fmtMonth, fmtDate } from '@/data/AppData'
+import { brokers, brokerStats, compoundedReturn, money, fmtMonth, fmtDate } from '@/data/AppData'
+import { useBrokerAccounts, useBrokerTrades, brokerModuleMeta } from '@/data/brokerRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useCapital } from '@/context/CapitalContext'
 
@@ -17,17 +18,21 @@ const netOf = (t) => t.grossPnl - t.brokerage - t.govtCharges
 export default function PnL() {
   const colors = useChartColors()
   const { getCapital } = useCapital()
+  const allAccounts = useBrokerAccounts()
+  const allTrades = useBrokerTrades()
+  const metaById = Object.fromEntries(brokerModuleMeta.map((m) => [m.id, m]))
 
   // Flatten accounts (with stats) and trades (with net) across all modules.
-  const accounts = brokerModules.flatMap((m) =>
-    m.accounts.map((a) => {
-      const cap = getCapital(a.slug)
-      return { ...a, module: m.title, basePath: m.basePath, capital: cap, ...brokerStats(m.trades, a, cap) }
-    }))
-  const acctSlug = {}
-  brokerModules.forEach((m) => m.accounts.forEach((a) => { acctSlug[a.id] = a.slug }))
-  const trades = brokerModules.flatMap((m) =>
-    m.trades.map((t) => ({ ...t, module: m.title, slug: acctSlug[t.accountId], net: netOf(t) })))
+  const accounts = allAccounts.map((a) => {
+    const m = metaById[a.module] || {}
+    const cap = getCapital(a.slug)
+    return { ...a, module: m.title, basePath: m.basePath, capital: cap, ...brokerStats(allTrades, a, cap) }
+  })
+  const acctById = Object.fromEntries(allAccounts.map((a) => [a.id, a]))
+  const trades = allTrades.map((t) => {
+    const acc = acctById[t.accountId] || {}
+    return { ...t, module: metaById[acc.module]?.title, slug: acc.slug, net: netOf(t) }
+  })
 
   // Capital is per broker (shared) — deploy total counts each broker ONCE.
   const capital = brokers.reduce((s, b) => s + getCapital(b.slug), 0)
@@ -55,7 +60,7 @@ export default function PnL() {
   const months = [...byMonth.entries()].sort((a, b) => a[0].localeCompare(b[0]))
 
   // Per-module rollup
-  const modules = brokerModules.map((m) => {
+  const modules = brokerModuleMeta.map((m) => {
     const accs = accounts.filter((a) => a.module === m.title)
     const tr = trades.filter((t) => t.module === m.title)
     const net = tr.reduce((s, t) => s + t.net, 0)
@@ -142,26 +147,26 @@ export default function PnL() {
       </div>
 
       {/* Headline tiles */}
-      <div className="row">
-        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100"><div className="card-body">
+      <div className="row g-3 mb-4">
+        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100 mb-0"><div className="card-body">
           <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Net P&amp;L</span></div>
             <div className={`stat-icon bg-${netPnl >= 0 ? 'success' : 'danger'}-subtle text-${netPnl >= 0 ? 'success' : 'danger'}`}><i className="ri-line-chart-line" /></div></div>
           <h4 className={'stat-value mt-3 mb-0 ' + pnlClass(netPnl)}>{money(netPnl, 'INR')}</h4>
           <span className="text-muted small">Gross {money(grossPnl, 'INR')} · Charges {money(charges, 'INR')}</span>
         </div></div></div>
-        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100"><div className="card-body">
+        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100 mb-0"><div className="card-body">
           <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Capital deployed</span></div>
             <div className="stat-icon bg-primary-subtle text-primary"><i className="ri-wallet-3-line" /></div></div>
           <h4 className="stat-value mt-3 mb-0">{money(capital, 'INR')}</h4>
-          <span className="text-muted small">{accounts.length} accounts · {brokerModules.length} businesses</span>
+          <span className="text-muted small">{accounts.length} accounts · {brokerModuleMeta.length} businesses</span>
         </div></div></div>
-        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100"><div className="card-body">
+        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100 mb-0"><div className="card-body">
           <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Overall return</span></div>
             <div className="stat-icon bg-info-subtle text-info"><i className="ri-percent-line" /></div></div>
           <h4 className={'stat-value mt-3 mb-0 ' + pnlClass(netPnl)}>{returnPct.toFixed(2)}%</h4>
           <span className="text-muted small">on deployed capital</span>
         </div></div></div>
-        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100"><div className="card-body">
+        <div className="col-xl-3 col-md-6"><div className="card stat-card h-100 mb-0"><div className="card-body">
           <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Win rate</span></div>
             <div className="stat-icon bg-warning-subtle text-warning"><i className="ri-trophy-line" /></div></div>
           <h4 className="stat-value mt-3 mb-0">{winRate.toFixed(0)}%</h4>
@@ -170,7 +175,7 @@ export default function PnL() {
       </div>
 
       {/* Highlights */}
-      <div className="row g-3 mb-1">
+      <div className="row g-3 mb-4">
         <div className="col-md-4"><div className="card mb-0"><div className="card-body d-flex align-items-center">
           <div className="stat-icon bg-success-subtle text-success me-3"><i className="ri-arrow-up-line" /></div>
           <div><div className="text-muted small">Best day</div><div className="fw-semibold">{best[0] ? `${money(best[1], 'INR')} · ${fmtDate(best[0])}` : '—'}</div></div>
@@ -186,15 +191,15 @@ export default function PnL() {
       </div>
 
       {/* Charts */}
-      <div className="row">
+      <div className="row g-3 mb-4">
         <div className="col-xl-5">
-          <div className="card h-100">
+          <div className="card h-100 mb-0">
             <div className="card-header"><h5 className="card-title mb-0">Net P&amp;L by business</h5></div>
             <div className="card-body"><ReactApexChart key={colors.primary + 'm'} options={moduleBar.options} series={moduleBar.series} type="bar" height={300} /></div>
           </div>
         </div>
         <div className="col-xl-7">
-          <div className="card h-100">
+          <div className="card h-100 mb-0">
             <div className="card-header"><h5 className="card-title mb-0">Cumulative P&amp;L</h5></div>
             <div className="card-body"><ReactApexChart key={colors.primary + 'c'} options={cumArea.options} series={cumArea.series} type="area" height={300} /></div>
           </div>

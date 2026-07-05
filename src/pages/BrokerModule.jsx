@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ReactApexChart from 'react-apexcharts'
 import { brokerStats, compoundedReturn, money, fmtDate, fmtMonth } from '@/data/AppData'
+import { useBrokerAccounts, useBrokerTrades, addTrade as apiAddTrade, editTrade as apiEditTrade, removeTrade as apiRemoveTrade } from '@/data/brokerRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useCapital } from '@/context/CapitalContext'
 import Modal from '@/components/ui/Modal'
@@ -72,9 +73,11 @@ function Tile({ label, value, sub, icon, tone }) {
 export function BrokerOverview({ module }) {
   const colors = useChartColors()
   const { getCapital } = useCapital()
-  const rows = module.accounts.map((a) => {
+  const accounts = useBrokerAccounts().filter((a) => a.module === module.id)
+  const trades = useBrokerTrades()
+  const rows = accounts.map((a) => {
     const capital = getCapital(a.slug)
-    return { ...a, capital, ...brokerStats(module.trades, a, capital) }
+    return { ...a, capital, ...brokerStats(trades, a, capital) }
   })
 
   const totalCapital = rows.reduce((s, a) => s + a.capital, 0)
@@ -238,7 +241,9 @@ export function BrokerAccount({ module }) {
   const { slug } = useParams()
   const colors = useChartColors()
   const { getCapital } = useCapital()
-  const account = useMemo(() => module.accounts.find((a) => a.slug === slug), [module, slug])
+  const allAccounts = useBrokerAccounts()
+  const allTrades = useBrokerTrades()
+  const account = useMemo(() => allAccounts.find((a) => a.slug === slug && a.module === module.id), [allAccounts, module, slug])
   const capital = getCapital(slug)
 
   const [trades, setTrades] = useState([])
@@ -248,9 +253,9 @@ export function BrokerAccount({ module }) {
   const [deleteRow, setDeleteRow] = useState(null)
 
   useEffect(() => {
-    setView('day'); setAdding(false); setEditRow(null); setDeleteRow(null)
-    setTrades(account ? module.trades.filter((t) => t.accountId === account.id) : [])
-  }, [module, slug]) // eslint-disable-line react-hooks/exhaustive-deps
+    setTrades(account ? allTrades.filter((t) => t.accountId === account.id) : [])
+  }, [allTrades, account])
+  useEffect(() => { setView('day'); setAdding(false); setEditRow(null); setDeleteRow(null) }, [slug])
 
   if (!account) {
     return (
@@ -265,9 +270,9 @@ export function BrokerAccount({ module }) {
   }
 
   const cur = account.currency
-  const addTrade = (t) => { setTrades((ts) => [...ts, { ...t, accountId: account.id }]); setAdding(false) }
-  const updateTrade = (t) => { setTrades((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...t } : x))); setEditRow(null) }
-  const confirmDelete = () => { setTrades((ts) => ts.filter((x) => x.id !== deleteRow.id)); setDeleteRow(null) }
+  const addTrade = (t) => { const row = { ...t, accountId: account.id }; setTrades((ts) => [...ts, row]); setAdding(false); apiAddTrade(row).catch(console.error) }
+  const updateTrade = (t) => { const row = { ...t, accountId: account.id }; setTrades((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...row } : x))); setEditRow(null); apiEditTrade(row).catch(console.error) }
+  const confirmDelete = () => { const id = deleteRow.id; setTrades((ts) => ts.filter((x) => x.id !== id)); setDeleteRow(null); apiRemoveTrade(id).catch(console.error) }
 
   const grossPnl = trades.reduce((s, t) => s + t.grossPnl, 0)
   const brokerage = trades.reduce((s, t) => s + t.brokerage, 0)

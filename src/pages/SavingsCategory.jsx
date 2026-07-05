@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { savings, savingsCategories, savingsStats, money, fmtDate } from '@/data/AppData'
+import { savingsStats, money, fmtDate } from '@/data/AppData'
+import { useSavings, useSavingsCategories, addSaving, editSaving, removeSaving } from '@/data/savingsRepo'
 import { useFx } from '@/context/FxContext'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
@@ -93,17 +94,20 @@ function SavingForm({ initial, defaultCurrency = 'INR', onSave, onCancel }) {
 export default function SavingsCategory() {
   const { category } = useParams()
   const { toINR } = useFx()
-  const cat = useMemo(() => savingsCategories.find((c) => c.slug === category), [category])
+  const { savings } = useSavings()
+  const savingsCategories = useSavingsCategories()
+  const cat = useMemo(() => savingsCategories.find((c) => c.slug === category), [savingsCategories, category])
 
   const [items, setItems] = useState([])
   const [adding, setAdding] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
 
+  // Sync local list from the (live) collection whenever it or the category changes.
   useEffect(() => {
-    setAdding(false); setEditRow(null); setDeleteRow(null)
     setItems(savings.filter((s) => s.category === category))
-  }, [category])
+  }, [savings, category])
+  useEffect(() => { setAdding(false); setEditRow(null); setDeleteRow(null) }, [category])
 
   if (!cat) {
     return (
@@ -121,9 +125,10 @@ export default function SavingsCategory() {
   const mixed = items.some((x) => x.currency === 'AED')
   const rows = [...items].sort((a, b) => toINR(b.currentValue, b.currency) - toINR(a.currentValue, a.currency))
 
-  const addItem = (x) => { setItems((xs) => [...xs, { ...x, category }]); setAdding(false) }
-  const updateItem = (x) => { setItems((xs) => xs.map((i) => (i.id === x.id ? { ...i, ...x } : i))); setEditRow(null) }
-  const confirmDelete = () => { setItems((xs) => xs.filter((i) => i.id !== deleteRow.id)); setDeleteRow(null) }
+  // Optimistic local update + persist to Supabase (no-op in static mode).
+  const addItem = (x) => { const row = { ...x, category }; setItems((xs) => [...xs, row]); setAdding(false); addSaving(row).catch(console.error) }
+  const updateItem = (x) => { setItems((xs) => xs.map((i) => (i.id === x.id ? { ...i, ...x } : i))); setEditRow(null); editSaving({ ...x, category }).catch(console.error) }
+  const confirmDelete = () => { const id = deleteRow.id; setItems((xs) => xs.filter((i) => i.id !== id)); setDeleteRow(null); removeSaving(id).catch(console.error) }
 
   return (
     <div className="savings">

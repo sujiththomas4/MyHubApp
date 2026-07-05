@@ -1,0 +1,49 @@
+import { useCollection, insertRow, deleteRow, uploadImage } from '@/lib/api'
+import { isSupabaseConfigured } from '@/lib/supabase'
+import { localInsert, localDelete } from '@/lib/localdb'
+
+/** Chart patterns (Supabase + Storage for images, or localStorage). */
+export const staticPatterns = [
+  {
+    id: 'p1', title: 'VWAP reclaim breakout', timeframe: '5m', image: null,
+    conditions: ['Price above VWAP', 'High volume breakout', '9 EMA support'],
+    notes: 'Price reclaims VWAP on a high-volume breakout candle; 9 EMA holds as support on the retest. Enter on the retest hold, SL below 9 EMA.',
+  },
+  {
+    id: 'p2', title: 'Inside-CPR low-volume fade', timeframe: '3m', image: null,
+    conditions: ['Camarilla within CPR resistance', 'Big candle, low volume', '20 EMA resistance'],
+    notes: 'Narrow CPR, price coiled inside. A big candle on low volume into 20 EMA fails — fade back toward the pivot.',
+  },
+]
+
+const rowToPattern = (r) => ({
+  id: r.id, title: r.title, timeframe: r.timeframe, image: r.image_url,
+  conditions: r.conditions || [], notes: r.notes || '',
+})
+
+const dataUrlToBlob = (dataUrl) => {
+  const [meta, b64] = dataUrl.split(',')
+  const mime = (meta.match(/:(.*?);/) || [])[1] || 'image/png'
+  const bin = atob(b64)
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
+export function usePatterns() {
+  const { data } = useCollection('chart_patterns', staticPatterns, { map: rowToPattern })
+  return data
+}
+
+export async function addPattern(p) {
+  if (!isSupabaseConfigured) return localInsert('chart_patterns', staticPatterns, p)
+  let image = p.image
+  if (image && image.startsWith('data:')) image = await uploadImage(dataUrlToBlob(image), 'patterns')
+  return insertRow('chart_patterns', {
+    id: p.id, title: p.title, timeframe: p.timeframe, image_url: image || null,
+    conditions: p.conditions, notes: p.notes,
+  })
+}
+
+export const removePattern = (id) =>
+  isSupabaseConfigured ? deleteRow('chart_patterns', id) : Promise.resolve(localDelete('chart_patterns', staticPatterns, id))

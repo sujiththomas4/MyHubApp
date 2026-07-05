@@ -2,13 +2,16 @@ import { useState } from 'react'
 import ReactApexChart from 'react-apexcharts'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  savings, savingsStats,
-  stockMarketAccounts, stockMarketHoldings, stockSum,
-  brokers, brokerModules, brokerStats,
-  plantationEntries,
-  loans, outstandingOf, balanceAfter, tenureMonths,
+  savingsStats, stockSum,
+  brokers, brokerStats,
+  balanceAfter, tenureMonths,
   money,
 } from '@/data/AppData'
+import { useSavings } from '@/data/savingsRepo'
+import { useStockAccounts, useStockHoldings } from '@/data/stockRepo'
+import { useBrokerAccounts, useBrokerTrades } from '@/data/brokerRepo'
+import { usePlantationEntries } from '@/data/plantationRepo'
+import { useLoans, useInstallments } from '@/data/loansRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useFx } from '@/context/FxContext'
 import { useCapital } from '@/context/CapitalContext'
@@ -58,6 +61,14 @@ function DashboardInner() {
   const { toINR } = useFx()
   const { getCapital } = useCapital()
   const [chartType, setChartType] = useState('area') // 'area' | 'bar'
+  const { savings } = useSavings()
+  const stockMarketAccounts = useStockAccounts()
+  const stockMarketHoldings = useStockHoldings()
+  const brokerAccounts = useBrokerAccounts()
+  const brokerTrades = useBrokerTrades()
+  const plantationEntries = usePlantationEntries()
+  const loans = useLoans()
+  const installments = useInstallments()
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening'
@@ -74,8 +85,7 @@ function DashboardInner() {
   }, { value: 0, pnl: 0 })
 
   // Business income (broker net P&L + plantation profit) + business value
-  let brokerNet = 0
-  brokerModules.forEach((m) => m.accounts.forEach((a) => { brokerNet += brokerStats(m.trades, a, 0).netPnl }))
+  const brokerNet = brokerAccounts.reduce((s, a) => s + brokerStats(brokerTrades, a, 0).netPnl, 0)
   const brokerCapital = brokers.reduce((s, b) => s + getCapital(b.slug), 0)
   const plIncome = plantationEntries.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0)
   const plExpense = plantationEntries.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
@@ -83,8 +93,11 @@ function DashboardInner() {
   const businessIncome = brokerNet + plantationNet
   const businessValue = brokerCapital + brokerNet
 
-  // Loans outstanding (INR)
-  const loansOutstanding = loans.reduce((s, l) => s + toINR(outstandingOf(l), l.currency), 0)
+  // Loans outstanding (INR) — from live installment paid counts.
+  const loansOutstanding = loans.reduce((s, l) => {
+    const paid = installments.filter((i) => i.loanId === l.id && i.status === 'paid').length
+    return s + toINR(balanceAfter(l, paid), l.currency)
+  }, 0)
 
   // Net worth
   const assets = sav.value + stock.value + businessValue
@@ -109,10 +122,10 @@ function DashboardInner() {
   // holdings base so the "income growth" line reflects total wealth: savings +
   // stock market + business capital + accumulating business income.
   const incMap = new Map()
-  brokerModules.forEach((m) => m.trades.forEach((t) => {
+  brokerTrades.forEach((t) => {
     const k = t.date.slice(0, 7)
     incMap.set(k, (incMap.get(k) || 0) + (t.grossPnl - t.brokerage - t.govtCharges))
-  }))
+  })
   plantationEntries.forEach((e) => {
     const k = e.date.slice(0, 7)
     incMap.set(k, (incMap.get(k) || 0) + (e.type === 'income' ? e.amount : -e.amount))

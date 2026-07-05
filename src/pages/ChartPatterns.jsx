@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { usePatterns, addPattern as apiAddPattern, removePattern as apiRemovePattern } from '@/data/chartPatternsRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import ImageDropZone from '@/components/ui/ImageDropZone'
@@ -54,19 +55,6 @@ const INDICATORS = [
 const rid = () => Math.random().toString(36).slice(2, 8)
 
 // --- Mock seed ---------------------------------------------------------------
-const seed = [
-  {
-    id: 'p1', title: 'VWAP reclaim breakout', timeframe: '5m', image: null,
-    conditions: ['Price above VWAP', 'High volume breakout', '9 EMA support'],
-    notes: 'Price reclaims VWAP on a high-volume breakout candle; 9 EMA holds as support on the retest. Enter on the retest hold, SL below 9 EMA.',
-  },
-  {
-    id: 'p2', title: 'Inside-CPR low-volume fade', timeframe: '3m', image: null,
-    conditions: ['Camarilla within CPR resistance', 'Big candle, low volume', '20 EMA resistance'],
-    notes: 'Narrow CPR, price coiled inside. A big candle on low volume into 20 EMA fails — fade back toward the pivot.',
-  },
-]
-
 // --- Add / edit form ---------------------------------------------------------
 function PatternForm({ initial, onSave, onCancel }) {
   const [title, setTitle] = useState(initial?.title || '')
@@ -173,7 +161,8 @@ function PatternCard({ pattern, onOpen, onDelete }) {
 
 // --- Page --------------------------------------------------------------------
 export default function ChartPatterns() {
-  const [patterns, setPatterns] = useState(seed)
+  const livePatterns = usePatterns()
+  const [patterns, setPatterns] = useState([])
   const [filter, setFilter] = useState('all') // 'all' | '3m' | '5m'
   const [search, setSearch] = useState('')
   const [condFilter, setCondFilter] = useState([]) // conditions that must all be present
@@ -194,12 +183,16 @@ export default function ChartPatterns() {
     })
   }, [patterns, filter, search, condFilter])
 
+  useEffect(() => { setPatterns(livePatterns) }, [livePatterns])
+
   const filtersActive = search.trim() || condFilter.length > 0 || filter !== 'all'
   const clearFilters = () => { setSearch(''); setCondFilter([]); setFilter('all') }
 
-  const addPattern = (p) => { setPatterns((ps) => [p, ...ps]); setAdding(false) }
+  const addPattern = (p) => { setPatterns((ps) => [p, ...ps]); setAdding(false); apiAddPattern(p).catch(console.error) }
   const confirmDelete = () => {
-    setPatterns((ps) => ps.filter((p) => p.id !== deleteTarget?.id))
+    const id = deleteTarget?.id
+    setPatterns((ps) => ps.filter((p) => p.id !== id))
+    apiRemovePattern(id).catch(console.error)
     setDeleteTarget(null)
   }
 

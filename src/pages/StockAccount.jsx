@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { stockMarketAccounts, stockMarketHoldings, stockSum, money } from '@/data/AppData'
+import { stockSum, money } from '@/data/AppData'
+import { useStockAccounts, useStockHoldings, addHolding, editHolding, removeHolding } from '@/data/stockRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
@@ -72,7 +73,9 @@ function HoldingForm({ initial, currency, onSave, onCancel }) {
 
 export default function StockAccount() {
   const { slug } = useParams()
-  const account = useMemo(() => stockMarketAccounts.find((a) => a.slug === slug), [slug])
+  const accounts = useStockAccounts()
+  const holdings = useStockHoldings()
+  const account = useMemo(() => accounts.find((a) => a.slug === slug), [accounts, slug])
 
   const [items, setItems] = useState([])
   const [adding, setAdding] = useState(false)
@@ -80,9 +83,9 @@ export default function StockAccount() {
   const [deleteRow, setDeleteRow] = useState(null)
 
   useEffect(() => {
-    setAdding(false); setEditRow(null); setDeleteRow(null)
-    setItems(account ? stockMarketHoldings.filter((h) => h.accountId === account.id) : [])
-  }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
+    setItems(account ? holdings.filter((h) => h.accountId === account.id) : [])
+  }, [holdings, account])
+  useEffect(() => { setAdding(false); setEditRow(null); setDeleteRow(null) }, [slug])
 
   if (!account) {
     return (
@@ -100,9 +103,9 @@ export default function StockAccount() {
   const s = stockSum(items)
   const rows = [...items].sort((a, b) => (b.currentValue - b.invested) - (a.currentValue - a.invested))
 
-  const addItem = (x) => { setItems((xs) => [...xs, { ...x, accountId: account.id }]); setAdding(false) }
-  const updateItem = (x) => { setItems((xs) => xs.map((i) => (i.id === x.id ? { ...i, ...x } : i))); setEditRow(null) }
-  const confirmDelete = () => { setItems((xs) => xs.filter((i) => i.id !== deleteRow.id)); setDeleteRow(null) }
+  const addItem = (x) => { const row = { ...x, accountId: account.id }; setItems((xs) => [...xs, row]); setAdding(false); addHolding(row).catch(console.error) }
+  const updateItem = (x) => { const row = { ...x, accountId: account.id }; setItems((xs) => xs.map((i) => (i.id === x.id ? { ...i, ...row } : i))); setEditRow(null); editHolding(row).catch(console.error) }
+  const confirmDelete = () => { const id = deleteRow.id; setItems((xs) => xs.filter((i) => i.id !== id)); setDeleteRow(null); removeHolding(id).catch(console.error) }
 
   return (
     <div className="stock-market">

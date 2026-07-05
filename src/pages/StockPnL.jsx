@@ -1,6 +1,7 @@
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
-import { stockMarketAccounts, stockMarketHoldings, stockSum, money } from '@/data/AppData'
+import { stockSum, money } from '@/data/AppData'
+import { useStockAccounts, useStockHoldings } from '@/data/stockRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useFx } from '@/context/FxContext'
 
@@ -16,6 +17,8 @@ const pnlClass = (n) => (n > 0 ? 'text-success' : n < 0 ? 'text-danger' : 'text-
 export default function StockPnL({ region }) {
   const colors = useChartColors()
   const { toINR, aedToInr } = useFx()
+  const stockMarketAccounts = useStockAccounts()
+  const stockMarketHoldings = useStockHoldings()
 
   const accts = stockMarketAccounts.filter((a) => !region || a.region === region)
   const rows = accts.map((a) => {

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '@/context/ThemeContext'
+import { useAuth } from '@/context/AuthContext'
 
 function useClickOutside(ref, handler) {
   useEffect(() => {
@@ -13,6 +14,7 @@ function useClickOutside(ref, handler) {
 
 export default function Topbar({ onHamburger, onOpenCustomizer }) {
   const { settings, setSetting } = useTheme()
+  const { signOut } = useAuth()
   const [openMenu, setOpenMenu] = useState(null) // 'notif' | 'user' | null
   const notifRef = useRef(null)
   const userRef = useRef(null)
@@ -119,7 +121,7 @@ export default function Topbar({ onHamburger, onOpenCustomizer }) {
               <div className="hub-dropdown-item"><i className="ri-wallet-line" /> Balance: <b className="ms-1">$5,971.67</b></div>
               <div className="hub-dropdown-item" onClick={onOpenCustomizer}><i className="ri-settings-3-line" /> Settings</div>
               <div className="hub-dropdown-item"><i className="ri-lock-line" /> Lock screen</div>
-              <div className="hub-dropdown-item text-danger"><i className="ri-logout-box-r-line" /> Logout</div>
+              <div className="hub-dropdown-item text-danger" onClick={signOut}><i className="ri-logout-box-r-line" /> Logout</div>
             </div>
           )}
         </div>

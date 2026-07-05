@@ -1,6 +1,7 @@
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
-import { savings, savingsCategories, savingsStats, money } from '@/data/AppData'
+import { savingsStats, money } from '@/data/AppData'
+import { useSavings, useSavingsCategories } from '@/data/savingsRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useFx } from '@/context/FxContext'
 
@@ -16,6 +17,8 @@ const pnlClass = (n) => (n > 0 ? 'text-success' : n < 0 ? 'text-danger' : 'text-
 export default function Savings() {
   const colors = useChartColors()
   const { toINR, aedToInr } = useFx()
+  const { savings } = useSavings()
+  const savingsCategories = useSavingsCategories()
   const all = savingsStats(savings, toINR)
 
   const rows = savingsCategories.map((c) => {

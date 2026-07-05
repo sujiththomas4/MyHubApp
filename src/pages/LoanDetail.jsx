@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ReactApexChart from 'react-apexcharts'
-import { loans, installments, prepayments, money, fmtDate, fmtMonth, slugOf, loanStats, balanceAfter, rateOf, remainingMonths, forwardBalances } from '@/data/AppData'
+import { money, fmtDate, fmtMonth, slugOf, loanStats, balanceAfter, rateOf, remainingMonths, forwardBalances } from '@/data/AppData'
+import { useLoans, useInstallments, usePrepayments, addPrepayment, removePrepayment, setInstallmentStatus } from '@/data/loansRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 
 const PAGE_SIZE = 12
@@ -73,26 +74,24 @@ function AddPrepayment({ currency, onAdd }) {
 export default function LoanDetail() {
   const { slug } = useParams()
   const colors = useChartColors()
+  const loansData = useLoans()
+  const installments = useInstallments()
+  const livePrepays = usePrepayments()
 
   const loan = useMemo(() => {
-    const found = loans.find((l) => slugOf(l) === slug)
+    const found = loansData.find((l) => slugOf(l) === slug)
     return found ? { ...found, ...loanStats(found) } : null
-  }, [slug])
+  }, [loansData, slug])
 
-  // Session state: months marked paid (future) + lump-sum prepayments.
   const [markedPaid, setMarkedPaid] = useState(() => new Set())
   const [prepays, setPrepays] = useState([])
   const [page, setPage] = useState(1)
   const [chartType, setChartType] = useState('area') // 'area' | 'bar'
 
-  // Reset when switching between loan detail pages (same component instance).
   useEffect(() => {
-    setPage(1)
-    setMarkedPaid(new Set())
-    setPrepays(
-      prepayments.filter((p) => loan && p.loanId === loan.id).sort((a, b) => b.date.localeCompare(a.date))
-    )
-  }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
+    setPrepays(livePrepays.filter((p) => loan && p.loanId === loan.id).sort((a, b) => b.date.localeCompare(a.date)))
+  }, [livePrepays, loan])
+  useEffect(() => { setPage(1); setMarkedPaid(new Set()) }, [slug])
 
   if (!loan) {
     return (
@@ -132,13 +131,20 @@ export default function LoanDetail() {
   const cleared = loan.amount - outstanding
   const pctPaid = Math.round((cleared / loan.amount) * 100)
 
-  const togglePaid = (id) => setMarkedPaid((s) => {
-    const n = new Set(s)
-    n.has(id) ? n.delete(id) : n.add(id)
-    return n
-  })
-  const addPrepay = (p) => setPrepays((ps) => [...ps, { ...p, loanId: loan.id }].sort((a, b) => b.date.localeCompare(a.date)))
-  const removePrepay = (id) => setPrepays((ps) => ps.filter((p) => p.id !== id))
+  const togglePaid = (id) => {
+    const willPay = !markedPaid.has(id)
+    setMarkedPaid((s) => { const n = new Set(s); willPay ? n.add(id) : n.delete(id); return n })
+    setInstallmentStatus(id, willPay ? 'paid' : 'not paid').catch(console.error)
+  }
+  const addPrepay = (p) => {
+    const row = { ...p, loanId: loan.id }
+    setPrepays((ps) => [...ps, row].sort((a, b) => b.date.localeCompare(a.date)))
+    addPrepayment(row).catch(console.error)
+  }
+  const removePrepay = (id) => {
+    setPrepays((ps) => ps.filter((p) => p.id !== id))
+    removePrepayment(id).catch(console.error)
+  }
 
   // Pagination
   const pageCount = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE))
