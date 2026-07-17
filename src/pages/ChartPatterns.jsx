@@ -59,7 +59,7 @@ const rid = () => Math.random().toString(36).slice(2, 8)
 // --- Add / edit form ---------------------------------------------------------
 function PatternForm({ initial, onSave, onCancel }) {
   const [title, setTitle] = useState(initial?.title || '')
-  const [timeframe, setTimeframe] = useState(initial?.timeframe || '3m')
+  const [timeframe, setTimeframe] = useState(initial?.timeframe || '5m')
   const [image, setImage] = useState(initial?.image || null)
   const [conditions, setConditions] = useState(initial?.conditions || [])
   const [notes, setNotes] = useState(initial?.notes || '')
