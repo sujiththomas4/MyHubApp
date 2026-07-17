@@ -21,10 +21,10 @@ export const staticNotes = [
 
 const rowToDay = (r) => ({ date: r.date, note: r.note || '', premarket: r.premarket || {} })
 const rowToTrade = (r) => ({ id: r.id, day: r.day, time: r.time, instrument: r.instrument, side: r.side, qty: r.qty, entry: r.entry, exit: r.exit, pnl: r.pnl, answers: r.answers || {} })
-const rowToNote = (r) => ({ id: r.id, day: r.day, time: r.time, text: r.text, image: r.image || null, answers: r.answers || {} })
+const rowToNote = (r) => ({ id: r.id, day: r.day, time: r.time, text: r.text, image: r.image || null, screenshots: r.screenshots || {}, answers: r.answers || {} })
 
 const tradeToRow = (t) => ({ id: t.id, day: t.day, time: t.time, instrument: t.instrument, side: t.side, qty: t.qty, entry: t.entry, exit: t.exit, pnl: t.pnl, answers: t.answers || {} })
-const noteToRow = (n) => ({ id: n.id, day: n.day, time: n.time, text: n.text, image: n.image || null, answers: n.answers || {} })
+const noteToRow = (n) => ({ id: n.id, day: n.day, time: n.time, text: n.text, image: n.image || null, screenshots: n.screenshots || {}, answers: n.answers || {} })
 
 // If the note carries a freshly-attached data-URL image, upload it to Storage
 // and swap in the hosted URL (Supabase mode only).
@@ -36,12 +36,23 @@ const dataUrlToBlob = (dataUrl) => {
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
   return new Blob([arr], { type: mime })
 }
-async function withUploadedImage(n) {
-  if (n.image && n.image.startsWith('data:')) {
-    const url = await uploadImage(dataUrlToBlob(n.image), 'journal')
-    return { ...n, image: url }
+const hostImage = async (v) =>
+  typeof v === 'string' && v.startsWith('data:')
+    ? await uploadImage(dataUrlToBlob(v), 'journal')
+    : v
+
+/* Swap every freshly-attached data-URL (the legacy single `image` plus each
+   named screenshot) for a hosted Storage URL. Without this the base64 payloads
+   would be written straight into the row. */
+async function withUploadedImages(n) {
+  const out = { ...n, image: await hostImage(n.image) }
+  if (n.screenshots && Object.keys(n.screenshots).length) {
+    const entries = await Promise.all(
+      Object.entries(n.screenshots).map(async ([k, v]) => [k, await hostImage(v)])
+    )
+    out.screenshots = Object.fromEntries(entries)
   }
-  return n
+  return out
 }
 
 export function useJournalDays() {
@@ -73,8 +84,8 @@ export const removeTrade = (id) =>
   isSupabaseConfigured ? deleteRow('journal_trades', id) : Promise.resolve(localDelete('journal_trades', staticTrades, id))
 
 export const addNote = async (n) =>
-  isSupabaseConfigured ? insertRow('journal_notes', noteToRow(await withUploadedImage(n))) : Promise.resolve(localInsert('journal_notes', staticNotes, n))
+  isSupabaseConfigured ? insertRow('journal_notes', noteToRow(await withUploadedImages(n))) : Promise.resolve(localInsert('journal_notes', staticNotes, n))
 export const editNote = async (n) =>
-  isSupabaseConfigured ? updateRow('journal_notes', n.id, noteToRow(await withUploadedImage(n))) : Promise.resolve(localUpdate('journal_notes', staticNotes, n.id, n))
+  isSupabaseConfigured ? updateRow('journal_notes', n.id, noteToRow(await withUploadedImages(n))) : Promise.resolve(localUpdate('journal_notes', staticNotes, n.id, n))
 export const removeNote = (id) =>
   isSupabaseConfigured ? deleteRow('journal_notes', id) : Promise.resolve(localDelete('journal_notes', staticNotes, id))

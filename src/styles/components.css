@@ -50,8 +50,83 @@
 }
 .imgdrop-empty i { font-size: 1.75rem; }
 .imgdrop-empty:hover { border-color: var(--bs-primary); color: var(--bs-primary); }
-.imgdrop-filled img { max-width: 100%; border-radius: 0.5rem; border: 1px solid var(--hub-border); display: block; }
-.imgdrop-remove { position: absolute; top: 0.5rem; right: 0.5rem; }
+.imgdrop-filled img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--hub-border);
+  display: block;
+  cursor: zoom-in;
+}
+
+/* Armed = this zone has focus, so a Ctrl/Cmd+V lands HERE and not in the other
+   zones on the form. Has to be obvious, otherwise you can't tell where a paste
+   is about to go. */
+.imgdrop:focus,
+.imgdrop:focus-within { outline: none; }
+.imgdrop.armed {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 0.2rem rgba(64, 81, 137, 0.25);
+  border-radius: 0.5rem;
+}
+.imgdrop-empty.armed { color: var(--bs-primary); border-style: solid; }
+
+/* Secondary to pasting — keep it a quiet link, not a button competing with the
+   paste hint. */
+.imgdrop-browse {
+  margin-top: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.6875rem;
+  text-decoration: underline;
+  opacity: 0.8;
+  cursor: pointer;
+}
+.imgdrop-browse:hover { color: var(--bs-primary); opacity: 1; }
+.imgdrop-browse i { font-size: 0.75rem; }
+
+.imgdrop-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.imgdrop-filled:hover .imgdrop-actions,
+.imgdrop-filled.armed .imgdrop-actions { opacity: 1; }
+
+/* Full-screen image viewer (ImageLightbox) */
+.img-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  background: rgba(0, 0, 0, 0.85);
+  cursor: zoom-out;
+}
+.img-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  cursor: default;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+}
+.img-lightbox-close { position: fixed; top: 1rem; right: 1.25rem; }
+.img-lightbox-caption {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.875rem;
+}
 
 /* Multi-select dropdown (filters) */
 .ms-wrap { position: relative; }
@@ -562,3 +637,206 @@
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.18); border-radius: 4px; }
 [data-bs-theme='dark'] ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); }
+
+/* ==========================================================================
+   Floating trade coach (Journal)
+   Sits bottom-right; the theme customizer gear is mid-right so they don't
+   collide. Rules/messages live in components/trading/coachRules.js.
+   ========================================================================== */
+.trade-coach {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1035;
+  width: 440px;
+  max-width: calc(100vw - 2.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.trade-coach .coach-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0.6rem;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+.trade-coach .coach-icon { font-size: 1.9rem; flex-shrink: 0; }
+.trade-coach .coach-text { line-height: 1.35; min-width: 0; }
+.trade-coach .coach-text strong {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+/* The detail line is the "why" — it was too small and too faint to read. */
+.trade-coach .coach-text small { font-size: 0.8125rem; opacity: 0.9; }
+
+/* Draw the eye to a stop-signal without being obnoxious. Keyed off .coach-stop,
+   not .bg-danger — the "Look for Sell" banner is red but must not pulse. */
+.trade-coach .coach-banner.coach-stop { animation: coach-pulse 1.6s ease-in-out infinite; }
+@keyframes coach-pulse {
+  0%, 100% { box-shadow: 0 6px 20px rgba(240, 101, 72, 0.35); }
+  50% { box-shadow: 0 6px 26px rgba(240, 101, 72, 0.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trade-coach .coach-banner.coach-stop { animation: none; }
+}
+
+.trade-coach .coach-more { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.trade-coach .coach-more .badge { font-size: 0.75rem; padding: 0.45em 0.65em; }
+.trade-coach .coach-panel {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.trade-coach .coach-panel .card-header h6 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* Each read is its own block, split by a rule so the labels read as headings
+   rather than blurring into the buttons above them. */
+.trade-coach .coach-signal { padding: 0.7rem 0; }
+.trade-coach .coach-signal + .coach-signal { border-top: 1px solid var(--hub-border); }
+.trade-coach .coach-signal:first-child { padding-top: 0.2rem; }
+
+/* Was `small text-muted` — too faint and too small to scan. */
+.trade-coach .coach-signal-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--bs-body-color);
+}
+.trade-coach .coach-signal .btn {
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.65rem;
+}
+.trade-coach .coach-signal-hint {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--bs-secondary-color);
+}
+
+/* ==========================================================================
+   Entry-level reminder popup (Journal)
+   Bottom-LEFT so it never collides with the trade coach (bottom-right) or the
+   customizer gear (mid-right). Config: components/trading/entryLevels.js
+   ========================================================================== */
+.entry-levels-popup {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1035;
+  width: 480px;
+  max-width: calc(100vw - 2.5rem);
+  /* Deliberately indigo/violet, not red/amber/green — those three already mean
+     stop / cut size / go on the trade coach, and reusing them here would read
+     as a signal instead of a reminder. */
+  background: linear-gradient(135deg, #6559cc 0%, #405189 100%);
+  color: #fff;
+  border: 0;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 34px rgba(101, 89, 204, 0.5);
+  animation: entry-levels-in 0.18s ease-out;
+}
+.entry-levels-popup .card-header,
+.entry-levels-popup .card-footer {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.entry-levels-popup .card-header h6 { color: #fff; }
+.entry-levels-popup .card-header h6 i { color: #fff !important; }
+.entry-levels-snooze-label { font-size: 0.8125rem; color: rgba(255, 255, 255, 0.75); }
+@keyframes entry-levels-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entry-levels-popup { animation: none; }
+}
+
+/* The instruction IS the heading — it wraps to two lines at this width. */
+.entry-levels-popup .card-header h6 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.entry-levels-list { list-style: none; margin: 0; padding: 0; }
+.entry-levels-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0;
+  font-size: 1rem;
+}
+.entry-levels-list li + li { border-top: 1px solid rgba(255, 255, 255, 0.18); }
+.entry-levels-label { flex: 1; min-width: 0; }
+.entry-levels-list .badge { flex-shrink: 0; font-size: 0.75rem; padding: 0.4em 0.6em; }
+
+/* Left behind while snoozed so the reminder is never lost for good. */
+.entry-levels-handle {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1035;
+  border: 1px solid var(--hub-border);
+  background: var(--hub-card-bg);
+  color: var(--bs-secondary-color);
+  border-radius: 2rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+.entry-levels-handle:hover { color: var(--bs-body-color); }
+
+/* Saved screenshots in an observation row — click to open the lightbox. */
+.img-zoomable { cursor: zoom-in; transition: opacity 0.15s ease; }
+.img-zoomable:hover { opacity: 0.85; }
+
+/* Empty screenshot slot in an observation's view mode. */
+.obs-shot-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+  padding: 0.5rem;
+  border: 1px dashed var(--hub-border);
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--bs-secondary-color);
+}
+
+/* Current market observation — Global market (DOW), OI, India VIX.
+   These three reads are the substance of an observation, so they get a readable
+   size instead of the default `small` label + `btn-sm` option text. Shared by
+   the edit form and the view mode so both read the same. */
+.obs-fields .obs-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--bs-body-color);
+}
+.obs-fields .btn { font-size: 0.875rem; padding: 0.4rem 0.7rem; }
+.obs-fields .badge { font-size: 0.875rem; padding: 0.45em 0.7em; }
+.obs-fields .fst-italic { font-size: 0.875rem; }
+
+/* Collapsed observation row — time, badge, excerpt and the action icons. This
+   is the row you scan to find an observation, so it shouldn't be the smallest
+   text on the page. */
+.obs-row-head { font-size: 0.9375rem; }
+.obs-row-head .badge { font-size: 0.8125rem; padding: 0.4em 0.65em; }
+.obs-row-head .obs-row-caret { font-size: 1.3rem; }
+.obs-row-head .btn i { font-size: 1.15rem; }
+.obs-row-head > .text-muted i { font-size: 1.1rem; }

@@ -150,7 +150,7 @@ export default function Sidebar() {
             <span className="logo-mark"><i className="ri-flashlight-fill" /></span>
             <span className="logo-text">Hub</span>
           </div>
-          <SimpleBar className="sidebar-menu" style={{ maxHeight: 'calc(100vh - 70px)' }}>
+          <SimpleBar className="sidebar-menu" style={{ height: '100%' }}>
             <VerticalMenu />
           </SimpleBar>
         </>

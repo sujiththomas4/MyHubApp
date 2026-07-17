@@ -32,7 +32,7 @@ export const DEFAULT_THEME = {
   colorScheme: 'light',
   topbar: 'light',
   sidebar: 'dark',
-  sidebarSize: 'sm-hover',
+  sidebarSize: 'lg',
   sidebarVisibility: 'show',
   layoutWidth: 'fluid',
   layoutPosition: 'fixed',
@@ -49,8 +49,6 @@ export const THEME_OPTIONS = {
     options: [
       { value: 'vertical', label: 'Vertical' },
       { value: 'horizontal', label: 'Horizontal' },
-      { value: 'twocolumn', label: 'Two Column' },
-      { value: 'semibox', label: 'Semi Box' },
     ],
   },
   colorScheme: {
@@ -97,42 +95,21 @@ export const THEME_OPTIONS = {
     title: 'Sidebar Size',
     hint: 'Choose a size of Sidebar.',
     type: 'card',
-    // Only meaningful for vertical/semibox layouts.
-    dependsOnLayout: ['vertical', 'semibox'],
+    // Only meaningful for the vertical layout.
+    dependsOnLayout: ['vertical'],
     options: [
       { value: 'lg', label: 'Default' },
-      { value: 'md', label: 'Compact' },
-      { value: 'sm', label: 'Small (Icon)' },
-      { value: 'sm-hover', label: 'Small Hover' },
     ],
   },
   sidebar: {
     title: 'Sidebar Color',
     hint: 'Choose a color of Sidebar.',
     type: 'card',
-    dependsOnLayout: ['vertical', 'semibox', 'twocolumn'],
+    dependsOnLayout: ['vertical'],
     options: [
       { value: 'light', label: 'Light' },
       { value: 'dark', label: 'Dark' },
       { value: 'gradient', label: 'Gradient' },
-    ],
-  },
-  layoutWidth: {
-    title: 'Layout Width',
-    hint: 'Choose Fluid or Boxed layout.',
-    type: 'card',
-    options: [
-      { value: 'fluid', label: 'Fluid' },
-      { value: 'boxed', label: 'Boxed' },
-    ],
-  },
-  layoutPosition: {
-    title: 'Layout Position',
-    hint: 'Choose Fixed or Scrollable position.',
-    type: 'card',
-    options: [
-      { value: 'fixed', label: 'Fixed' },
-      { value: 'scrollable', label: 'Scrollable' },
     ],
   },
 }

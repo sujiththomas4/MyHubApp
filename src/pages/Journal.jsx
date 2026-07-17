@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Assessment from '@/components/trading/Assessment'
-import { evaluate } from '@/components/trading/assessmentRules'
+import TradeCoach from '@/components/trading/TradeCoach'
+import EntryLevelsPopup from '@/components/trading/EntryLevelsPopup'
+import { evaluate, assessment, sentiment } from '@/components/trading/assessmentRules'
 import {
   useJournalDays, useJournalTrades, useJournalNotes,
   addDay as apiAddDay, setDayPremarket as apiSetPremarket,
@@ -11,6 +13,7 @@ import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import RichTextEditor from '@/components/ui/RichTextEditor'
 import ImageDropZone from '@/components/ui/ImageDropZone'
+import ImageLightbox from '@/components/ui/ImageLightbox'
 
 /**
  * Journal.jsx  (DRAFT)
@@ -255,48 +258,157 @@ function TradeRow({ trade, onEdit, onDelete }) {
 }
 
 // --- Single note (collapsible) ----------------------------------------------
+// --- Observation model -------------------------------------------------------
+/* Row 1 — the reads captured with every observation. Options come from the
+   shared pre-trade checklist definitions so the wording never drifts. */
+const OBSERVATION_FIELDS = [
+  { id: 'global', label: 'Global market (DOW)' },
+  { id: 'oi', label: 'OI' },
+  { id: 'vix', label: 'India VIX' },
+]
+
+// Row 2 — the raw chart captures. Row 3 adds its own marked-up `plan` shot.
+const OBSERVATION_SHOTS = [
+  { id: 'nifty50', label: 'Nifty 50' },
+  { id: 'niftyFuture', label: 'Nifty Future' },
+  { id: 'oiChange', label: 'OI change' },
+  { id: 'vix', label: 'VIX' },
+]
+
+const SHOT_LABEL = {
+  ...Object.fromEntries(OBSERVATION_SHOTS.map((s) => [s.id, s.label])),
+  plan: 'Nifty 50 (plan)',
+}
+
+/* One screenshot slot in view mode — the image, or an explicit "none" so the
+   slot is still accounted for rather than silently absent. */
+function ObsShot({ src, alt, onZoom }) {
+  if (!src) return <div className="obs-shot-empty">No screenshot</div>
+  return (
+    <img src={src} alt={alt} className="rounded border w-100 img-zoomable" role="button" onClick={onZoom} />
+  )
+}
+
+// --- Single observation (collapsible) ---------------------------------------
 function NoteRow({ note, onEdit, onDelete }) {
   const [open, setOpen] = useState(false)
-  const hasAssessment = ['global', 'oi', 'bias15', 'bias1h', 'sr'].some((k) => note.answers?.[k])
+  const [zoom, setZoom] = useState(null) // { src, alt } of the image being viewed
+  const hasAssessment = OBSERVATION_FIELDS.some((f) => note.answers?.[f.id])
+  const shots = Object.entries(note.screenshots || {}).filter(([, v]) => v)
   const excerpt = htmlExcerpt(note.text)
   return (
     <div className="card border border-info-subtle mb-2">
       <div
-        className="card-body py-2 d-flex align-items-center flex-wrap gap-3"
+        className="card-body py-2 d-flex align-items-center flex-wrap gap-3 obs-row-head"
         role="button"
         onClick={() => setOpen((o) => !o)}
       >
-        <i className={'text-muted ' + (open ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line')} />
+        <i className={'text-muted obs-row-caret ' + (open ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line')} />
         <TimeBadge time={note.time} />
-        <span className="badge bg-info-subtle text-info"><i className="ri-sticky-note-line me-1" />Note</span>
+        <span className="badge bg-info-subtle text-info"><i className="ri-eye-line me-1" />Observation</span>
         <div className="flex-grow-1 text-truncate" style={{ maxWidth: 460 }}>
           {excerpt || <span className="text-muted fst-italic">No text</span>}
         </div>
-        {(note.image || htmlHasImage(note.text)) && <i className="ri-image-line text-muted" title="Has image" />}
-        {hasAssessment && <i className="ri-radar-line text-muted" title="Has setup assessment" />}
+        {(note.image || shots.length > 0 || htmlHasImage(note.text)) && (
+          <span className="text-muted" title={`${shots.length || 1} screenshot(s)`}>
+            <i className="ri-image-line" />{shots.length > 1 && <small className="ms-1">{shots.length}</small>}
+          </span>
+        )}
+        {hasAssessment && <i className="ri-radar-line text-muted" title="Has market observation" />}
         <div className="d-flex gap-1" onClick={(e) => e.stopPropagation()}>
-          <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit note" onClick={onEdit}>
+          <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit observation" onClick={onEdit}>
             <i className="ri-pencil-line" />
           </button>
-          <button className="btn btn-sm btn-ghost-danger p-1" title="Delete note" onClick={onDelete}>
+          <button className="btn btn-sm btn-ghost-danger p-1" title="Delete observation" onClick={onDelete}>
             <i className="ri-delete-bin-line" />
           </button>
         </div>
       </div>
       {open && (
+        /* Mirrors the form's three rows so view and edit read the same. Every
+           field is shown even when empty — a missing read is itself worth
+           seeing, and a blank gap makes you wonder if it failed to save. */
         <div className="card-body border-top bg-light-subtle">
-          {note.text && (
-            <div className="rte-content mb-3" dangerouslySetInnerHTML={{ __html: note.text }} />
-          )}
+          <h6 className="text-uppercase text-muted fs-11 mb-2">Current market observation</h6>
+          <div className="row g-3 mb-4 obs-fields">
+            <div className="col-6 col-md-auto">
+              <div className="obs-label">Time</div>
+              <TimeBadge time={note.time} />
+            </div>
+            {OBSERVATION_FIELDS.map((f) => {
+              const val = note.answers?.[f.id]
+              const s = val ? sentiment(val) : null
+              return (
+                <div className="col-12 col-md" key={f.id}>
+                  <div className="obs-label">{f.label}</div>
+                  {val ? (
+                    <span className="badge bg-light text-body border pill-light">
+                      {s && <i className={s.icon + ' sentiment-arrow me-1'} style={{ color: s.color }} />}
+                      {val}
+                    </span>
+                  ) : (
+                    <span className="text-muted fst-italic">Not set</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <h6 className="text-uppercase text-muted fs-11 mb-2">Screenshots</h6>
+          <div className="row g-3 mb-4">
+            {OBSERVATION_SHOTS.map((s) => (
+              <div className="col-6 col-lg-3" key={s.id}>
+                <div className="small text-muted mb-1">{s.label}</div>
+                <ObsShot
+                  src={note.screenshots?.[s.id]}
+                  alt={s.label}
+                  onZoom={() => setZoom({ src: note.screenshots[s.id], alt: s.label })}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="row g-3">
+            <div className="col-lg-8">
+              <div className="small text-muted mb-1">My observation or plans</div>
+              {note.text ? (
+                <div className="rte-content" dangerouslySetInnerHTML={{ __html: note.text }} />
+              ) : (
+                <span className="text-muted fst-italic small">Nothing written</span>
+              )}
+            </div>
+            <div className="col-lg-4">
+              <div className="small text-muted mb-1">{SHOT_LABEL.plan}</div>
+              <ObsShot
+                src={note.screenshots?.plan}
+                alt={SHOT_LABEL.plan}
+                onZoom={() => setZoom({ src: note.screenshots.plan, alt: SHOT_LABEL.plan })}
+              />
+            </div>
+          </div>
+
+          {/* Legacy single attachment from before the named screenshots */}
           {note.image && (
-            <img src={note.image} alt="attachment" className="rounded border mb-3 d-block" style={{ maxHeight: 320, maxWidth: '100%' }} />
+            <div className="mt-3">
+              <div className="small text-muted mb-1">Attachment (legacy)</div>
+              <img
+                src={note.image}
+                alt="attachment"
+                className="rounded border d-block img-zoomable"
+                style={{ maxHeight: 320, maxWidth: '100%' }}
+                role="button"
+                onClick={() => setZoom({ src: note.image, alt: 'Attachment' })}
+              />
+            </div>
           )}
-          {hasAssessment && (
-            <>
-              <h6 className="text-uppercase text-muted fs-11 mb-2">Market observation</h6>
-              <Assessment answers={note.answers} readOnly only="setup" />
-            </>
-          )}
+
+          <div className="mt-3 pt-3 border-top">
+            <button className="btn btn-sm btn-soft-info" onClick={onEdit}>
+              <i className="ri-pencil-line me-1" /> Edit this observation
+            </button>
+          </div>
+
+          {zoom && <ImageLightbox src={zoom.src} alt={zoom.alt} onClose={() => setZoom(null)} />}
         </div>
       )}
     </div>
@@ -385,45 +497,107 @@ function TradeForm({ initial, onSave, onCancel }) {
 }
 
 // --- Note form (add / edit) --------------------------------------------------
+function ObservationField({ def, label, value, onChange }) {
+  return (
+    <>
+      <label className="obs-label">{label}</label>
+      <div className="d-flex flex-wrap gap-1">
+        {def.options.map((opt) => {
+          const s = sentiment(opt)
+          const active = value === opt
+          return (
+            <button
+              key={opt}
+              type="button"
+              className={'btn btn-sm ' + (active ? 'btn-primary' : 'btn-light')}
+              onClick={() => onChange(active ? null : opt)}
+            >
+              {s && (
+                <i
+                  className={s.icon + ' sentiment-arrow me-1'}
+                  style={active ? undefined : { color: s.color }}
+                />
+              )}
+              {opt}
+            </button>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
 function NoteForm({ initial, onSave, onCancel }) {
   const [time, setTime] = useState(initial?.time || nowHM())
   const [text, setText] = useState(initial?.text || '')
-  const [image, setImage] = useState(initial?.image || null)
   const [answers, setAnswers] = useState(initial?.answers || {})
+  const [shots, setShots] = useState(initial?.screenshots || {})
   const set = (id, value) => setAnswers((a) => ({ ...a, [id]: value }))
+  const setShot = (id, value) => setShots((s) => ({ ...s, [id]: value }))
 
-  const save = () => onSave({ id: initial?.id || 'n' + rid(), time, text, image, answers })
+  const save = () => onSave({
+    id: initial?.id || 'n' + rid(),
+    time,
+    text,
+    answers,
+    screenshots: shots,
+    image: initial?.image ?? null, // legacy single attachment, kept as-is
+  })
 
   return (
     <>
-      <div className="row g-3">
-        {/* Left: time + observation + attachment */}
-        <div className="col-lg-6">
-          <div className="mb-3" style={{ maxWidth: 220 }}>
-            <TimeField value={time} onChange={setTime} />
-          </div>
+      {/* Row 1 — current market observation */}
+      <h6 className="text-uppercase text-muted fs-11 mb-2">Current market observation</h6>
+      <div className="row g-3 mb-4 obs-fields">
+        <div className="col-6 col-md-auto" style={{ maxWidth: 200 }}>
+          <TimeField value={time} onChange={setTime} />
+        </div>
+        {OBSERVATION_FIELDS.map((f) => {
+          const def = assessment.find((a) => a.id === f.id)
+          if (!def) return null
+          return (
+            <div className="col-12 col-md" key={f.id}>
+              <ObservationField
+                def={def}
+                label={f.label}
+                value={answers[f.id]}
+                onChange={(v) => set(f.id, v)}
+              />
+            </div>
+          )
+        })}
+      </div>
 
-          <label className="form-label small mb-1">Observation</label>
+      {/* Row 2 — chart captures */}
+      <h6 className="text-uppercase text-muted fs-11 mb-2">Screenshots</h6>
+      <div className="row g-3 mb-4">
+        {OBSERVATION_SHOTS.map((s) => (
+          <div className="col-6 col-lg-3" key={s.id}>
+            <label className="form-label small mb-1">{s.label}</label>
+            <ImageDropZone value={shots[s.id] || null} onChange={(v) => setShot(s.id, v)} minHeight={120} />
+          </div>
+        ))}
+      </div>
+
+      {/* Row 3 — the plan, plus its own marked-up Nifty 50 */}
+      <div className="row g-3">
+        <div className="col-lg-8">
+          <label className="form-label small mb-1">My observation or plans</label>
           <RichTextEditor
             value={text}
             onChange={setText}
-            placeholder="Type your market observation…"
+            placeholder="What are you seeing? What's the plan?"
           />
-
-          <label className="form-label small mb-1 mt-3">Attachment (screenshot)</label>
-          <ImageDropZone value={image} onChange={setImage} minHeight={140} />
         </div>
-
-        {/* Right: market observation (setup assessment) */}
-        <div className="col-lg-6">
-          <h6 className="text-uppercase text-muted fs-11 mb-2">Market observation (optional)</h6>
-          <Assessment answers={answers} onChange={set} only="setup" />
+        <div className="col-lg-4">
+          <label className="form-label small mb-1">Nifty 50 (plan)</label>
+          <ImageDropZone value={shots.plan || null} onChange={(v) => setShot('plan', v)} minHeight={150} />
         </div>
       </div>
 
       <div className="d-flex gap-2 mt-3">
         <button className="btn btn-info btn-sm" onClick={save}>
-          <i className="ri-save-line me-1" /> {initial ? 'Save changes' : 'Save note'}
+          <i className="ri-save-line me-1" /> {initial ? 'Save changes' : 'Save observation'}
         </button>
         <button className="btn btn-light btn-sm" onClick={onCancel}>Cancel</button>
       </div>
@@ -431,30 +605,63 @@ function NoteForm({ initial, onSave, onCancel }) {
   )
 }
 
+/* Today's date as a local ISO day (YYYY-MM-DD). Built from the local calendar
+   rather than toISOString(), which would shift to UTC and can land on the
+   wrong day. */
+const todayIso = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 // --- Page --------------------------------------------------------------------
 export default function Journal() {
   const daysRaw = useJournalDays()
   const tradesRaw = useJournalTrades()
   const notesRaw = useJournalNotes()
-  const [activeDate, setActiveDate] = useState('')
+  const [tab, setTab] = useState('today') // 'today' | 'past'
+  const [pastDate, setPastDate] = useState('') // day picked from the Past daily log
   const [adding, setAdding] = useState(null) // null | 'trade' | 'note'
   const [editTrade, setEditTrade] = useState(null) // trade being edited
   const [deleteTradeItem, setDeleteTradeItem] = useState(null) // trade pending delete confirm
   const [editNote, setEditNote] = useState(null) // note being edited
   const [deleteNoteItem, setDeleteNoteItem] = useState(null) // note pending delete confirm
+  const [saveError, setSaveError] = useState(null) // surfaced instead of console-only
+  const formRef = useRef(null)
 
-  // Join days with their trades + notes (newest day first).
-  const days = useMemo(() => daysRaw.map((d) => ({
-    ...d,
-    trades: tradesRaw.filter((t) => t.day === d.date),
-    notes: notesRaw.filter((n) => n.day === d.date),
-  })), [daysRaw, tradesRaw, notesRaw])
+  // Join days with their trades + notes, newest day first. The sort is done
+  // here rather than relying on the source order: Supabase returns them
+  // descending, but the localStorage fallback yields insertion order.
+  // Dates are ISO (YYYY-MM-DD), so a plain string compare is chronological.
+  const days = useMemo(() => daysRaw
+    .map((d) => ({
+      ...d,
+      trades: tradesRaw.filter((t) => t.day === d.date),
+      notes: notesRaw.filter((n) => n.day === d.date),
+    }))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '')), [daysRaw, tradesRaw, notesRaw])
 
+  // The Today tab is always pinned to the real calendar day; the Past tab shows
+  // whichever day is picked from the daily log. Everything downstream (timeline,
+  // forms, modals) just reads `activeDate`.
+  const today = todayIso()
+  const activeDate = tab === 'today' ? today : pastDate
+
+  // Keep a valid selection in the Past tab only.
   useEffect(() => {
-    if ((!activeDate || !days.some((d) => d.date === activeDate)) && days.length) setActiveDate(days[0].date)
-  }, [days, activeDate])
+    if (tab !== 'past') return
+    if ((!pastDate || !days.some((d) => d.date === pastDate)) && days.length) setPastDate(days[0].date)
+  }, [tab, days, pastDate])
 
   const activeDay = useMemo(() => days.find((d) => d.date === activeDate), [days, activeDate])
+
+  /* The form sits under pre-market, so hitting Edit on an observation further
+     down the timeline would otherwise open it off-screen. */
+  useEffect(() => {
+    if (adding === 'note' || editNote) {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [adding, editNote])
+
 
   // Trades + notes, interleaved and sorted by time.
   const timeline = useMemo(() => {
@@ -465,25 +672,45 @@ export default function Journal() {
     ].sort((a, b) => (a.time || '').localeCompare(b.time || ''))
   }, [activeDay])
 
-  // Create today's day if it doesn't exist yet, then select it.
+  // Create today's day if it doesn't exist yet, then show it on the Today tab.
   const newDay = () => {
-    const now = new Date()
-    const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    if (!days.some((d) => d.date === iso)) apiAddDay({ date: iso, note: '', premarket: {} }).catch(console.error)
-    setActiveDate(iso)
+    if (!days.some((d) => d.date === today)) {
+      apiAddDay({ date: today, note: '', premarket: {} }).catch(console.error)
+    }
+    setTab('today')
     setAdding(null)
   }
 
   const addTrade = (trade) => { apiAddTrade({ ...trade, day: activeDate }).catch(console.error); setAdding(null) }
   const updateTrade = (trade) => { apiEditTrade({ ...trade, day: activeDate }).catch(console.error); setEditTrade(null) }
   const confirmDeleteTrade = () => { apiRemoveTrade(deleteTradeItem?.id).catch(console.error); setDeleteTradeItem(null) }
-  const addNote = (note) => { apiAddNote({ ...note, day: activeDate }).catch(console.error); setAdding(null) }
-  const updateNote = (note) => { apiEditNote({ ...note, day: activeDate }).catch(console.error); setEditNote(null) }
+  /* Only close the form once the write actually lands. Closing optimistically
+     and swallowing the error into console.error meant a failed save looked
+     identical to a successful one — the form shut and the observation silently
+     vanished, screenshots and all. */
+  const addNote = (note) => {
+    setSaveError(null)
+    return apiAddNote({ ...note, day: activeDate })
+      .then(() => setAdding(null))
+      .catch((e) => setSaveError(e?.message || String(e)))
+  }
+  const updateNote = (note) => {
+    setSaveError(null)
+    return apiEditNote({ ...note, day: activeDate })
+      .then(() => setEditNote(null))
+      .catch((e) => setSaveError(e?.message || String(e)))
+  }
   const confirmDeleteNote = () => { apiRemoveNote(deleteNoteItem?.id).catch(console.error); setDeleteNoteItem(null) }
   const setPremarket = (pm) => apiSetPremarket(activeDate, pm).catch(console.error)
 
   return (
     <div className="journal">
+      {/* Floating "when to trade / when not to" coach. Rules: coachRules.js */}
+      <TradeCoach today={today} />
+
+      {/* Recurring "check your entry levels" nag. Config: entryLevels.js */}
+      <EntryLevelsPopup />
+
       <div className="page-title-box d-flex align-items-center">
         <h4 className="flex-grow-1 mb-0">Trading Journal</h4>
         <nav aria-label="breadcrumb">
@@ -495,7 +722,48 @@ export default function Journal() {
         </nav>
       </div>
 
-      {/* Days table */}
+      {/* Tabs: today's entry vs. the historical daily log */}
+      <ul className="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
+        <li className="nav-item" role="presentation">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'today'}
+            className={'nav-link' + (tab === 'today' ? ' active' : '')}
+            onClick={() => { setTab('today'); setAdding(null) }}
+          >
+            <i className="ri-calendar-check-line me-1" /> Today&apos;s Journal
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'past'}
+            className={'nav-link' + (tab === 'past' ? ' active' : '')}
+            onClick={() => { setTab('past'); setAdding(null) }}
+          >
+            <i className="ri-history-line me-1" /> Past
+          </button>
+        </li>
+      </ul>
+
+      {/* Today tab with no entry yet */}
+      {tab === 'today' && !activeDay && (
+        <div className="card">
+          <div className="card-body text-center py-5">
+            <i className="ri-calendar-line fs-1 text-muted d-block mb-2" />
+            <h5 className="mb-1">Nothing logged for today yet</h5>
+            <p className="text-muted mb-3">{fmtDate(today)}</p>
+            <button className="btn btn-primary" onClick={newDay}>
+              <i className="ri-add-line me-1" /> Start today&apos;s journal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Days table — history only, lives under the Past tab */}
+      {tab === 'past' && (
       <div className="card">
         <div className="card-header d-flex align-items-center">
           <h5 className="card-title mb-0 flex-grow-1">Daily log</h5>
@@ -525,7 +793,7 @@ export default function Journal() {
                       key={day.date}
                       role="button"
                       className={isActive ? 'table-active' : ''}
-                      onClick={() => { setActiveDate(day.date); setAdding(null) }}
+                      onClick={() => { setPastDate(day.date); setAdding(null) }}
                     >
                       <td className="fw-medium">{fmtDate(day.date)}</td>
                       <td className="text-center">{s.count}</td>
@@ -545,8 +813,9 @@ export default function Journal() {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Selected day timeline */}
+      {/* Selected day timeline — today's entry, or the day picked from the log */}
       {activeDay && (
         <div className="card">
           <div className="card-header d-flex align-items-center flex-wrap gap-2">
@@ -559,8 +828,8 @@ export default function Journal() {
               <span className={'fs-15 fw-semibold ' + pnlClass(dayStats(activeDay).net)}>
                 {money(dayStats(activeDay).net)}
               </span>
-              <button className="btn btn-info btn-sm" onClick={() => setAdding('note')} disabled={adding === 'note'}>
-                <i className="ri-sticky-note-line me-1" /> Add note
+              <button className="btn btn-info btn-sm" onClick={() => { setEditNote(null); setAdding('note') }} disabled={adding === 'note'}>
+                <i className="ri-eye-line me-1" /> Add observation
               </button>
               <button className="btn btn-primary btn-sm" onClick={() => setAdding('trade')} disabled={adding === 'trade'}>
                 <i className="ri-add-line me-1" /> Add trade
@@ -571,8 +840,42 @@ export default function Journal() {
             {/* Pre-market always shows first for the day */}
             <PreMarket key={activeDate} value={activeDay.premarket || {}} onSave={setPremarket} />
 
+            {/* Observation form sits inline right under pre-market — you log
+                several of these through the day, and a modal each time got in
+                the way. */}
+            {(adding === 'note' || editNote) && (
+              <div className="card border border-info-subtle mb-3" ref={formRef}>
+                <div className="card-header d-flex align-items-center py-2">
+                  <h6 className="card-title mb-0">
+                    <i className={(editNote ? 'ri-pencil-line' : 'ri-eye-line') + ' me-2 text-info'} />
+                    {editNote ? `Edit observation — ${fmtTime(editNote.time)}` : 'New observation'}
+                  </h6>
+                </div>
+                <div className="card-body">
+                  {saveError && (
+                    <div className="alert alert-danger d-flex align-items-start gap-2 py-2">
+                      <i className="ri-error-warning-line mt-1" />
+                      <div>
+                        <strong>Couldn’t save this observation.</strong>
+                        <div className="small">{saveError}</div>
+                        <div className="small mt-1">
+                          Your text and screenshots are still here — fix the issue and hit save again.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <NoteForm
+                    key={editNote?.id || 'new'}
+                    initial={editNote}
+                    onSave={editNote ? updateNote : addNote}
+                    onCancel={() => { setAdding(null); setEditNote(null); setSaveError(null) }}
+                  />
+                </div>
+              </div>
+            )}
+
             {timeline.length === 0 && (
-              <p className="text-muted text-center my-4 mb-0">No trades or notes logged for this day yet.</p>
+              <p className="text-muted text-center my-4 mb-0">No trades or observations logged for this day yet.</p>
             )}
 
             {timeline.map((item) =>
@@ -617,24 +920,6 @@ export default function Journal() {
         />
       </Modal>
 
-      <Modal
-        open={adding === 'note' || Boolean(editNote)}
-        size="xl"
-        title={
-          editNote
-            ? <><i className="ri-pencil-line me-2 text-info" />Edit note — {activeDay && fmtDate(activeDay.date)}</>
-            : <><i className="ri-sticky-note-line me-2 text-info" />New note — {activeDay && fmtDate(activeDay.date)}</>
-        }
-        onClose={() => { setAdding(null); setEditNote(null) }}
-      >
-        <NoteForm
-          key={editNote?.id || 'new'}
-          initial={editNote}
-          onSave={editNote ? updateNote : addNote}
-          onCancel={() => { setAdding(null); setEditNote(null) }}
-        />
-      </Modal>
-
       <ConfirmDialog
         open={Boolean(deleteTradeItem)}
         title="Delete trade log?"
@@ -648,9 +933,9 @@ export default function Journal() {
 
       <ConfirmDialog
         open={Boolean(deleteNoteItem)}
-        title="Delete note?"
+        title="Delete observation?"
         message={deleteNoteItem
-          ? `The note at ${fmtTime(deleteNoteItem.time)} will be permanently removed.`
+          ? `The observation at ${fmtTime(deleteNoteItem.time)} will be permanently removed.`
           : ''}
         confirmLabel="Delete"
         onConfirm={confirmDeleteNote}

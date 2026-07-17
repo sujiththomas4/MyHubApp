@@ -18,10 +18,21 @@ import {
 
 const ThemeContext = createContext(null)
 
+// Values we still support. Anything else persisted from an older build
+// (e.g. the removed 'twocolumn'/'semibox' layouts, or the 'md'/'sm'/'sm-hover'
+// sidebar sizes) is coerced back to the default.
+const SUPPORTED_LAYOUTS = ['vertical', 'horizontal']
+const SUPPORTED_SIDEBAR_SIZES = ['lg']
+
 function readInitialState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...DEFAULT_THEME, ...JSON.parse(raw) }
+    if (raw) {
+      const merged = { ...DEFAULT_THEME, ...JSON.parse(raw) }
+      if (!SUPPORTED_LAYOUTS.includes(merged.layout)) merged.layout = DEFAULT_THEME.layout
+      if (!SUPPORTED_SIDEBAR_SIZES.includes(merged.sidebarSize)) merged.sidebarSize = DEFAULT_THEME.sidebarSize
+      return merged
+    }
   } catch {
     /* ignore malformed storage */
   }

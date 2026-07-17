@@ -158,6 +158,10 @@
 
 .sidebar-menu {
   flex: 1;
+  /* min-height:0 lets this flex item shrink below its content height so the
+     SimpleBar can actually scroll; without it min-height:auto keeps the menu
+     as tall as its content and items get clipped off the bottom. */
+  min-height: 0;
   overflow: hidden;
   padding: 0.5rem 0 2rem;
 }
@@ -387,14 +391,24 @@
   border-bottom: 1px solid var(--hub-sidebar-border);
   display: flex;
   align-items: center;
-  padding: 0 1.5rem;
-  height: 46px;
+  /* Wrap to more rows instead of clipping the last items. We can't use
+     overflow scroll here: any non-visible overflow would also clip the hover
+     dropdowns. HorizontalMenu.jsx measures the real height into
+     --horizontal-menu-height so the content below stays clear. */
+  flex-wrap: wrap;
+  padding: 0.25rem 1.5rem;
+  min-height: 46px;
   gap: 0.25rem;
-  overflow-x: auto;
+  overflow: visible;
 }
-[data-layout='horizontal'] .main-content { padding-top: calc(var(--hub-header-height) + 46px); }
+[data-layout='horizontal'] .main-content {
+  padding-top: calc(var(--hub-header-height) + var(--horizontal-menu-height, 46px));
+}
 .horizontal-menu { display: none; }
 [data-layout='horizontal'] .horizontal-menu { display: flex; }
+
+.horizontal-menu .h-menu-item { position: relative; }
+
 .horizontal-menu .h-item {
   display: flex;
   align-items: center;
@@ -410,6 +424,52 @@
 .horizontal-menu .h-item.active {
   color: var(--hub-sidebar-item-active);
   background: var(--hub-sidebar-active-bg);
+}
+.horizontal-menu .h-caret {
+  font-size: 1rem;
+  transition: transform 0.15s ease;
+}
+.horizontal-menu .h-menu-item.has-children:hover .h-caret { transform: rotate(180deg); }
+
+/* Hover dropdown of a group's children */
+.horizontal-menu .h-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  border-radius: 0.5rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1002;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+.horizontal-menu .h-menu-item.has-children:hover .h-dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.horizontal-menu .h-dropdown-link {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  color: var(--hub-sidebar-item);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.horizontal-menu .h-dropdown-link:hover {
+  color: var(--hub-sidebar-item-active);
+  background: var(--hub-sidebar-active-bg);
+}
+.horizontal-menu .h-dropdown-link.active {
+  color: var(--bs-primary);
+  font-weight: 500;
 }
 
 /* ==========================================================================

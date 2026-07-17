@@ -14,23 +14,6 @@ function LayoutPreview({ value, scheme }) {
       </div>
     )
   }
-  if (value === 'twocolumn') {
-    return (
-      <div className={`preview${dark ? ' dark' : ''}`}>
-        <div className="p-side" style={{ width: '18%', background: 'var(--bs-primary)' }} />
-        <div className="p-side" style={{ width: '24%', background: 'rgba(0,0,0,.15)' }} />
-        <div className="p-main"><div className="p-top" /><div className="p-block" /></div>
-      </div>
-    )
-  }
-  if (value === 'semibox') {
-    return (
-      <div className={`preview${dark ? ' dark' : ''}`} style={{ padding: 4, gap: 3 }}>
-        <div className="p-side" style={{ background: 'var(--bs-primary)', borderRadius: 2 }} />
-        <div className="p-main"><div className="p-top" /><div className="p-block" /></div>
-      </div>
-    )
-  }
   // vertical / light / dark generic
   return (
     <div className={`preview${dark ? ' dark' : ''}`}>

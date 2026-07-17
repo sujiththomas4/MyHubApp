@@ -154,10 +154,17 @@ create table if not exists journal_notes (
   id text primary key,
   day date not null references journal_days(date) on delete cascade,
   time text,
-  text text,                    -- rich-text HTML observation
-  image text,                   -- attached screenshot (storage URL)
+  text text,                    -- rich-text HTML "my observation or plans"
+  image text,                   -- legacy single attachment (storage URL)
+  screenshots jsonb not null default '{}'::jsonb,  -- named shots -> storage URL
   answers jsonb not null default '{}'::jsonb
 );
+
+-- `create table if not exists` above is a no-op on an existing database, so add
+-- the column explicitly for projects created before observations gained their
+-- named screenshots (Nifty 50, Nifty Future, OI change, VIX, plan).
+alter table journal_notes
+  add column if not exists screenshots jsonb not null default '{}'::jsonb;
 
 -- ---- Chart patterns -------------------------------------------------
 create table if not exists chart_patterns (

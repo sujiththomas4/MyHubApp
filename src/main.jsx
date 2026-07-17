@@ -6,6 +6,7 @@ import { CapitalProvider } from '@/context/CapitalContext'
 import { FxProvider } from '@/context/FxContext'
 import { AuthProvider } from '@/context/AuthContext'
 import App from './App'
+import DbConnectionBanner from '@/components/ui/DbConnectionBanner'
 import './styles/index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <FxProvider>
           <CapitalProvider>
             <BrowserRouter>
+              <DbConnectionBanner />
               <App />
             </BrowserRouter>
           </CapitalProvider>
