@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  ENTRY_LEVELS, POPUP_INTERVAL_MS, SNOOZE_OPTIONS, QUALITY_CLASS,
+  POPUP_INTERVAL_MS, SNOOZE_OPTIONS, TRADE_RULES, levelsByTier, quantityFor,
 } from './entryLevels'
 
 /**
@@ -8,6 +8,12 @@ import {
  * -----------------------------------------------------------------------------
  * Nags you every POPUP_INTERVAL_MS to re-check where price actually is against
  * your entry levels, so entries happen AT a level instead of at random.
+ *
+ * Design intent: the levels are GRADED, and that grading is the point — a
+ * Camarilla-inside-CPR is not the same trade as a 20 EMA touch. So they're
+ * grouped into tiers, best first, each with its own colour rail and star
+ * weight, instead of seven identical rows you'd stop reading after a week.
+ * Then the size cap as one hero number, then the do/don't rules.
  *
  * Deliberately non-blocking: at a 10s cadence a modal would make the page
  * unusable, so this is a floating card you can keep working around. Bottom-LEFT
@@ -18,7 +24,7 @@ import {
  * Snooze → suppressed until the chosen time, and the choice survives a reload
  *          (otherwise refreshing the page would defeat the snooze).
  *
- * Levels/cadence/snooze choices all live in entryLevels.js.
+ * Levels/cadence/snooze/rules all live in entryLevels.js.
  */
 const KEY = 'hub.entryLevels.snoozeUntil'
 
@@ -30,9 +36,19 @@ const readSnooze = () => {
   }
 }
 
-export default function EntryLevelsPopup() {
+const Stars = ({ n }) => (
+  <span className="elp-stars" aria-label={`${n} of 3`}>
+    {[1, 2, 3].map((i) => (
+      <i key={i} className={i <= n ? 'ri-star-fill' : 'ri-star-line is-off'} />
+    ))}
+  </span>
+)
+
+export default function EntryLevelsPopup({ capital }) {
   const [visible, setVisible] = useState(false)
   const [snoozedUntil, setSnoozedUntil] = useState(readSnooze)
+  const qty = quantityFor(capital)
+  const tiers = levelsByTier()
 
   // Held in a ref so the interval below never needs to be torn down/recreated
   // when the snooze changes.
@@ -80,41 +96,106 @@ export default function EntryLevelsPopup() {
 
   if (!visible) return null
 
+  const dos = TRADE_RULES.filter((r) => r.type !== 'dont')
+  const donts = TRADE_RULES.filter((r) => r.type === 'dont')
+
   return (
-    <div className="entry-levels-popup card" role="dialog" aria-label="Entry levels">
-      <div className="card-header d-flex align-items-start gap-2 py-3">
-        <h6 className="mb-0 flex-grow-1">
-          <i className="ri-focus-3-line me-1" /> Only enter at one of these. No level, no trade.
-        </h6>
-        <button className="btn-close btn-close-white" aria-label="Close" onClick={() => setVisible(false)} />
-      </div>
+    <div className="entry-levels-popup" role="dialog" aria-label="Entry levels">
+      <header className="elp-head">
+        <span className="elp-head-icon"><i className="ri-focus-3-line" /></span>
+        <span className="elp-head-text">
+          <span className="elp-title">Only enter at one of these</span>
+          <span className="elp-sub">No level, no trade.</span>
+        </span>
+        <button className="btn-close elp-close" aria-label="Close" onClick={() => setVisible(false)} />
+      </header>
 
-      <div className="card-body py-2">
-        <ul className="entry-levels-list">
-          {ENTRY_LEVELS.map((lvl) => (
-            <li key={lvl.id}>
-              <span className="entry-levels-label">{lvl.label}</span>
-              {lvl.quality && (
-                <span className={`badge ${QUALITY_CLASS[lvl.quality] || 'bg-secondary'}`}>
-                  {lvl.quality}
-                </span>
-              )}
-            </li>
+      <div className="elp-body">
+        {/* Left — the graded levels */}
+        <div className="elp-col">
+          {tiers.map((tier) => (
+            <div className="elp-tier" key={tier.quality} style={{ '--tier': tier.color, '--tier-tint': tier.tint }}>
+              <div className="elp-tier-head">
+                <Stars n={tier.stars} />
+                <span className="elp-tier-name">{tier.quality}</span>
+                <span className="elp-tier-note">{tier.note}</span>
+              </div>
+              <ul className="elp-levels">
+                {tier.levels.map((lvl) => (
+                  <li key={lvl.id}>
+                    <i className="ri-check-line" />
+                    <span>{lvl.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
+
+        {/* Middle — the size cap, as one number you can't miss */}
+        <div className="elp-col elp-col-hero">
+          <div className="elp-hero">
+            {qty && qty.lots > 0 ? (
+              <>
+                <span className="elp-hero-label">Max quantity</span>
+                <span className="elp-hero-value">{qty.maxQty}</span>
+                <span className="elp-hero-lots">{qty.lots} lot{qty.lots > 1 ? 's' : ''}</span>
+                <div className="elp-hero-split">
+                  <div>
+                    <span className="elp-hero-num">{qty.entryQty}</span>
+                    <small>to enter</small>
+                  </div>
+                  <div>
+                    <span className="elp-hero-num">{qty.canAverage ? qty.maxQty - qty.entryQty : 0}</span>
+                    <small>{qty.canAverage ? 'for 1 average' : 'no average'}</small>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="elp-hero-empty">
+                <i className="ri-wallet-3-line d-block mb-2" />
+                {qty ? 'Capital is under one lot' : 'Set your capital to get today’s max quantity'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right — the discipline, stacked */}
+        <div className="elp-col elp-rules">
+          <div className="elp-rule-group">
+            <div className="elp-rule-head is-do"><i className="ri-check-double-line" /> Always</div>
+            <ul className="elp-rule-col">
+              {dos.map((r) => (
+                <li key={r.id} className="is-do">
+                  <i className="ri-checkbox-circle-fill" /><span>{r.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="elp-rule-group">
+            <div className="elp-rule-head is-dont"><i className="ri-forbid-2-line" /> Never</div>
+            <ul className="elp-rule-col">
+              {donts.map((r) => (
+                <li key={r.id} className="is-dont">
+                  <i className="ri-close-circle-fill" /><span>{r.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
 
-      <div className="card-footer d-flex align-items-center gap-2 py-2">
-        <span className="entry-levels-snooze-label">Snooze</span>
+      <footer className="elp-foot">
+        <span className="elp-snooze-label">Snooze</span>
         {SNOOZE_OPTIONS.map((opt) => (
-          <button key={opt.label} className="btn btn-sm btn-outline-light" onClick={() => snooze(opt.ms)}>
+          <button key={opt.label} className="btn btn-sm btn-outline-secondary" onClick={() => snooze(opt.ms)}>
             {opt.label}
           </button>
         ))}
-        <button className="btn btn-sm btn-light ms-auto" onClick={() => setVisible(false)}>
+        <button className="btn btn-sm btn-primary ms-auto" onClick={() => setVisible(false)}>
           Got it
         </button>
-      </div>
+      </footer>
     </div>
   )
 }

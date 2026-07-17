@@ -158,11 +158,15 @@
 
 .sidebar-menu {
   flex: 1;
-  /* min-height:0 lets this flex item shrink below its content height so the
-     SimpleBar can actually scroll; without it min-height:auto keeps the menu
-     as tall as its content and items get clipped off the bottom. */
+  /* min-height:0 lets this flex item shrink below its content height. Without
+     it, min-height:auto sizes the menu to its content, it never overflows, and
+     the items past the fold are simply unreachable. */
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Don't chain the scroll to the page once the menu hits its end. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 0.5rem 0 2rem;
 }
 

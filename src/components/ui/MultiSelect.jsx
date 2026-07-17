@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
  */
 export default function MultiSelect({ label = 'Filter', groups = [], selected = [], onChange }) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const ref = useRef(null)
 
   useEffect(() => {
@@ -26,8 +27,23 @@ export default function MultiSelect({ label = 'Filter', groups = [], selected = 
     }
   }, [open])
 
+  // Start each opening from a clean search rather than the last one.
+  useEffect(() => { if (!open) setQuery('') }, [open])
+
   const toggle = (opt) =>
     onChange(selected.includes(opt) ? selected.filter((x) => x !== opt) : [...selected, opt])
+
+  /* Match on the option OR its group name, so typing "ema" surfaces the whole
+     9 EMA / 20 EMA groups, not just options with "ema" in the text. Groups left
+     with nothing are dropped. */
+  const q = query.trim().toLowerCase()
+  const shown = groups
+    .map((g) => {
+      if (!q) return g
+      if (g.label.toLowerCase().includes(q)) return g
+      return { ...g, options: g.options.filter((o) => o.toLowerCase().includes(q)) }
+    })
+    .filter((g) => g.options.length > 0)
 
   return (
     <div className="ms-wrap" ref={ref}>
@@ -38,15 +54,36 @@ export default function MultiSelect({ label = 'Filter', groups = [], selected = 
       </button>
       {open && (
         <div className="ms-panel">
+          <div className="ms-search">
+            <i className="ri-search-line" />
+            <input
+              className="form-control form-control-sm"
+              placeholder={`Search ${label.toLowerCase()}…`}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+            />
+            {query && (
+              <button type="button" className="ms-search-clear" aria-label="Clear search" onClick={() => setQuery('')}>
+                <i className="ri-close-line" />
+              </button>
+            )}
+          </div>
+
           <div className="d-flex align-items-center mb-2">
             <span className="small text-muted flex-grow-1">{selected.length} selected</span>
             {selected.length > 0 && (
               <button type="button" className="btn btn-link btn-sm p-0" onClick={() => onChange([])}>Clear</button>
             )}
           </div>
-          {groups.map((g) => (
+
+          {shown.length === 0 && (
+            <div className="small text-muted text-center py-2">No match for “{query}”</div>
+          )}
+
+          {shown.map((g) => (
             <div className="ms-group" key={g.label}>
-              <div className="small text-muted mb-1">{g.label}</div>
+              <div className="ms-group-label">{g.label}</div>
               {g.options.map((opt) => (
                 <label className="ms-item" key={opt}>
                   <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} />

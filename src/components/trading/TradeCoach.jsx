@@ -78,7 +78,7 @@ export default function TradeCoach({ today }) {
       {/* The message */}
       <button
         type="button"
-        className={`coach-banner ${top ? `${tone.bg} ${tone.text}` : 'bg-light text-muted'}`}
+        className={`coach-banner ${top ? `${tone.bg} ${tone.text}` : 'coach-idle'}`}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         title="Set your market read"

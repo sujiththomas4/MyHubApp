@@ -677,6 +677,21 @@
 /* The detail line is the "why" — it was too small and too faint to read. */
 .trade-coach .coach-text small { font-size: 0.8125rem; opacity: 0.9; }
 
+/* Idle state — "Set your market read", before any rule matches. Inverted
+   against the theme: light on dark, dark on light. A card-coloured chip just
+   disappeared into the page, and this one has to be noticed — an unset read is
+   the state where you're most likely to take a random trade. */
+.trade-coach .coach-banner.coach-idle {
+  background: #2a2f34;
+  color: #e9ecef;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+[data-bs-theme='dark'] .trade-coach .coach-banner.coach-idle {
+  background: #f3f3f9;
+  color: #495057;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
 /* Draw the eye to a stop-signal without being obnoxious. Keyed off .coach-stop,
    not .bg-danger — the "Look for Sell" banner is red but must not pulse. */
 .trade-coach .coach-banner.coach-stop { animation: coach-pulse 1.6s ease-in-out infinite; }
@@ -690,14 +705,51 @@
 
 .trade-coach .coach-more { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .trade-coach .coach-more .badge { font-size: 0.75rem; padding: 0.45em 0.65em; }
+/* "Market now" panel — warm orange surface, fixed in both themes.
+   A light TINT rather than a saturated orange on purpose: the coach already
+   uses amber to mean "cut size", so a strong orange here would read as a
+   signal. Text and controls are pinned to dark tones below, because in the dark
+   theme they'd otherwise inherit light colours and vanish against it. */
 .trade-coach .coach-panel {
+  background: linear-gradient(160deg, #fff6ea 0%, #ffe3c0 100%);
+  border: 1px solid #f0c48a;
+  color: #5c3a13;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   max-height: 70vh;
   overflow-y: auto;
 }
+.trade-coach .coach-panel .card-header {
+  background: rgba(241, 150, 59, 0.16);
+  border-bottom-color: rgba(241, 150, 59, 0.32);
+}
 .trade-coach .coach-panel .card-header h6 {
   font-size: 1.05rem;
   font-weight: 600;
+  color: #5c3a13;
+}
+/* Beat the theme's light-on-dark text inside this fixed-light surface. */
+.trade-coach .coach-panel .coach-signal-label { color: #5c3a13; }
+.trade-coach .coach-panel .coach-signal-hint,
+.trade-coach .coach-panel .text-muted { color: #8a6234 !important; }
+.trade-coach .coach-panel .coach-signal + .coach-signal {
+  border-top-color: rgba(241, 150, 59, 0.35);
+}
+/* Inputs default to a dark fill in the dark theme — force them light so they
+   don't punch black holes in the orange. */
+.trade-coach .coach-panel .form-control,
+.trade-coach .coach-panel .input-group-text {
+  background: #fff;
+  color: #212529;
+  border-color: rgba(241, 150, 59, 0.5);
+}
+.trade-coach .coach-panel .btn-light {
+  background: #fff;
+  border-color: rgba(241, 150, 59, 0.45);
+  color: #5c3a13;
+}
+.trade-coach .coach-panel .btn-light:hover {
+  background: #fff8f0;
+  border-color: #f1963b;
 }
 
 /* Each read is its own block, split by a rule so the labels read as headings
@@ -731,56 +783,229 @@
    customizer gear (mid-right). Config: components/trading/entryLevels.js
    ========================================================================== */
 .entry-levels-popup {
+  /* Centred, 80% wide. Still no backdrop: at a 10s cadence a blocking modal
+     would make the page unusable — this floats over the middle and you can
+     work around it. */
   position: fixed;
-  left: 1.25rem;
-  bottom: 1.25rem;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 1035;
-  width: 480px;
-  max-width: calc(100vw - 2.5rem);
-  /* Deliberately indigo/violet, not red/amber/green — those three already mean
-     stop / cut size / go on the trade coach, and reusing them here would read
-     as a signal instead of a reminder. */
-  background: linear-gradient(135deg, #6559cc 0%, #405189 100%);
-  color: #fff;
-  border: 0;
+  width: 80%;
+  max-width: 1180px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  /* Light lavender surface. Still deliberately off the red/amber/green axis —
+     those three already mean stop / cut size / go on the trade coach, and
+     reusing them here would read as a trading signal instead of a reminder.
+     Fixed light in both themes: it's a nag that must not blend into the page. */
+  background: linear-gradient(160deg, #ffffff 0%, #eef0fb 100%);
+  color: #212529;
+  border: 1px solid #d7dbf0;
   border-radius: 0.75rem;
-  box-shadow: 0 10px 34px rgba(101, 89, 204, 0.5);
+  box-shadow: 0 24px 70px rgba(31, 35, 60, 0.45);
   animation: entry-levels-in 0.18s ease-out;
 }
-.entry-levels-popup .card-header,
-.entry-levels-popup .card-footer {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-.entry-levels-popup .card-header h6 { color: #fff; }
-.entry-levels-popup .card-header h6 i { color: #fff !important; }
-.entry-levels-snooze-label { font-size: 0.8125rem; color: rgba(255, 255, 255, 0.75); }
+/* Must carry the -50%/-50% centring through every frame, or the card slides in
+   from the wrong place and snaps. */
 @keyframes entry-levels-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate(-50%, -47%) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .entry-levels-popup { animation: none; }
 }
 
-/* The instruction IS the heading — it wraps to two lines at this width. */
-.entry-levels-popup .card-header h6 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-.entry-levels-list { list-style: none; margin: 0; padding: 0; }
-.entry-levels-list li {
+/* ---- Header: dark bar so the instruction reads as a rule, not a caption ---- */
+.elp-head {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 0;
-  font-size: 1rem;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.7rem 0.7rem 0 0;
+  background: linear-gradient(135deg, #2f3550 0%, #434a73 100%);
+  color: #fff;
 }
-.entry-levels-list li + li { border-top: 1px solid rgba(255, 255, 255, 0.18); }
-.entry-levels-label { flex: 1; min-width: 0; }
-.entry-levels-list .badge { flex-shrink: 0; font-size: 0.75rem; padding: 0.4em 0.6em; }
+.elp-head-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.elp-head-text { display: flex; flex-direction: column; line-height: 1.25; }
+.elp-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+.elp-sub { font-size: 0.8125rem; opacity: 0.75; }
+.elp-close { margin-left: auto; filter: invert(1) grayscale(1) brightness(2); opacity: 0.7; }
+.elp-close:hover { opacity: 1; }
+
+/* Three columns: graded levels | size cap | discipline. */
+.elp-body {
+  display: grid;
+  grid-template-columns: 1.25fr 0.8fr 1fr;
+  gap: 1.1rem;
+  padding: 1.1rem 1.25rem;
+  overflow-y: auto;
+  align-items: stretch;
+}
+.elp-col { min-width: 0; }
+.elp-col-hero { display: flex; }
+@media (max-width: 991.98px) {
+  .elp-body { grid-template-columns: 1fr; }
+}
+
+/* ---- Tiers: the grading is the message. Each tier owns a colour rail, and
+   the star weight says at a glance how much this level is worth. ---- */
+.elp-tier {
+  position: relative;
+  margin-bottom: 0.6rem;
+  padding: 0.55rem 0.7rem 0.6rem 0.85rem;
+  border-radius: 0.5rem;
+  background: var(--tier-tint);
+  border: 1px solid color-mix(in srgb, var(--tier) 30%, transparent);
+}
+/* The rail — the fastest read in the whole card. */
+.elp-tier::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  bottom: 0.45rem;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--tier);
+}
+.elp-tier-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-bottom: 0.3rem;
+}
+.elp-tier-name {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--tier);
+}
+.elp-tier-note {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  color: #6c757d;
+}
+.elp-stars { display: inline-flex; gap: 1px; font-size: 0.7rem; color: var(--tier); }
+.elp-stars .is-off { opacity: 0.3; }
+
+.elp-levels { list-style: none; margin: 0; padding: 0; }
+.elp-levels li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.16rem 0;
+  font-size: 0.9375rem;
+  color: #212529;
+}
+.elp-levels i { color: var(--tier); font-size: 1rem; flex-shrink: 0; }
+
+/* ---- Hero: the size cap, dead centre, as the one number you must obey ---- */
+.elp-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  padding: 1.25rem 1rem;
+  border-radius: 0.7rem;
+  color: #fff;
+  background: linear-gradient(150deg, #0ab39c 0%, #05796c 100%);
+  box-shadow: 0 8px 24px rgba(10, 179, 156, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.elp-hero-label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  opacity: 0.85;
+}
+.elp-hero-value {
+  font-size: 3.4rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin: 0.15rem 0;
+}
+.elp-hero-lots { font-size: 0.8125rem; opacity: 0.85; }
+/* Entry vs. reserve, side by side — the split IS the anti-averaging rule. */
+.elp-hero-split {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+}
+.elp-hero-split > div { flex: 1; }
+.elp-hero-num { display: block; font-size: 1.3rem; font-weight: 700; line-height: 1.1; }
+.elp-hero-split small { font-size: 0.625rem; opacity: 0.85; }
+.elp-hero-empty { font-size: 0.8125rem; opacity: 0.95; }
+.elp-hero-empty i { font-size: 1.75rem; }
+
+/* ---- Rules: Always over Never, stacked down the right ---- */
+.elp-rules { display: flex; flex-direction: column; gap: 0.7rem; }
+.elp-rule-group {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(64, 81, 137, 0.14);
+}
+.elp-rule-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.elp-rule-head.is-do { color: #0ab39c; }
+.elp-rule-head.is-dont { color: #f06548; }
+.elp-rule-col { list-style: none; margin: 0; padding: 0; }
+.elp-rule-col li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.18rem 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: #343a40;
+}
+.elp-rule-col i { flex-shrink: 0; font-size: 0.95rem; margin-top: 0.05rem; }
+.elp-rule-col .is-do i,
+.elp-rule-col li.is-do i { color: #0ab39c; }
+.elp-rule-col li.is-dont i { color: #f06548; }
+.elp-rule-col li.is-dont span { font-weight: 600; }
+
+/* ---- Footer ---- */
+.elp-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border-top: 1px solid rgba(64, 81, 137, 0.14);
+  background: rgba(64, 81, 137, 0.05);
+  border-radius: 0 0 0.7rem 0.7rem;
+}
+.elp-snooze-label { font-size: 0.75rem; color: #6c757d; }
+@media (max-width: 575.98px) {
+  .elp-rules { grid-template-columns: 1fr; }
+}
 
 /* Left behind while snoozed so the reminder is never lost for good. */
 .entry-levels-handle {
@@ -840,3 +1065,241 @@
 .obs-row-head .obs-row-caret { font-size: 1.3rem; }
 .obs-row-head .btn i { font-size: 1.15rem; }
 .obs-row-head > .text-muted i { font-size: 1.1rem; }
+
+/* ==========================================================================
+   Observation panels (Journal) — one raised box per section.
+   The three sections used to be bare headings stacked in a flat card body, so
+   the fields, drop zones and editor all ran together. Each is now its own
+   surface. Shared by the edit form and the view mode.
+   ========================================================================== */
+.obs-panel {
+  position: relative;
+  margin-bottom: 1.1rem;
+  padding: 1.05rem 1.15rem 1.2rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  border-radius: 0.75rem;
+  /* Layered: a tight contact shadow + a soft ambient one, plus a 1px inner
+     highlight along the top edge — that highlight is what reads as "raised"
+     rather than just "outlined". */
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 6px 18px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.obs-panel:last-of-type { margin-bottom: 0; }
+
+/* Lift the section you're actually working in. */
+.obs-panel:focus-within {
+  border-color: color-mix(in srgb, var(--bs-primary) 40%, var(--hub-border));
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.06),
+    0 12px 28px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* On a dark surface a white top-highlight is what sells the bevel, but at 0.7
+   it looks like a scratch — and the ambient shadow needs to be far deeper to
+   register at all. */
+[data-bs-theme='dark'] .obs-panel {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 6px 18px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+[data-bs-theme='dark'] .obs-panel:focus-within {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 12px 28px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.obs-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+.obs-panel-title::before {
+  content: '';
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--bs-primary);
+  flex-shrink: 0;
+}
+
+.obs-shot-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--bs-secondary-color);
+}
+
+/* Trading capital, in the day header beside the date. */
+.capital-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--hub-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--bs-primary) 5%, var(--hub-card-bg));
+}
+.capital-field .capital-input { width: 132px; }
+.capital-field .capital-max { font-size: 0.8125rem; }
+
+/* The day's working area — pre-market, observations, trades. Needs to sit apart
+   from the white/near-black panels inside it, so it goes the OPPOSITE way from
+   the card in each theme: a touch darker in light mode, a touch lighter in dark.
+   (Using --hub-body-bg in dark went darker than the card and buried everything
+   in near-black.) */
+.day-body {
+  background: var(--hub-body-bg);
+  border-radius: 0 0 var(--bs-card-border-radius, 0.5rem) var(--bs-card-border-radius, 0.5rem);
+}
+[data-bs-theme='dark'] .day-body {
+  background: color-mix(in srgb, #fff 5%, var(--hub-card-bg));
+}
+/* In a dark theme elevation reads as LIGHTER, so anything sitting on the body
+   must lift further above it — otherwise the panels look like holes punched
+   into the surface instead of cards resting on it. */
+[data-bs-theme='dark'] .day-body .obs-panel,
+[data-bs-theme='dark'] .day-body > .card {
+  background: color-mix(in srgb, #fff 11%, var(--hub-card-bg));
+}
+
+
+/* ==========================================================================
+   New / edit observation form — a fixed WHITE working surface in both themes.
+   Selectors are theme-scoped where they must out-specify the dark .day-body
+   rules above. Everything inside is pinned to dark tones: in the dark theme the
+   controls, labels and editor all inherit light colours and would otherwise be
+   invisible (or punch black holes) on white.
+   ========================================================================== */
+.obs-form-card,
+[data-bs-theme='dark'] .day-body > .obs-form-card {
+  background: #ffffff;
+  border: 1px solid #dbe0e6;
+  box-shadow: 0 6px 22px rgba(31, 41, 55, 0.12);
+}
+.obs-form-card .card-header,
+[data-bs-theme='dark'] .obs-form-card .card-header {
+  background: #f5f7fa;
+  border-bottom: 1px solid #e4e8ee;
+}
+.obs-form-card .card-header .card-title { color: #212529; }
+.obs-form-card .card-body { background: #ffffff; border-radius: 0 0 0.5rem 0.5rem; }
+
+/* Panels sit just off-white so they still read as blocks on the white body. */
+.obs-form-card .obs-panel,
+[data-bs-theme='dark'] .obs-form-card .obs-panel {
+  background: #fbfcfd;
+  border-color: #e4e8ee;
+  box-shadow:
+    0 1px 2px rgba(31, 41, 55, 0.05),
+    0 6px 16px rgba(31, 41, 55, 0.05),
+    inset 0 1px 0 #ffffff;
+}
+.obs-form-card .obs-panel-title { color: #6c757d; }
+.obs-form-card .obs-label,
+.obs-form-card .obs-shot-label,
+.obs-form-card .form-label { color: #212529; }
+.obs-form-card .text-muted { color: #6c757d !important; }
+
+/* Form controls + rich text editor */
+.obs-form-card .form-control,
+.obs-form-card .input-group-text,
+.obs-form-card .rte,
+.obs-form-card .rte-toolbar {
+  background: #ffffff;
+  color: #212529;
+  border-color: #ced4da;
+}
+.obs-form-card .rte:empty::before { color: #adb5bd; }
+
+/* Screenshot drop zones */
+.obs-form-card .imgdrop-empty {
+  background: #ffffff;
+  border-color: #ced4da;
+  color: #6c757d;
+}
+.obs-form-card .imgdrop-empty:hover,
+.obs-form-card .imgdrop-empty.armed { border-color: var(--bs-primary); color: var(--bs-primary); }
+
+/* Unselected option buttons */
+.obs-form-card .btn-light {
+  background: #f8f9fa;
+  border-color: #dbe0e6;
+  color: #212529;
+}
+.obs-form-card .btn-light:hover { background: #eef1f5; }
+
+/* ==========================================================================
+   Condition group headings + search (Chart Patterns form and MultiSelect)
+   The headings were `small text-muted` — the faintest thing in the box, even
+   though they're what you navigate by. They now carry real weight.
+   ========================================================================== */
+.pattern-cond-label,
+.ms-group-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--hub-heading-color, var(--bs-emphasis-color));
+}
+/* Accent rule under each heading so groups separate without extra chrome. */
+.pattern-cond-label::after,
+.ms-group-label::after {
+  content: '';
+  display: block;
+  width: 26px;
+  height: 2px;
+  margin-top: 0.25rem;
+  border-radius: 2px;
+  background: var(--bs-primary);
+}
+
+/* Search box shared by the pattern form and the MultiSelect panel */
+.ms-search { position: relative; }
+.ms-search > i.ri-search-line {
+  position: absolute;
+  top: 50%;
+  left: 0.6rem;
+  transform: translateY(-50%);
+  color: var(--bs-secondary-color);
+  pointer-events: none;
+  font-size: 0.9rem;
+}
+.ms-search .form-control { padding-left: 1.9rem; padding-right: 1.9rem; }
+.ms-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.4rem;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--bs-secondary-color);
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem;
+}
+.ms-search-clear:hover { color: var(--bs-danger); }
+
+/* Keep the search pinned while the option list scrolls under it. */
+.ms-panel .ms-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: 0.5rem;
+  background: var(--hub-card-bg);
+}

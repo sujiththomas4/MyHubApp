@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Assessment from '@/components/trading/Assessment'
 import TradeCoach from '@/components/trading/TradeCoach'
 import EntryLevelsPopup from '@/components/trading/EntryLevelsPopup'
+import { quantityFor, CAPITAL_PER_QTY, LOT_SIZE } from '@/components/trading/entryLevels'
 import { evaluate, assessment, sentiment } from '@/components/trading/assessmentRules'
 import {
   useJournalDays, useJournalTrades, useJournalNotes,
@@ -210,6 +211,61 @@ function PreMarket({ value = {}, onSave }) {
   )
 }
 
+/* Trading capital -> today's size cap. Stored in the day's `premarket` jsonb,
+   but edited in the day header so the max quantity sits next to the date rather
+   than buried in the pre-market panel. Commits on blur/Enter. */
+function CapitalField({ value, onSave }) {
+  const [draft, setDraft] = useState(value ?? '')
+
+  // Follow the row when the day changes or a save lands.
+  useEffect(() => { setDraft(value ?? '') }, [value])
+
+  const qty = quantityFor(draft)
+  const commit = () => {
+    if (String(draft) === String(value ?? '')) return
+    onSave(draft === '' ? null : draft)
+  }
+
+  return (
+    <div className="capital-field">
+      <div className="input-group input-group-sm capital-input">
+        <span className="input-group-text">₹</span>
+        <input
+          type="number"
+          className="form-control"
+          placeholder="Capital"
+          aria-label="Trading capital"
+          title={`₹${CAPITAL_PER_QTY} per qty · ${LOT_SIZE} qty per lot`}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        />
+      </div>
+
+      {qty ? (
+        qty.lots > 0 ? (
+          <>
+            <span className="badge bg-primary-subtle text-primary capital-max">
+              Max {qty.maxQty} qty
+            </span>
+            <small className="text-muted">
+              {qty.lots} lot{qty.lots > 1 ? 's' : ''} · enter {qty.entryQty}
+              {qty.canAverage ? ' (keep 1 average)' : ' (no room to average)'}
+            </small>
+          </>
+        ) : (
+          <small className="text-warning">
+            Under one lot — needs ₹{qty.perLot.toLocaleString('en-IN')}
+          </small>
+        )
+      ) : (
+        <small className="text-muted">Set capital for max qty</small>
+      )}
+    </div>
+  )
+}
+
 // --- Single trade log (collapsible) -----------------------------------------
 function TradeRow({ trade, onEdit, onDelete }) {
   const [open, setOpen] = useState(false)
@@ -329,8 +385,9 @@ function NoteRow({ note, onEdit, onDelete }) {
            field is shown even when empty — a missing read is itself worth
            seeing, and a blank gap makes you wonder if it failed to save. */
         <div className="card-body border-top bg-light-subtle">
-          <h6 className="text-uppercase text-muted fs-11 mb-2">Current market observation</h6>
-          <div className="row g-3 mb-4 obs-fields">
+          <section className="obs-panel">
+          <h6 className="obs-panel-title">Current market observation</h6>
+          <div className="row g-3 obs-fields">
             <div className="col-6 col-md-auto">
               <div className="obs-label">Time</div>
               <TimeBadge time={note.time} />
@@ -353,39 +410,44 @@ function NoteRow({ note, onEdit, onDelete }) {
               )
             })}
           </div>
+          </section>
 
-          <h6 className="text-uppercase text-muted fs-11 mb-2">Screenshots</h6>
-          <div className="row g-3 mb-4">
-            {OBSERVATION_SHOTS.map((s) => (
-              <div className="col-6 col-lg-3" key={s.id}>
-                <div className="small text-muted mb-1">{s.label}</div>
+          <section className="obs-panel">
+            <h6 className="obs-panel-title">Screenshots</h6>
+            <div className="row g-3">
+              {OBSERVATION_SHOTS.map((s) => (
+                <div className="col-6 col-lg-3" key={s.id}>
+                  <div className="obs-shot-label">{s.label}</div>
+                  <ObsShot
+                    src={note.screenshots?.[s.id]}
+                    alt={s.label}
+                    onZoom={() => setZoom({ src: note.screenshots[s.id], alt: s.label })}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="obs-panel">
+            <h6 className="obs-panel-title">My observation or plans</h6>
+            <div className="row g-3">
+              <div className="col-lg-8">
+                {note.text ? (
+                  <div className="rte-content" dangerouslySetInnerHTML={{ __html: note.text }} />
+                ) : (
+                  <span className="text-muted fst-italic">Nothing written</span>
+                )}
+              </div>
+              <div className="col-lg-4">
+                <div className="obs-shot-label">{SHOT_LABEL.plan}</div>
                 <ObsShot
-                  src={note.screenshots?.[s.id]}
-                  alt={s.label}
-                  onZoom={() => setZoom({ src: note.screenshots[s.id], alt: s.label })}
+                  src={note.screenshots?.plan}
+                  alt={SHOT_LABEL.plan}
+                  onZoom={() => setZoom({ src: note.screenshots.plan, alt: SHOT_LABEL.plan })}
                 />
               </div>
-            ))}
-          </div>
-
-          <div className="row g-3">
-            <div className="col-lg-8">
-              <div className="small text-muted mb-1">My observation or plans</div>
-              {note.text ? (
-                <div className="rte-content" dangerouslySetInnerHTML={{ __html: note.text }} />
-              ) : (
-                <span className="text-muted fst-italic small">Nothing written</span>
-              )}
             </div>
-            <div className="col-lg-4">
-              <div className="small text-muted mb-1">{SHOT_LABEL.plan}</div>
-              <ObsShot
-                src={note.screenshots?.plan}
-                alt={SHOT_LABEL.plan}
-                onZoom={() => setZoom({ src: note.screenshots.plan, alt: SHOT_LABEL.plan })}
-              />
-            </div>
-          </div>
+          </section>
 
           {/* Legacy single attachment from before the named screenshots */}
           {note.image && (
@@ -547,53 +609,59 @@ function NoteForm({ initial, onSave, onCancel }) {
   return (
     <>
       {/* Row 1 — current market observation */}
-      <h6 className="text-uppercase text-muted fs-11 mb-2">Current market observation</h6>
-      <div className="row g-3 mb-4 obs-fields">
-        <div className="col-6 col-md-auto" style={{ maxWidth: 200 }}>
-          <TimeField value={time} onChange={setTime} />
+      <section className="obs-panel">
+        <h6 className="obs-panel-title">Current market observation</h6>
+        <div className="row g-3 obs-fields">
+          <div className="col-6 col-md-auto" style={{ maxWidth: 200 }}>
+            <TimeField value={time} onChange={setTime} />
+          </div>
+          {OBSERVATION_FIELDS.map((f) => {
+            const def = assessment.find((a) => a.id === f.id)
+            if (!def) return null
+            return (
+              <div className="col-12 col-md" key={f.id}>
+                <ObservationField
+                  def={def}
+                  label={f.label}
+                  value={answers[f.id]}
+                  onChange={(v) => set(f.id, v)}
+                />
+              </div>
+            )
+          })}
         </div>
-        {OBSERVATION_FIELDS.map((f) => {
-          const def = assessment.find((a) => a.id === f.id)
-          if (!def) return null
-          return (
-            <div className="col-12 col-md" key={f.id}>
-              <ObservationField
-                def={def}
-                label={f.label}
-                value={answers[f.id]}
-                onChange={(v) => set(f.id, v)}
-              />
-            </div>
-          )
-        })}
-      </div>
+      </section>
 
       {/* Row 2 — chart captures */}
-      <h6 className="text-uppercase text-muted fs-11 mb-2">Screenshots</h6>
-      <div className="row g-3 mb-4">
-        {OBSERVATION_SHOTS.map((s) => (
-          <div className="col-6 col-lg-3" key={s.id}>
-            <label className="form-label small mb-1">{s.label}</label>
-            <ImageDropZone value={shots[s.id] || null} onChange={(v) => setShot(s.id, v)} minHeight={120} />
-          </div>
-        ))}
-      </div>
+      <section className="obs-panel">
+        <h6 className="obs-panel-title">Screenshots</h6>
+        <div className="row g-3">
+          {OBSERVATION_SHOTS.map((s) => (
+            <div className="col-6 col-lg-3" key={s.id}>
+              <label className="obs-shot-label">{s.label}</label>
+              <ImageDropZone value={shots[s.id] || null} onChange={(v) => setShot(s.id, v)} minHeight={120} />
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Row 3 — the plan, plus its own marked-up Nifty 50 */}
-      <div className="row g-3">
-        <div className="col-lg-8">
-          <label className="form-label small mb-1">My observation or plans</label>
-          <RichTextEditor
-            value={text}
-            onChange={setText}
-            placeholder="What are you seeing? What's the plan?"
-          />
+      <section className="obs-panel">
+        <h6 className="obs-panel-title">My observation or plans</h6>
+        <div className="row g-3">
+          <div className="col-lg-8">
+            <RichTextEditor
+              value={text}
+              onChange={setText}
+              placeholder="What are you seeing? What's the plan?"
+            />
+          </div>
+          <div className="col-lg-4">
+            <label className="obs-shot-label">{SHOT_LABEL.plan}</label>
+            <ImageDropZone value={shots.plan || null} onChange={(v) => setShot('plan', v)} minHeight={150} />
+          </div>
         </div>
-        <div className="col-lg-4">
-          <label className="form-label small mb-1">Nifty 50 (plan)</label>
-          <ImageDropZone value={shots.plan || null} onChange={(v) => setShot('plan', v)} minHeight={150} />
-        </div>
-      </div>
+      </section>
 
       <div className="d-flex gap-2 mt-3">
         <button className="btn btn-info btn-sm" onClick={save}>
@@ -654,6 +722,13 @@ export default function Journal() {
 
   const activeDay = useMemo(() => days.find((d) => d.date === activeDate), [days, activeDate])
 
+  /* The size cap is about trading right now, so it always reads today's
+     capital — even while reviewing an older day on the Past tab. */
+  const todayCapital = useMemo(
+    () => days.find((d) => d.date === today)?.premarket?.capital,
+    [days, today]
+  )
+
   /* The form sits under pre-market, so hitting Edit on an observation further
      down the timeline would otherwise open it off-screen. */
   useEffect(() => {
@@ -703,13 +778,23 @@ export default function Journal() {
   const confirmDeleteNote = () => { apiRemoveNote(deleteNoteItem?.id).catch(console.error); setDeleteNoteItem(null) }
   const setPremarket = (pm) => apiSetPremarket(activeDate, pm).catch(console.error)
 
+  /* Capital lives inside the day's premarket jsonb, and setDayPremarket writes
+     that column whole — so merge rather than replace, or saving the capital
+     would wipe the day's cues. */
+  const saveCapital = (capital) => {
+    setSaveError(null)
+    return apiSetPremarket(activeDate, { ...(activeDay?.premarket || {}), capital })
+      .catch((e) => setSaveError(e?.message || String(e)))
+  }
+
   return (
     <div className="journal">
       {/* Floating "when to trade / when not to" coach. Rules: coachRules.js */}
       <TradeCoach today={today} />
 
-      {/* Recurring "check your entry levels" nag. Config: entryLevels.js */}
-      <EntryLevelsPopup />
+      {/* Recurring "check your entry levels" nag. Config: entryLevels.js.
+          Capital comes from today's pre-market, never the day being viewed. */}
+      <EntryLevelsPopup capital={todayCapital} />
 
       <div className="page-title-box d-flex align-items-center">
         <h4 className="flex-grow-1 mb-0">Trading Journal</h4>
@@ -818,12 +903,15 @@ export default function Journal() {
       {/* Selected day timeline — today's entry, or the day picked from the log */}
       {activeDay && (
         <div className="card">
-          <div className="card-header d-flex align-items-center flex-wrap gap-2">
-            <div className="flex-grow-1">
+          <div className="card-header d-flex align-items-center flex-wrap gap-3">
+            <div>
               <h5 className="card-title mb-0">{fmtDate(activeDay.date)}</h5>
               <small className="text-muted">{activeDay.note}</small>
             </div>
-            <div className="d-flex gap-3 align-items-center">
+
+            <CapitalField value={activeDay.premarket?.capital} onSave={saveCapital} />
+
+            <div className="d-flex gap-3 align-items-center ms-auto">
               <span className="text-muted small">Net</span>
               <span className={'fs-15 fw-semibold ' + pnlClass(dayStats(activeDay).net)}>
                 {money(dayStats(activeDay).net)}
@@ -836,7 +924,7 @@ export default function Journal() {
               </button>
             </div>
           </div>
-          <div className="card-body">
+          <div className="card-body day-body">
             {/* Pre-market always shows first for the day */}
             <PreMarket key={activeDate} value={activeDay.premarket || {}} onSave={setPremarket} />
 
@@ -844,7 +932,7 @@ export default function Journal() {
                 several of these through the day, and a modal each time got in
                 the way. */}
             {(adding === 'note' || editNote) && (
-              <div className="card border border-info-subtle mb-3" ref={formRef}>
+              <div className="card obs-form-card mb-3" ref={formRef}>
                 <div className="card-header d-flex align-items-center py-2">
                   <h6 className="card-title mb-0">
                     <i className={(editNote ? 'ri-pencil-line' : 'ri-eye-line') + ' me-2 text-info'} />
@@ -878,25 +966,29 @@ export default function Journal() {
               <p className="text-muted text-center my-4 mb-0">No trades or observations logged for this day yet.</p>
             )}
 
-            {timeline.map((item) =>
-              item.kind === 'trade'
-                ? (
-                  <TradeRow
-                    key={item.id}
-                    trade={item}
-                    onEdit={() => setEditTrade(item)}
-                    onDelete={() => setDeleteTradeItem(item)}
-                  />
-                )
-                : (
-                  <NoteRow
-                    key={item.id}
-                    note={item}
-                    onEdit={() => setEditNote(item)}
-                    onDelete={() => setDeleteNoteItem(item)}
-                  />
-                )
-            )}
+            {timeline.map((item) => {
+              /* Whatever is open in the form above is hidden here — otherwise
+                 the same observation shows twice, once being edited and once
+                 read-only, and it's unclear which one is live. */
+              if (item.kind === 'note' && editNote?.id === item.id) return null
+              if (item.kind === 'trade' && editTrade?.id === item.id) return null
+
+              return item.kind === 'trade' ? (
+                <TradeRow
+                  key={item.id}
+                  trade={item}
+                  onEdit={() => setEditTrade(item)}
+                  onDelete={() => setDeleteTradeItem(item)}
+                />
+              ) : (
+                <NoteRow
+                  key={item.id}
+                  note={item}
+                  onEdit={() => { setAdding(null); setEditNote(item) }}
+                  onDelete={() => setDeleteNoteItem(item)}
+                />
+              )
+            })}
           </div>
         </div>
       )}

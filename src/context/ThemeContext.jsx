@@ -24,6 +24,12 @@ const ThemeContext = createContext(null)
 const SUPPORTED_LAYOUTS = ['vertical', 'horizontal']
 const SUPPORTED_SIDEBAR_SIZES = ['lg']
 
+/* These lost their customizer controls, so a value persisted by an older build
+   can no longer be changed back from the UI — and a stale 'scrollable' makes
+   the sidebar position:absolute, which breaks its height and its scrolling.
+   Pin them to the default. */
+const PINNED_TO_DEFAULT = ['layoutWidth', 'layoutPosition']
+
 function readInitialState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -31,6 +37,7 @@ function readInitialState() {
       const merged = { ...DEFAULT_THEME, ...JSON.parse(raw) }
       if (!SUPPORTED_LAYOUTS.includes(merged.layout)) merged.layout = DEFAULT_THEME.layout
       if (!SUPPORTED_SIDEBAR_SIZES.includes(merged.sidebarSize)) merged.sidebarSize = DEFAULT_THEME.sidebarSize
+      for (const key of PINNED_TO_DEFAULT) merged[key] = DEFAULT_THEME[key]
       return merged
     }
   } catch {

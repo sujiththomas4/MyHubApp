@@ -150,9 +150,14 @@ export default function Sidebar() {
             <span className="logo-mark"><i className="ri-flashlight-fill" /></span>
             <span className="logo-text">Hub</span>
           </div>
-          <SimpleBar className="sidebar-menu" style={{ height: '100%' }}>
+          {/* Native scroll rather than SimpleBar: SimpleBar has to measure a
+              definite height to know it overflows, which kept failing at zoom
+              levels / small viewports, and its custom bar replaces the native
+              touch scrolling mobile needs. Flexbox gives this a real height and
+              the browser handles the rest. */}
+          <div className="sidebar-menu">
             <VerticalMenu />
-          </SimpleBar>
+          </div>
         </>
       )}
     </aside>

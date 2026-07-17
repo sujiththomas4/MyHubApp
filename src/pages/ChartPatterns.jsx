@@ -31,6 +31,7 @@ const INDICATORS = [
   { id: 'volume', label: 'Volume', options: ['High volume breakout', 'Big candle, low volume', 'Volume climax'] },
   { id: 'ema9', label: '9 EMA', options: ['9 EMA support', '9 EMA resistance'] },
   { id: 'ema20', label: '20 EMA', options: ['20 EMA support', '20 EMA resistance'] },
+  { id: 'ema9-20-break', label: '9 and 20 EMA Break', options: ['9 & 20 EMA breakout'] },
   {
     id: 'camarilla', label: 'Camarilla / CPR',
     options: [
@@ -62,9 +63,22 @@ function PatternForm({ initial, onSave, onCancel }) {
   const [image, setImage] = useState(initial?.image || null)
   const [conditions, setConditions] = useState(initial?.conditions || [])
   const [notes, setNotes] = useState(initial?.notes || '')
+  const [condQuery, setCondQuery] = useState('')
 
   const toggle = (opt) =>
     setConditions((c) => (c.includes(opt) ? c.filter((x) => x !== opt) : [...c, opt]))
+
+  /* Match on the option OR its group name, so "ema" surfaces the whole 9 EMA /
+     20 EMA groups rather than only options containing "ema". Already-selected
+     conditions always stay visible — otherwise searching would hide what you've
+     ticked and you'd lose track of it. */
+  const q = condQuery.trim().toLowerCase()
+  const shownGroups = INDICATORS
+    .map((g) => {
+      if (!q || g.label.toLowerCase().includes(q)) return g
+      return { ...g, options: g.options.filter((o) => o.toLowerCase().includes(q) || conditions.includes(o)) }
+    })
+    .filter((g) => g.options.length > 0)
 
   const save = () =>
     onSave({ id: initial?.id || 'p' + rid(), title: title.trim() || 'Untitled pattern', timeframe, image, conditions, notes: notes.trim() })
@@ -88,11 +102,35 @@ function PatternForm({ initial, onSave, onCancel }) {
       <label className="form-label small mb-1">Chart screenshot</label>
       <ImageDropZone value={image} onChange={setImage} />
 
-      <label className="form-label small mb-1 mt-3">Price &amp; indicator positions</label>
+      <div className="d-flex align-items-center gap-2 mt-3 mb-1">
+        <label className="form-label small mb-0 flex-grow-1">Price &amp; indicator positions</label>
+        {conditions.length > 0 && (
+          <span className="badge bg-primary">{conditions.length} selected</span>
+        )}
+      </div>
       <div className="border rounded p-2 mb-3">
-        {INDICATORS.map((g) => (
+        <div className="ms-search mb-2">
+          <i className="ri-search-line" />
+          <input
+            className="form-control form-control-sm"
+            placeholder="Search conditions…"
+            value={condQuery}
+            onChange={(e) => setCondQuery(e.target.value)}
+          />
+          {condQuery && (
+            <button type="button" className="ms-search-clear" aria-label="Clear search" onClick={() => setCondQuery('')}>
+              <i className="ri-close-line" />
+            </button>
+          )}
+        </div>
+
+        {shownGroups.length === 0 && (
+          <div className="small text-muted text-center py-2">No condition matches “{condQuery}”</div>
+        )}
+
+        {shownGroups.map((g) => (
           <div className="pattern-cond-group" key={g.id}>
-            <div className="small text-muted mb-1">{g.label}</div>
+            <div className="pattern-cond-label">{g.label}</div>
             <div className="d-flex flex-wrap gap-2">
               {g.options.map((opt) => {
                 const on = conditions.includes(opt)
@@ -271,14 +309,14 @@ export default function ChartPatterns() {
       </div>
 
       {/* Add pattern popup */}
-      <Modal open={adding} size="lg" title={<><i className="ri-add-line me-2 text-primary" />Add chart pattern</>} onClose={() => setAdding(false)}>
+      <Modal open={adding} size="xl" title={<><i className="ri-add-line me-2 text-primary" />Add chart pattern</>} onClose={() => setAdding(false)}>
         <PatternForm onSave={addPattern} onCancel={() => setAdding(false)} />
       </Modal>
 
       {/* View pattern popup */}
       <Modal
         open={Boolean(viewing)}
-        size="lg"
+        size="xxl"
         title={viewing && <>{viewing.title} <span className="badge bg-dark ms-2">{tfLabel(viewing.timeframe)}</span></>}
         onClose={() => setViewing(null)}
       >
