@@ -41,21 +41,23 @@ function MenuNode({ node, level, openIds, toggle }) {
     )
   }
 
-  /* Parent with children. Clicking the row opens/closes the submenu — it does
-     NOT navigate, so browsing the menu can't move you off the page you're on.
-     The parent's own landing page stays reachable via the arrow button, which
-     is the one part of the row that navigates. `open` also starts true for the
-     section containing the current route. Plain call (not a hook) so we never
-     call hooks conditionally after the early returns above. */
+  /* Parent with children. One click does both: opens the submenu AND goes to
+     the section's own landing page. The chevron already signals expandability,
+     so there's no second arrow — and folding navigation back into the row keeps
+     pages like /loans and /wealth/savings reachable from the nav.
+     `open` also starts true for the section containing the current route. Plain
+     call (not a hook) so we never call hooks conditionally after the early
+     returns above. */
   const isOpen = openIds.includes(node.id)
   const hasActiveChild = Boolean(findActiveTrail(node.children, pathname))
 
   return (
     <li className={'menu-item has-children' + (isOpen ? ' open' : '')}>
-      <button
-        type="button"
-        className={'menu-link' + (hasActiveChild ? ' active' : '')}
+      <NavLink
+        to={node.to || '#'}
+        end={node.to === '/'}
         aria-expanded={isOpen}
+        className={({ isActive }) => 'menu-link' + (isActive || hasActiveChild ? ' active' : '')}
         onClick={() => toggle(node.id)}
       >
         {node.icon && <i className={`menu-icon ${node.icon}`} />}
@@ -64,20 +66,7 @@ function MenuNode({ node, level, openIds, toggle }) {
           <span className={`menu-badge badge bg-${node.badge.variant} me-2`}>{node.badge.text}</span>
         )}
         <i className="menu-arrow ri-arrow-right-s-line" />
-      </button>
-
-      {/* Sibling, not nested — an <a> inside a <button> is invalid HTML.
-          Absolutely positioned over the row so it still reads as one line. */}
-      {node.to && (
-        <NavLink
-          to={node.to}
-          end={node.to === '/'}
-          className="menu-open-page"
-          title={`Open ${node.label}`}
-        >
-          <i className="ri-arrow-right-up-line" />
-        </NavLink>
-      )}
+      </NavLink>
       <ul className="submenu">
         {node.children.map((child) => (
           <MenuNode key={child.id} node={child} level={level + 1} openIds={openIds} toggle={toggle} />

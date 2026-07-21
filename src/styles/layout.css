@@ -213,26 +213,7 @@
 /* Only the open section's arrow turns — hover no longer implies anything. */
 .menu-item.open > .menu-link .menu-arrow { transform: rotate(90deg); }
 
-/* Parent rows toggle; this is the one part that navigates to the section's own
-   landing page. Sits over the row, left of the arrow, and only on hover so it
-   doesn't clutter the menu. */
 .menu-item.has-children { position: relative; }
-.menu-open-page {
-  position: absolute;
-  top: 0;
-  right: 2.5rem;
-  height: 2.35rem;
-  display: flex;
-  align-items: center;
-  padding: 0 0.35rem;
-  color: var(--hub-sidebar-item);
-  font-size: 0.95rem;
-  opacity: 0;
-  transition: opacity 0.12s ease, color 0.12s ease;
-}
-.menu-item.has-children:hover .menu-open-page,
-.menu-open-page:focus-visible { opacity: 0.75; }
-.menu-open-page:hover { opacity: 1; color: var(--hub-sidebar-item-active); }
 
 .menu-link.active,
 .menu-item > .menu-link.active {
