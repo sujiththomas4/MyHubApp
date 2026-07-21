@@ -35,6 +35,13 @@ export const QUALITY = {
 export const CAPITAL_PER_QTY = 200
 export const LOT_SIZE = 65
 
+/* Always held back and never traded. Subtracted before any quantity is worked
+   out, so every screen quotes a size the account can actually survive. */
+export const CAPITAL_RESERVE = 30_000
+
+// Most entries a position may be split into (1 entry + up to 2 averages).
+export const MAX_ENTRIES = 3
+
 /**
  * Turn the day's trading capital into a tradable size.
  *
@@ -55,11 +62,15 @@ export const LOT_SIZE = 65
 export function quantityFor(capital) {
   const c = Number(capital)
   if (!Number.isFinite(c) || c <= 0) return null
-  const affordableQty = Math.floor(c / CAPITAL_PER_QTY)
+  // The reserve never trades — take it off the top before sizing anything.
+  const usable = Math.max(0, c - CAPITAL_RESERVE)
+  const affordableQty = Math.floor(usable / CAPITAL_PER_QTY)
   const lots = Math.floor(affordableQty / LOT_SIZE)
   const entryLots = Math.floor(lots / 2)
   return {
     capital: c,
+    reserve: CAPITAL_RESERVE,
+    usable,
     affordableQty,
     lots,
     maxQty: lots * LOT_SIZE,
@@ -67,6 +78,34 @@ export function quantityFor(capital) {
     canAverage: entryLots > 0,
     perLot: LOT_SIZE * CAPITAL_PER_QTY, // capital one lot ties up
   }
+}
+
+/**
+ * The same capital split three ways: all-in-one, two entries, or three.
+ * Decide WHICH plan before entering — that's what stops an unplanned average
+ * turning into a third and a fourth.
+ *
+ * Each entry is a whole number of lots, so `totalQty` can be below `maxQty`
+ * when the lots don't divide evenly (7 lots over 3 entries = 2 each, 1 unused).
+ * Rounding up instead would breach the capital.
+ *
+ * @returns null when nothing is tradable, else an array of MAX_ENTRIES plans
+ */
+export function quantityPlans(capital) {
+  const q = quantityFor(capital)
+  if (!q || q.lots < 1) return null
+  return Array.from({ length: MAX_ENTRIES }, (_, i) => {
+    const entries = i + 1
+    const lotsPerEntry = Math.floor(q.lots / entries)
+    return {
+      entries,
+      lotsPerEntry,
+      qtyPerEntry: lotsPerEntry * LOT_SIZE,
+      totalLots: lotsPerEntry * entries,
+      totalQty: lotsPerEntry * entries * LOT_SIZE,
+      viable: lotsPerEntry >= 1,
+    }
+  })
 }
 
 // --- Discipline reminders ----------------------------------------------------

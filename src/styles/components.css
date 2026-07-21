@@ -1303,3 +1303,813 @@
   padding-bottom: 0.5rem;
   background: var(--hub-card-bg);
 }
+
+/* ==========================================================================
+   BEFORE I TRADE — the daily pre-market read.
+   Deliberately not a calm dashboard. The creed is dark and heavy, the
+   account-damaging mistakes are red, and the money each one cost is the loudest
+   line in the card — because the cost is the part that changes behaviour.
+   ========================================================================== */
+.before-trade .bt-section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+}
+.before-trade .bt-section-head h5 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--hub-heading-color);
+}
+.before-trade .bt-section-head > :last-child { margin-left: auto; }
+
+/* ---- 1. The creed ---- */
+.bt-creed {
+  position: relative;
+  overflow: hidden;
+  padding: 1.35rem 1.6rem 1.5rem;
+  margin-bottom: 1.75rem;
+  border-radius: 0.9rem;
+  color: #fff;
+  background:
+    radial-gradient(900px 260px at 8% -10%, rgba(240, 101, 72, 0.42), transparent 62%),
+    linear-gradient(135deg, #171a27 0%, #2b3048 58%, #3a2f4d 100%);
+  box-shadow: 0 18px 46px rgba(15, 18, 30, 0.5);
+}
+/* Every heading is coloured by a global h1–h6 rule using --hub-heading-color,
+   which is DARK grey in the light theme — on this dark banner it was almost
+   invisible. Force white for everything inside, in both themes. */
+.bt-creed,
+.bt-creed h5,
+.bt-creed p,
+.bt-creed strong { color: #fff; }
+
+.bt-creed-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 2rem;
+  background: rgba(240, 101, 72, 0.2);
+  border: 1px solid rgba(240, 101, 72, 0.55);
+  color: #ffb3a3;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.bt-creed-main { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.bt-creed-years {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-right: 1.5rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+}
+.bt-creed-num {
+  font-size: 5rem;
+  font-weight: 800;
+  line-height: 0.82;
+  letter-spacing: -0.05em;
+  color: #f06548;
+  text-shadow: 0 0 40px rgba(240, 101, 72, 0.55);
+}
+.bt-creed-unit {
+  font-size: 0.8125rem;
+  line-height: 1.15;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+}
+.bt-creed-text { flex: 1 1 320px; min-width: 0; }
+.bt-creed-text h5 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.45rem;
+}
+.bt-creed-text p {
+  font-size: 0.875rem;
+  margin-bottom: 0.45rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+.bt-creed-line {
+  margin: 0 !important;
+  font-size: 1rem !important;
+  font-weight: 600;
+  font-style: italic;
+  color: #ffd9d1 !important;
+}
+.bt-creed-ack { margin-left: auto; text-align: center; flex-shrink: 0; }
+.bt-streak {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #ffc107;
+  white-space: nowrap;
+}
+.bt-streak.is-zero { color: rgba(255, 255, 255, 0.45); }
+
+/* Today's trap — the one mistake spotlighted for this date. */
+.bt-focus {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-top: 1.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 4px solid #f7b84b;
+}
+.bt-focus-tag {
+  flex-shrink: 0;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.3rem;
+  background: #f7b84b;
+  color: #3d2c05;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.bt-focus-body { display: flex; flex-direction: column; min-width: 0; flex: 1 1 220px; }
+.bt-focus-body strong { font-size: 1rem; }
+.bt-focus-cost { font-size: 0.8125rem; color: #ffb3a3; }
+.bt-focus-rule {
+  margin-left: auto;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.4rem;
+  background: rgba(10, 179, 156, 0.18);
+  border: 1px solid rgba(10, 179, 156, 0.45);
+  color: #7ee6d6;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* ---- 2. Mistakes — told graphically ---- */
+.bt-mistake {
+  --accent: #f7b84b;                 /* high severity */
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  padding: 1.05rem 1.15rem 1.15rem;
+  border-radius: 0.8rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, var(--hub-card-bg)) 0%,
+                            var(--hub-card-bg) 42%);
+  border: 1px solid var(--hub-border);
+  border-top: 3px solid var(--accent);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bt-mistake:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12); }
+.bt-mistake.is-critical {
+  --accent: #f06548;                 /* account-damaging */
+  box-shadow: 0 4px 20px rgba(240, 101, 72, 0.16);
+}
+
+/* Unread cards breathe until they're acknowledged. A soft glow pulse rather
+   than a hard on/off blink — six cards flashing at once would be unreadable,
+   and the point is to pull the eye, not to punish it. */
+.bt-mistake.is-unread { animation: bt-blink 1.9s ease-in-out infinite; }
+@keyframes bt-blink {
+  0%, 100% {
+    border-color: var(--hub-border);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  }
+  50% {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent),
+                0 6px 22px color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+}
+/* Hovering pauses it so it can't strobe while you're actually reading. */
+.bt-mistake.is-unread:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .bt-mistake.is-unread { animation: none; border-color: var(--accent); }
+}
+
+/* Read: the pulse ends for good and the card goes calm green. */
+.bt-mistake.is-read {
+  animation: none;
+  border: 1px solid var(--bs-success);
+  border-top: 3px solid var(--bs-success);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--bs-success) 22%, transparent);
+}
+.bt-mistake.is-read .bt-mistake-watermark { opacity: 0.05; }
+
+/* Oversized ghost of the same icon — carries the card visually without
+   competing with the text. */
+.bt-mistake-watermark {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.75rem;
+  font-size: 6.5rem;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.09;
+  pointer-events: none;
+}
+
+.bt-mistake-head { display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.6rem; }
+.bt-mistake-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 0.65rem;
+  font-size: 1.4rem;
+  color: #fff;
+  background: linear-gradient(140deg, var(--accent) 0%,
+              color-mix(in srgb, var(--accent) 55%, #000) 100%);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.bt-mistake-heading { min-width: 0; }
+.bt-mistake-sev {
+  display: inline-block;
+  margin-bottom: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.25rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.bt-mistake h6 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 0;
+}
+
+/* ---- Tags ---- */
+.bt-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.65rem; }
+.bt-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.bt-tag.is-when { background: rgba(41, 156, 219, 0.14); color: #299cdb; border-color: rgba(41, 156, 219, 0.35); }
+.bt-tag.is-product { background: rgba(101, 89, 204, 0.14); color: #8b80e0; border-color: rgba(101, 89, 204, 0.35); }
+.bt-tag.is-habit { background: rgba(134, 142, 150, 0.16); color: var(--bs-secondary-color); border-color: rgba(134, 142, 150, 0.32); }
+/* The account tag is deliberately the loudest chip on the card — trading the
+   wrong product in the wrong account is the most expensive mistake here, so the
+   account name has to jump out before anything else is read. */
+.bt-tag.is-account {
+  background: linear-gradient(135deg, #f06548 0%, #d64527 100%);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 2px 8px rgba(240, 101, 72, 0.45);
+}
+.bt-tag.is-account i { font-size: 0.8rem; }
+
+.bt-mistake-detail {
+  font-size: 0.8125rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.65rem;
+  line-height: 1.5;
+}
+
+/* ---- Cost / rule blocks ---- */
+.bt-mistake-block {
+  position: relative;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.bt-mistake-block + .bt-mistake-block { margin-top: 0.4rem; }
+.bt-block-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+}
+/* Red for what it took, green for what prevents it. */
+.bt-mistake-block.is-cost {
+  background: rgba(240, 101, 72, 0.1);
+  border: 1px solid rgba(240, 101, 72, 0.28);
+  color: #f06548;
+}
+.bt-mistake-block.is-rule {
+  background: color-mix(in srgb, var(--bs-success) 10%, var(--hub-card-bg));
+  border: 1px solid color-mix(in srgb, var(--bs-success) 32%, transparent);
+  color: var(--bs-success);
+}
+
+/* ---- 3. Morning playbook ---- */
+.bt-morning {
+  height: 100%;
+  padding: 1rem 1.15rem;
+  border-radius: 0.7rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+}
+.bt-morning.is-avoid { border-top: 3px solid #f06548; }
+.bt-morning.is-trust { border-top: 3px solid #0ab39c; }
+.bt-morning-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+.bt-morning.is-avoid .bt-morning-head { color: #f06548; }
+.bt-morning.is-trust .bt-morning-head { color: #0ab39c; }
+.bt-morning-why {
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.6rem;
+}
+.bt-morning ul { list-style: none; margin: 0; padding: 0; }
+.bt-morning li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-size: 0.9375rem;
+  border-top: 1px solid var(--hub-border);
+}
+.bt-morning li:first-child { border-top: 0; }
+.bt-morning.is-avoid li i { color: #f06548; }
+.bt-morning.is-trust li i { color: #0ab39c; }
+.bt-morning.is-avoid li { text-decoration: line-through; opacity: 0.75; }
+
+/* ---- 4. Today's checks ---- */
+.bt-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--hub-border);
+  overflow: hidden;
+}
+.bt-progress-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--bs-primary);
+  transition: width 0.25s ease, background-color 0.25s ease;
+}
+.bt-progress-bar.is-done { background: var(--bs-success); }
+.bt-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.5rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.bt-check i { font-size: 1.2rem; color: var(--bs-secondary-color); flex-shrink: 0; }
+.bt-check strong { display: block; font-size: 0.875rem; font-weight: 600; }
+.bt-check small { display: block; font-size: 0.6875rem; color: var(--bs-secondary-color); line-height: 1.3; }
+.bt-check.is-on {
+  border-color: color-mix(in srgb, var(--bs-success) 45%, transparent);
+  background: color-mix(in srgb, var(--bs-success) 8%, var(--hub-card-bg));
+}
+.bt-check.is-on i { color: var(--bs-success); }
+
+/* ---- 5. Patterns ---- */
+.bt-pattern { position: relative; }
+.bt-pattern img {
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid var(--hub-border);
+  cursor: zoom-in;
+}
+.bt-pattern-empty {
+  display: grid;
+  place-items: center;
+  height: 130px;
+  border-radius: 0.5rem;
+  border: 1px dashed var(--hub-border);
+  color: var(--bs-secondary-color);
+  font-size: 1.5rem;
+}
+.bt-pattern-title {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.bt-pattern-tf { position: absolute; top: 0.4rem; right: 0.4rem; font-size: 0.625rem; }
+
+@media (max-width: 767.98px) {
+  .bt-creed { padding: 1.15rem; gap: 1rem; }
+  .bt-creed-num { font-size: 3.2rem; }
+  .bt-creed-ack { margin-left: 0; width: 100%; text-align: left; }
+}
+
+/* No button — the card itself is the target while it's unread. */
+.bt-mistake.is-unread { cursor: pointer; }
+.bt-mistake.is-unread:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+/* Green check that replaces it once the card has been read. */
+.bt-mistake-done {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bs-success);
+  color: #fff;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--bs-success) 50%, transparent);
+  animation: bt-done-pop 0.25s ease-out;
+}
+@keyframes bt-done-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bt-mistake-done { animation: none; }
+}
+
+/* ---- Open on the laptop: windows that must be up and watched ---- */
+.bt-screen {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  height: 100%;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.6rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.bt-screen:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+.bt-screen-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  font-size: 1.15rem;
+  color: var(--bs-secondary-color);
+  background: var(--hub-hover-bg);
+}
+.bt-screen-text { min-width: 0; flex: 1; }
+.bt-screen-text strong { display: flex; align-items: center; gap: 0.4rem; font-size: 0.875rem; font-weight: 600; }
+.bt-screen-text small { display: block; font-size: 0.6875rem; color: var(--bs-secondary-color); line-height: 1.3; }
+.bt-screen-tick { font-size: 1.25rem; color: var(--bs-secondary-color); flex-shrink: 0; }
+.bt-screen-link {
+  color: var(--bs-secondary-color);
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.bt-screen-link:hover { color: var(--bs-primary); }
+/* OI decides whether to trade at all, so its tile is marked. */
+.bt-screen-key { 
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem;
+  background: #f06548;
+  color: #fff;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.bt-screen.is-key { border-color: rgba(240, 101, 72, 0.45); }
+.bt-screen.is-on {
+  border-color: color-mix(in srgb, var(--bs-success) 45%, transparent);
+  background: color-mix(in srgb, var(--bs-success) 8%, var(--hub-card-bg));
+}
+.bt-screen.is-on .bt-screen-tick,
+.bt-screen.is-on .bt-screen-icon { color: var(--bs-success); }
+.bt-screen.is-on .bt-screen-icon { background: color-mix(in srgb, var(--bs-success) 15%, transparent); }
+
+/* ---- Capital -> tradable flow ---- */
+.bt-capital-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.55rem;
+  background: var(--hub-hover-bg);
+  border: 1px solid var(--hub-border);
+}
+.bt-capital-flow > span {
+  display: flex;
+  flex-direction: column;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.bt-capital-flow small {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--bs-secondary-color);
+}
+.bt-capital-flow > i { color: var(--bs-secondary-color); }
+.bt-capital-flow .is-reserve { color: #f7b84b; }
+.bt-capital-flow .is-usable { color: var(--bs-primary); }
+.bt-capital-flow .is-max { color: var(--bs-success); }
+
+/* ---- The three entry plans ---- */
+.bt-plan {
+  height: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 0.65rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  border-top: 3px solid var(--bs-primary);
+  text-align: center;
+}
+.bt-plan.is-dead { border-top-color: var(--hub-border); opacity: 0.6; }
+.bt-plan-head { font-size: 0.9375rem; font-weight: 700; }
+.bt-plan-head small {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--bs-secondary-color);
+}
+.bt-plan-qty {
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1.05;
+  margin: 0.4rem 0 0.1rem;
+  color: var(--bs-primary);
+}
+.bt-plan-qty small {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--bs-secondary-color);
+}
+/* One chip per entry — shows the shape of the position at a glance. */
+.bt-plan-dots { display: flex; justify-content: center; gap: 0.25rem; margin: 0.5rem 0 0.4rem; }
+.bt-plan-dots span {
+  flex: 1;
+  max-width: 60px;
+  padding: 0.15rem 0;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--bs-primary) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bs-primary) 32%, transparent);
+  color: var(--bs-primary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+.bt-plan-total { font-size: 0.75rem; color: var(--bs-secondary-color); }
+.bt-plan-dead { font-size: 0.75rem; color: var(--bs-secondary-color); padding: 1rem 0; }
+
+/* ==========================================================================
+   Panels + bulging cards (Before I Trade)
+   ========================================================================== */
+
+/* Section panel — each section owns a colour, so the page reads as distinct
+   blocks rather than one long scroll. `--panel` is the section hue; the tinted
+   wash plus the dot grid gives the raised tiles a coloured surface to sit on.
+   Deliberately a tint, not a saturated fill: the cards inside are card-coloured
+   and would be unreadable on a strong background. */
+.before-trade .bt-panel {
+  --panel: 64, 81, 137;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(var(--panel), 0.28);
+  background-color: color-mix(in srgb, rgb(var(--panel)) 11%, var(--hub-card-bg));
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(var(--panel), 0.16) 1px, transparent 0),
+    radial-gradient(760px 240px at 10% -12%, rgba(var(--panel), 0.3), transparent 64%),
+    radial-gradient(600px 220px at 104% 112%, rgba(var(--panel), 0.22), transparent 62%);
+  background-size: 22px 22px, 100% 100%, 100% 100%;
+  box-shadow: 0 8px 28px rgba(var(--panel), 0.16);
+}
+/* Colour bar across the top so the section is identifiable at a glance. */
+.before-trade .bt-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgb(var(--panel)), color-mix(in srgb, rgb(var(--panel)) 45%, #fff));
+}
+.before-trade .bt-panel.is-patterns { --panel: 101, 89, 204; }  /* violet— patterns */
+
+/* "Open on the laptop" and "Quantity for today" are state-driven: red while
+   something is still missing, green once it isn't — so each panel is its own
+   go/no-go signal rather than something you have to read and count. */
+.before-trade .bt-panel.is-notready { --panel: 240, 101, 72; }
+.before-trade .bt-panel.is-ready { --panel: 10, 179, 156; }
+.before-trade .bt-panel.is-notready,
+.before-trade .bt-panel.is-ready {
+  transition: background-color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+[data-bs-theme='dark'] .before-trade .bt-panel {
+  background-color: color-mix(in srgb, rgb(var(--panel)) 16%, var(--hub-card-bg));
+  border-color: rgba(var(--panel), 0.4);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0),
+    radial-gradient(760px 240px at 10% -12%, rgba(var(--panel), 0.34), transparent 64%),
+    radial-gradient(600px 220px at 104% 112%, rgba(var(--panel), 0.26), transparent 62%);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+/* Convex "bulge": a top-to-bottom gradient plus a bright inset line along the
+   top edge and a soft inset shade along the bottom. That pairing is what reads
+   as puffed-out rather than merely outlined — the outer shadows alone only make
+   a flat card hover. */
+.before-trade .bt-screen,
+.before-trade .bt-plan,
+.before-trade .bt-capital-flow {
+  background-image: linear-gradient(180deg,
+    color-mix(in srgb, #fff 70%, var(--hub-card-bg)) 0%,
+    var(--hub-card-bg) 55%,
+    color-mix(in srgb, #000 4%, var(--hub-card-bg)) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -2px 5px rgba(31, 41, 55, 0.06),
+    0 1px 2px rgba(31, 41, 55, 0.06),
+    0 8px 18px rgba(31, 41, 55, 0.09);
+}
+/* In a dark theme the highlight has to be faint or it looks like a scratch,
+   and the ambient shadow has to be far deeper to register at all. */
+[data-bs-theme='dark'] .before-trade .bt-screen,
+[data-bs-theme='dark'] .before-trade .bt-plan,
+[data-bs-theme='dark'] .before-trade .bt-capital-flow {
+  background-image: linear-gradient(180deg,
+    color-mix(in srgb, #fff 9%, var(--hub-card-bg)) 0%,
+    var(--hub-card-bg) 55%,
+    color-mix(in srgb, #000 22%, var(--hub-card-bg)) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 10px 22px rgba(0, 0, 0, 0.4);
+}
+
+/* Press the tile in when it's toggled — the inverse of the bulge. */
+.before-trade .bt-screen { transition: transform 0.14s ease, box-shadow 0.14s ease, background-color 0.14s ease; }
+.before-trade .bt-screen:hover { transform: translateY(-2px); }
+.before-trade .bt-screen.is-on {
+  background-image: none;
+  box-shadow: inset 0 2px 5px rgba(31, 41, 55, 0.1);
+}
+[data-bs-theme='dark'] .before-trade .bt-screen.is-on {
+  background-image: none;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.before-trade .bt-plan { transition: transform 0.14s ease, box-shadow 0.14s ease; }
+.before-trade .bt-plan:hover:not(.is-dead) { transform: translateY(-3px); }
+
+/* Featured = "check this daily" — surfaced on the Before I Trade screen. */
+.pattern-featured {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px dashed var(--hub-border);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.pattern-featured input { margin-top: 0.2rem; cursor: pointer; }
+.pattern-featured > i { font-size: 1.2rem; color: var(--bs-secondary-color); }
+.pattern-featured strong { display: block; font-size: 0.875rem; }
+.pattern-featured small { display: block; font-size: 0.6875rem; color: var(--bs-secondary-color); }
+.pattern-featured.is-on {
+  border-style: solid;
+  border-color: #f7b84b;
+  background: color-mix(in srgb, #f7b84b 10%, var(--hub-card-bg));
+}
+.pattern-featured.is-on > i { color: #f7b84b; }
+
+/* Star toggle + badge on the gallery card */
+.pattern-star { color: var(--bs-secondary-color); border: 0; background: transparent; line-height: 1; }
+.pattern-star:hover, .pattern-star.is-on { color: #f7b84b; }
+.pattern-card.is-featured { border-color: #f7b84b; }
+.pattern-featured-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.25rem;
+  background: #f7b84b;
+  color: #3d2c05;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ---- Patterns to review: one full-width row each, text left / chart right ---- */
+.bt-pattern-rows { display: flex; flex-direction: column; gap: 0.85rem; }
+.bt-prow {
+  display: flex;
+  gap: 1.1rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  border-radius: 0.65rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 4px rgba(31, 41, 55, 0.05),
+    0 8px 18px rgba(31, 41, 55, 0.07);
+}
+[data-bs-theme='dark'] .bt-prow {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 8px 18px rgba(0, 0, 0, 0.4);
+}
+.bt-prow-text { flex: 1 1 0; min-width: 0; }
+.bt-prow-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.bt-prow-head h6 { margin: 0; font-size: 1.0625rem; font-weight: 700; }
+.bt-prow-label {
+  margin: 0.55rem 0 0.3rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--bs-secondary-color);
+}
+.bt-prow-label:first-child { margin-top: 0; }
+.bt-prow-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.bt-prow-chips span {
+  padding: 0.2rem 0.55rem;
+  border-radius: 2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--bs-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bs-primary) 32%, transparent);
+  color: var(--bs-primary);
+}
+.bt-prow-notes {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--bs-body-color);
+}
+/* Chart sits right, fixed share of the row so the rows line up down the page. */
+.bt-prow-img { flex: 0 0 320px; max-width: 320px; }
+.bt-prow-img img {
+  width: 100%;
+  max-height: 210px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid var(--hub-border);
+  cursor: zoom-in;
+  display: block;
+}
+.bt-prow-img .bt-pattern-empty { height: 150px; }
+
+@media (max-width: 767.98px) {
+  .bt-prow { flex-direction: column; }
+  .bt-prow-img { flex: 1 1 auto; max-width: 100%; width: 100%; }
+}
+
+/* Pattern view modal — chart left, description right. */
+.pattern-view-img { width: 100%; cursor: zoom-in; }
+.pattern-view-notes { font-size: 0.9375rem; line-height: 1.6; white-space: pre-wrap; }
+/* The chart column sticks while a long note scrolls beside it. */
+@media (min-width: 992px) {
+  .pattern-view > .col-lg-7 { position: sticky; top: 0; align-self: flex-start; }
+}

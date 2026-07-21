@@ -173,8 +173,14 @@ create table if not exists chart_patterns (
   timeframe text not null,      -- 3m | 5m
   image_url text,               -- storage URL
   conditions jsonb not null default '[]'::jsonb,
-  notes text
+  notes text,
+  featured boolean not null default false  -- surfaced on "Before I Trade"
 );
+
+-- `create table if not exists` is a no-op on an existing database, so add the
+-- column explicitly for projects created before patterns could be featured.
+alter table chart_patterns
+  add column if not exists featured boolean not null default false;
 
 -- =====================================================================
 -- Row Level Security. Personal app → require an authenticated user.

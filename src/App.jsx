@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import Login from '@/pages/Login'
 import MainLayout from '@/layouts/MainLayout'
 import Dashboard from '@/pages/Dashboard'
-import RuleBook from '@/pages/RuleBook'
+import BeforeITrade from '@/pages/BeforeITrade'
 import Journal from '@/pages/Journal'
 import ChartPatterns from '@/pages/ChartPatterns'
 import Loans from '@/pages/Loans'
@@ -45,7 +45,9 @@ export default function App() {
         <Route path="/investments/india" element={<StockPnL region="India" />} />
         <Route path="/investments/uae" element={<StockPnL region="UAE" />} />
         <Route path="/investments/:slug" element={<StockAccount />} />
-        <Route path="/trading/rule-book" element={<RuleBook />} />
+        <Route path="/trading/before-i-trade" element={<BeforeITrade />} />
+        {/* Old path kept so existing links/bookmarks still land somewhere. */}
+        <Route path="/trading/rule-book" element={<BeforeITrade />} />
         <Route path="/trading/journal" element={<Journal />} />
         <Route path="/trading/chart-patterns" element={<ChartPatterns />} />
         <Route path="/trading/brokers" element={<BrokerOverview module={optionBuyingModule} />} />

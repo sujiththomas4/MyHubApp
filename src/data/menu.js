@@ -75,10 +75,10 @@ export const menu = [
 
   {
     id: 'trading-rulebook',
-    label: 'Rule book',
-    icon: 'ri-book-open-line',
-    to: '/trading/rule-book',
-    badge: { text: 'Imp', variant: 'warning' },
+    label: 'Before I Trade',
+    icon: 'ri-shield-star-line',
+    to: '/trading/before-i-trade',
+    badge: { text: 'Daily', variant: 'danger' },
   },
   {
     id: 'trading-journal',

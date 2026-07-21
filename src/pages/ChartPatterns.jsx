@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { usePatterns, addPattern as apiAddPattern, removePattern as apiRemovePattern } from '@/data/chartPatternsRepo'
+import { usePatterns, addPattern as apiAddPattern, removePattern as apiRemovePattern, setPatternFeatured as apiSetFeatured } from '@/data/chartPatternsRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import ImageDropZone from '@/components/ui/ImageDropZone'
 import MultiSelect from '@/components/ui/MultiSelect'
+import ImageLightbox from '@/components/ui/ImageLightbox'
 
 /**
  * ChartPatterns.jsx  (DRAFT)
@@ -63,6 +64,7 @@ function PatternForm({ initial, onSave, onCancel }) {
   const [image, setImage] = useState(initial?.image || null)
   const [conditions, setConditions] = useState(initial?.conditions || [])
   const [notes, setNotes] = useState(initial?.notes || '')
+  const [featured, setFeatured] = useState(initial?.featured || false)
   const [condQuery, setCondQuery] = useState('')
 
   const toggle = (opt) =>
@@ -81,7 +83,7 @@ function PatternForm({ initial, onSave, onCancel }) {
     .filter((g) => g.options.length > 0)
 
   const save = () =>
-    onSave({ id: initial?.id || 'p' + rid(), title: title.trim() || 'Untitled pattern', timeframe, image, conditions, notes: notes.trim() })
+    onSave({ id: initial?.id || 'p' + rid(), title: title.trim() || 'Untitled pattern', timeframe, image, conditions, notes: notes.trim(), featured })
 
   return (
     <>
@@ -152,6 +154,16 @@ function PatternForm({ initial, onSave, onCancel }) {
         placeholder="e.g. Enter on retest hold above VWAP, SL below 9 EMA…"
         value={notes} onChange={(e) => setNotes(e.target.value)} />
 
+      {/* Featured patterns are surfaced on the Before I Trade screen. */}
+      <label className={'pattern-featured' + (featured ? ' is-on' : '')}>
+        <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
+        <i className={featured ? 'ri-star-fill' : 'ri-star-line'} />
+        <span>
+          <strong>Featured — check this daily</strong>
+          <small>Shows up in “Patterns to review” on the Before I Trade screen.</small>
+        </span>
+      </label>
+
       <div className="d-flex gap-2">
         <button className="btn btn-primary btn-sm" onClick={save}>
           <i className="ri-save-line me-1" />{initial ? 'Save changes' : 'Add pattern'}
@@ -172,9 +184,9 @@ const ConditionChips = ({ conditions }) => (
 )
 
 // --- Gallery card ------------------------------------------------------------
-function PatternCard({ pattern, onOpen, onDelete }) {
+function PatternCard({ pattern, onOpen, onDelete, onToggleFeatured }) {
   return (
-    <div className="card h-100 pattern-card">
+    <div className={'card h-100 pattern-card' + (pattern.featured ? ' is-featured' : '')}>
       <div className="pattern-thumb" role="button" onClick={onOpen}>
         {pattern.image ? (
           <img src={pattern.image} alt={pattern.title} />
@@ -182,10 +194,22 @@ function PatternCard({ pattern, onOpen, onDelete }) {
           <div className="pattern-thumb-empty"><i className="ri-line-chart-line" /></div>
         )}
         <span className="badge bg-dark pattern-tf">{tfLabel(pattern.timeframe)}</span>
+        {pattern.featured && (
+          <span className="pattern-featured-badge" title="Checked daily">
+            <i className="ri-star-fill" />Daily
+          </span>
+        )}
       </div>
       <div className="card-body">
         <div className="d-flex align-items-start">
           <h6 className="mb-2 flex-grow-1" role="button" onClick={onOpen}>{pattern.title}</h6>
+          <button
+            className={'btn btn-sm p-0 ms-2 pattern-star' + (pattern.featured ? ' is-on' : '')}
+            title={pattern.featured ? 'Remove from daily review' : 'Check this daily'}
+            onClick={onToggleFeatured}
+          >
+            <i className={pattern.featured ? 'ri-star-fill' : 'ri-star-line'} />
+          </button>
           <button className="btn btn-sm btn-ghost-danger p-0 ms-2" title="Delete" onClick={onDelete}>
             <i className="ri-delete-bin-line" />
           </button>
@@ -207,6 +231,8 @@ export default function ChartPatterns() {
   const [adding, setAdding] = useState(false)
   const [viewing, setViewing] = useState(null) // pattern being viewed
   const [deleteTarget, setDeleteTarget] = useState(null) // pattern pending delete confirm
+  const [saveError, setSaveError] = useState(null) // surfaced instead of console-only
+  const [zoom, setZoom] = useState(null) // { src, alt } of the chart being viewed full-screen
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -226,12 +252,34 @@ export default function ChartPatterns() {
   const filtersActive = search.trim() || condFilter.length > 0 || filter !== 'all'
   const clearFilters = () => { setSearch(''); setCondFilter([]); setFilter('all') }
 
-  const addPattern = (p) => { setPatterns((ps) => [p, ...ps]); setAdding(false); apiAddPattern(p).catch(console.error) }
+  /* Only close the form once the write actually lands. Adding to local state and
+     closing optimistically meant a rejected insert looked identical to a
+     successful one — the pattern showed up, then silently vanished the moment
+     the live query overwrote local state with the real table. */
+  const addPattern = (p) => {
+    setSaveError(null)
+    return apiAddPattern(p)
+      .then(() => setAdding(false))
+      .catch((e) => setSaveError(e?.message || String(e)))
+  }
+
+  // Optimistic, but put it back if the write is rejected.
+  const toggleFeatured = (p) => {
+    const featured = !p.featured
+    setSaveError(null)
+    setPatterns((ps) => ps.map((x) => (x.id === p.id ? { ...x, featured } : x)))
+    apiSetFeatured(p.id, featured).catch((e) => {
+      setPatterns((ps) => ps.map((x) => (x.id === p.id ? { ...x, featured: !featured } : x)))
+      setSaveError(e?.message || String(e))
+    })
+  }
+
   const confirmDelete = () => {
     const id = deleteTarget?.id
-    setPatterns((ps) => ps.filter((p) => p.id !== id))
-    apiRemovePattern(id).catch(console.error)
-    setDeleteTarget(null)
+    setSaveError(null)
+    apiRemovePattern(id)
+      .catch((e) => setSaveError(e?.message || String(e)))
+      .finally(() => setDeleteTarget(null))
   }
 
   return (
@@ -246,6 +294,15 @@ export default function ChartPatterns() {
           </ol>
         </nav>
       </div>
+
+      {/* Failures from the star toggle / delete, which have no form to report in */}
+      {saveError && !adding && (
+        <div className="alert alert-danger d-flex align-items-center gap-2 py-2">
+          <i className="ri-error-warning-line" />
+          <div className="flex-grow-1"><strong>Couldn’t save.</strong> <span className="small">{saveError}</span></div>
+          <button className="btn-close" aria-label="Dismiss" onClick={() => setSaveError(null)} />
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header d-flex align-items-center flex-wrap gap-2">
@@ -298,6 +355,7 @@ export default function ChartPatterns() {
                 <div className="col-md-6 col-xl-4" key={p.id}>
                   <PatternCard
                     pattern={p}
+                    onToggleFeatured={() => toggleFeatured(p)}
                     onOpen={() => setViewing(p)}
                     onDelete={() => setDeleteTarget(p)}
                   />
@@ -309,8 +367,18 @@ export default function ChartPatterns() {
       </div>
 
       {/* Add pattern popup */}
-      <Modal open={adding} size="xl" title={<><i className="ri-add-line me-2 text-primary" />Add chart pattern</>} onClose={() => setAdding(false)}>
-        <PatternForm onSave={addPattern} onCancel={() => setAdding(false)} />
+      <Modal open={adding} size="xl" title={<><i className="ri-add-line me-2 text-primary" />Add chart pattern</>} onClose={() => { setAdding(false); setSaveError(null) }}>
+        {saveError && (
+          <div className="alert alert-danger d-flex align-items-start gap-2 py-2">
+            <i className="ri-error-warning-line mt-1" />
+            <div>
+              <strong>Couldn’t save this pattern.</strong>
+              <div className="small">{saveError}</div>
+              <div className="small mt-1">Nothing was lost — fix the issue and save again.</div>
+            </div>
+          </div>
+        )}
+        <PatternForm onSave={addPattern} onCancel={() => { setAdding(false); setSaveError(null) }} />
       </Modal>
 
       {/* View pattern popup */}
@@ -321,23 +389,44 @@ export default function ChartPatterns() {
         onClose={() => setViewing(null)}
       >
         {viewing && (
-          <>
-            {viewing.image ? (
-              <img src={viewing.image} alt={viewing.title} className="img-fluid rounded border mb-3" />
-            ) : (
-              <div className="pattern-thumb-empty rounded border mb-3" style={{ height: 220 }}>
-                <i className="ri-line-chart-line" />
-              </div>
-            )}
-            <h6 className="text-uppercase text-muted fs-11 mb-2">Price &amp; indicator positions</h6>
-            <ConditionChips conditions={viewing.conditions} />
-            {viewing.notes && (
-              <>
-                <h6 className="text-uppercase text-muted fs-11 mb-2 mt-3">Notes</h6>
-                <p className="mb-0">{viewing.notes}</p>
-              </>
-            )}
-          </>
+          /* Chart left, description right — the screenshot is what you study,
+             so it gets the larger half and the notes read alongside it rather
+             than pushed below the fold. */
+          <div className="row g-4 pattern-view">
+            <div className="col-lg-7">
+              {viewing.image ? (
+                <img
+                  src={viewing.image}
+                  alt={viewing.title}
+                  className="img-fluid rounded border pattern-view-img"
+                  role="button"
+                  onClick={() => setZoom({ src: viewing.image, alt: viewing.title })}
+                />
+              ) : (
+                <div className="pattern-thumb-empty rounded border" style={{ height: 260 }}>
+                  <i className="ri-line-chart-line" />
+                </div>
+              )}
+            </div>
+
+            <div className="col-lg-5">
+              {viewing.featured && (
+                <span className="badge bg-warning text-dark mb-3">
+                  <i className="ri-star-fill me-1" />Checked daily
+                </span>
+              )}
+
+              <h6 className="text-uppercase text-muted fs-11 mb-2">Price &amp; indicator positions</h6>
+              {viewing.conditions?.length > 0
+                ? <ConditionChips conditions={viewing.conditions} />
+                : <p className="text-muted small mb-0">None tagged.</p>}
+
+              <h6 className="text-uppercase text-muted fs-11 mb-2 mt-4">Notes</h6>
+              {viewing.notes
+                ? <p className="mb-0 pattern-view-notes">{viewing.notes}</p>
+                : <p className="text-muted small mb-0">No notes yet.</p>}
+            </div>
+          </div>
         )}
       </Modal>
 
@@ -349,6 +438,8 @@ export default function ChartPatterns() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {zoom && <ImageLightbox src={zoom.src} alt={zoom.alt} onClose={() => setZoom(null)} />}
     </div>
   )
 }

@@ -1,6 +1,6 @@
-import { useCollection, insertRow, deleteRow, uploadImage } from '@/lib/api'
+import { useCollection, insertRow, updateRow, deleteRow, uploadImage } from '@/lib/api'
 import { isSupabaseConfigured } from '@/lib/supabase'
-import { localInsert, localDelete } from '@/lib/localdb'
+import { localInsert, localUpdate, localDelete } from '@/lib/localdb'
 
 /** Chart patterns (Supabase + Storage for images, or localStorage). */
 export const staticPatterns = [
@@ -19,6 +19,7 @@ export const staticPatterns = [
 const rowToPattern = (r) => ({
   id: r.id, title: r.title, timeframe: r.timeframe, image: r.image_url,
   conditions: r.conditions || [], notes: r.notes || '',
+  featured: Boolean(r.featured),
 })
 
 const dataUrlToBlob = (dataUrl) => {
@@ -41,9 +42,15 @@ export async function addPattern(p) {
   if (image && image.startsWith('data:')) image = await uploadImage(dataUrlToBlob(image), 'patterns')
   return insertRow('chart_patterns', {
     id: p.id, title: p.title, timeframe: p.timeframe, image_url: image || null,
-    conditions: p.conditions, notes: p.notes,
+    conditions: p.conditions, notes: p.notes, featured: Boolean(p.featured),
   })
 }
+
+/** Toggle "check this daily" without reopening the pattern. */
+export const setPatternFeatured = (id, featured) =>
+  isSupabaseConfigured
+    ? updateRow('chart_patterns', id, { featured })
+    : Promise.resolve(localUpdate('chart_patterns', staticPatterns, id, { featured }))
 
 export const removePattern = (id) =>
   isSupabaseConfigured ? deleteRow('chart_patterns', id) : Promise.resolve(localDelete('chart_patterns', staticPatterns, id))
