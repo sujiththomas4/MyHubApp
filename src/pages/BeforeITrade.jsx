@@ -434,8 +434,9 @@ export default function BeforeITrade() {
 
           <div className="bt-creed-text">
             <h5>{CREED.headline}</h5>
-            <p>{CREED.body}</p>
-            <p className="bt-creed-line">{CREED.line}</p>
+            <ul className="bt-known">
+              {CREED.known.map((k) => <li key={k}>{k}</li>)}
+            </ul>
           </div>
 
           <div className="bt-creed-ack">
@@ -454,6 +455,49 @@ export default function BeforeITrade() {
                 : 'Start the streak'}
             </div>
           </div>
+        </div>
+
+        {/* The part meant to be felt rather than skimmed */}
+        <div className="bt-reflect">
+          {CREED.turning.map((p) => <p key={p}>{p}</p>)}
+          <p className="bt-reflect-close">{CREED.turningLine}</p>
+
+          {CREED.system.map((p) => <p key={p}>{p}</p>)}
+
+          <ul className="bt-wants">
+            {CREED.wants.map((w) => <li key={w}><i className="ri-arrow-right-line" />{w}</li>)}
+          </ul>
+          <p>{CREED.wantsClose}</p>
+
+          <div className="bt-choices">
+            <span className="bt-choices-lead">Today, I choose</span>
+            {CREED.choices.map((c) => (
+              <span className="bt-choice" key={c.take}>
+                <strong>{c.take}</strong>
+                <em>over</em>
+                <span>{c.over}</span>
+              </span>
+            ))}
+          </div>
+
+          <div className="bt-pledge">
+            {CREED.pledge.map((p) => <p key={p}>{p}</p>)}
+          </div>
+
+          <div className="bt-promise">
+            <div className="bt-promise-title">Today’s promise to myself</div>
+            <ul>
+              {CREED.promises.map((p) => (
+                <li key={p}><i className="ri-checkbox-circle-fill" />{p}</li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="bt-reflect-close">{CREED.close}</p>
+          <div className="bt-mantra">
+            {CREED.mantra.map((m) => <span key={m}>{m}</span>)}
+          </div>
+          <p className="bt-last">{CREED.last}</p>
         </div>
 
         {/* Rotates daily so this screen is never the same wallpaper twice */}

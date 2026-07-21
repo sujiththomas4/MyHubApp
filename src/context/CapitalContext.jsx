@@ -5,27 +5,20 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 /**
  * CapitalContext
  * -----------------------------------------------------------------------------
- * Per-broker capital (shared across every activity). Source of truth is the
- * `brokers` table in Supabase when configured (live + persisted); otherwise
- * localStorage. Seeded from AppData.brokers.
+ * Per-broker capital, shared across every activity. The `brokers` table is the
+ * only source of truth — the localStorage copy this used to keep was per-device
+ * and silently diverged from the real figures.
+ *
+ * AppData.brokers is used purely for the slug list until the first fetch lands;
+ * the values it carries are replaced by the table.
  */
 const CapitalContext = createContext(null)
-const KEY = 'hub.capital'
 const seed = () => Object.fromEntries(brokers.map((b) => [b.slug, b.capital]))
 
 export function CapitalProvider({ children }) {
-  const [capitals, setCapitals] = useState(() => {
-    if (isSupabaseConfigured) return seed()
-    try { const saved = JSON.parse(localStorage.getItem(KEY)); return { ...seed(), ...(saved || {}) } } catch { return seed() }
-  })
+  const [capitals, setCapitals] = useState(seed)
 
-  // Static mode: persist to localStorage.
-  useEffect(() => {
-    if (isSupabaseConfigured) return
-    try { localStorage.setItem(KEY, JSON.stringify(capitals)) } catch { /* ignore */ }
-  }, [capitals])
-
-  // Supabase mode: load + realtime from the brokers table.
+  // Load + realtime from the brokers table.
   useEffect(() => {
     if (!isSupabaseConfigured) return
     const load = () => supabase.from('brokers').select('slug,capital').then(({ data }) => {

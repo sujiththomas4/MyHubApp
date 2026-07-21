@@ -205,13 +205,34 @@
   font-size: 1rem;
   transition: transform 0.2s ease;
 }
-
-/* Sub-navigation reveals on hover; the active section stays open on load. */
+/* Click-driven, not hover: hovering opened trees just by moving the pointer
+   across the sidebar, which shifted everything below and made the menu jump
+   while you were reading it. `.open` is toggled in Sidebar.jsx. */
 .menu-item > .submenu { display: none; }
-.menu-item.open > .submenu,
-.menu-item:hover > .submenu { display: block; }
-.menu-item.open > .menu-link .menu-arrow,
-.menu-item:hover > .menu-link .menu-arrow { transform: rotate(90deg); }
+.menu-item.open > .submenu { display: block; }
+/* Only the open section's arrow turns — hover no longer implies anything. */
+.menu-item.open > .menu-link .menu-arrow { transform: rotate(90deg); }
+
+/* Parent rows toggle; this is the one part that navigates to the section's own
+   landing page. Sits over the row, left of the arrow, and only on hover so it
+   doesn't clutter the menu. */
+.menu-item.has-children { position: relative; }
+.menu-open-page {
+  position: absolute;
+  top: 0;
+  right: 2.5rem;
+  height: 2.35rem;
+  display: flex;
+  align-items: center;
+  padding: 0 0.35rem;
+  color: var(--hub-sidebar-item);
+  font-size: 0.95rem;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.menu-item.has-children:hover .menu-open-page,
+.menu-open-page:focus-visible { opacity: 0.75; }
+.menu-open-page:hover { opacity: 1; color: var(--hub-sidebar-item-active); }
 
 .menu-link.active,
 .menu-item > .menu-link.active {

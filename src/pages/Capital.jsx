@@ -1,38 +1,51 @@
-import { brokers, brokerModules, compoundedReturn, money } from '@/data/AppData'
+import { useMemo } from 'react'
+import { brokers, compoundedReturn, money } from '@/data/AppData'
 import { useCapital } from '@/context/CapitalContext'
+import { useBrokerAccounts, useBrokerTrades } from '@/data/brokerRepo'
 
 /**
  * Capital.jsx
  * -----------------------------------------------------------------------------
  * Allocate capital per broker (Zerodha / Dhan / Upstox / Tradesmart). The same
  * broker capital is shared across every activity (Option Buying / Selling /
- * Intraday), so this is the single place to change it. Edits persist via
- * CapitalContext (localStorage) and flow into every business screen + P&L.
+ * Intraday), so this is the single place to change it.
+ *
+ * Capital comes from CapitalContext (the `brokers` table); the P&L comes from
+ * the `broker_trades` table via useBrokerTrades(). It used to read the sample
+ * arrays in AppData directly, so the Net P&L shown was seed data rather than
+ * anything actually booked.
  */
 const pnlClass = (n) => (n > 0 ? 'text-success' : n < 0 ? 'text-danger' : 'text-muted')
-
-// All day-P&L rows booked on a broker across every module.
-function tradesForBroker(slug) {
-  return brokerModules.flatMap((m) => {
-    const acc = m.accounts.find((a) => a.slug === slug)
-    return acc ? m.trades.filter((t) => t.accountId === acc.id) : []
-  })
-}
 const netOf = (t) => t.grossPnl - t.brokerage - t.govtCharges
 
 export default function Capital() {
   const { getCapital, setCapital, resetCapital } = useCapital()
+  const accounts = useBrokerAccounts()
+  const trades = useBrokerTrades()
+
+  // Broker slug -> its day-P&L rows, across every module that broker trades in.
+  const tradesBySlug = useMemo(() => {
+    const accIds = new Map()            // account id -> broker slug
+    accounts.forEach((a) => accIds.set(a.id, a.slug))
+    const out = {}
+    trades.forEach((t) => {
+      const slug = accIds.get(t.accountId)
+      if (!slug) return                 // orphaned row: account deleted
+      ;(out[slug] = out[slug] || []).push(t)
+    })
+    return out
+  }, [accounts, trades])
 
   const rows = brokers.map((b) => {
     const capital = getCapital(b.slug)
-    const trades = tradesForBroker(b.slug)
-    const net = trades.reduce((s, t) => s + netOf(t), 0)
-    return { ...b, capital, net, value: capital + net, returnPct: compoundedReturn(trades, capital) }
+    const t = tradesBySlug[b.slug] || []
+    const net = t.reduce((s, x) => s + netOf(x), 0)
+    return { ...b, capital, net, value: capital + net, returnPct: compoundedReturn(t, capital) }
   })
   const total = rows.reduce((s, b) => s + b.capital, 0)
   const totalNet = rows.reduce((s, b) => s + b.net, 0)
   const totalValue = total + totalNet
-  const totalReturn = compoundedReturn(brokerModules.flatMap((m) => m.trades), total)
+  const totalReturn = compoundedReturn(trades, total)
 
   return (
     <div className="option-buying">

@@ -162,3 +162,39 @@ export const menu = [
 
   { id: 'settings', label: 'Settings', icon: 'ri-settings-3-line', to: '/settings' },
 ]
+
+/**
+ * Profile modes — which sections of the nav are visible.
+ *   full     — everything (wealth, investments, trading, business, system)
+ *   business — trading + business only, so the money-management screens don't
+ *              pull focus during market hours
+ *
+ * Listed by section-title id. `menu` is a FLAT array where `isTitle` marks the
+ * start of a section, so a section owns every node up to the next title.
+ */
+export const PROFILE_MODES = [
+  { id: 'full', label: 'Full', icon: 'ri-layout-grid-line', hint: 'Everything' },
+  { id: 'business', label: 'Business', icon: 'ri-briefcase-line', hint: 'Trading + business only' },
+]
+
+const MODE_SECTIONS = {
+  business: ['title-trading', 'title-business', 'title-system'],
+}
+
+/** The nav for a given mode. Unknown modes fall back to the full menu. */
+export function menuForMode(mode) {
+  const allowed = MODE_SECTIONS[mode]
+  if (!allowed) return menu
+
+  const out = []
+  let keeping = false
+  for (const node of menu) {
+    if (node.isTitle) {
+      keeping = allowed.includes(node.id)
+      if (keeping) out.push(node)
+      continue
+    }
+    if (keeping) out.push(node)
+  }
+  return out
+}

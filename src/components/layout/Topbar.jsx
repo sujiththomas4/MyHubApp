@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
+import { PROFILE_MODES } from '@/data/menu'
 
 function useClickOutside(ref, handler) {
   useEffect(() => {
@@ -42,6 +43,26 @@ export default function Topbar({ onHamburger, onOpenCustomizer }) {
       <div className="topbar-search ms-3 d-none d-md-block">
         <i className="ri-search-line search-icon" />
         <input type="text" placeholder="Search anything..." aria-label="Search" />
+      </div>
+
+      {/* Which sections of the nav are visible — see menuForMode(). */}
+      <div className="profile-mode ms-3" role="group" aria-label="Profile mode">
+        {PROFILE_MODES.map((m) => {
+          const on = (settings.profileMode || 'full') === m.id
+          return (
+            <button
+              key={m.id}
+              type="button"
+              className={'profile-mode-btn' + (on ? ' active' : '')}
+              aria-pressed={on}
+              title={`${m.label} mode — ${m.hint}`}
+              onClick={() => setSetting('profileMode', m.id)}
+            >
+              <i className={m.icon} />
+              <span>{m.label}</span>
+            </button>
+          )
+        })}
       </div>
 
       <div className="topbar-actions">

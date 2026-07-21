@@ -18,14 +18,70 @@
 // Update this once a year. Drives the reality-check headline.
 export const YEARS_TRADING = 6
 
+/**
+ * The morning read. Written first-person on purpose — it's me talking to me,
+ * not advice from anyone else. Every line here is editable; it only works if it
+ * stays in my own words.
+ */
 export const CREED = {
-  kicker: 'Read this before you click buy',
-  headline: `${YEARS_TRADING} years in. The same handful of mistakes.`,
-  body:
-    'The market doesn’t take my money — I hand it over. Not one of these losses came ' +
-    'from a setup I didn’t understand. They came from setups I understood perfectly ' +
-    'and took anyway.',
-  line: 'Knowing the rule was never the problem. Following it today is.',
+  kicker: 'Read this before placing a single order',
+  headline: `For the last ${YEARS_TRADING} years, I have known what my mistakes are.`,
+
+  // Named plainly. Vague regret changes nothing; these do.
+  known: [
+    'I exited winning trades too early.',
+    'I averaged losing positions instead of accepting a small loss.',
+    'I traded oversized quantities, especially on expiry days.',
+    'I let emotions make decisions instead of following my system.',
+  ],
+
+  turning: [
+    'None of these mistakes happened because I didn’t know better. They happened because I chose emotion over discipline.',
+    `If I continue trading the same way I have for the last ${YEARS_TRADING} years, I will most likely spend the next ${YEARS_TRADING} years repeating the same cycle.`,
+  ],
+  turningLine: 'Nothing changes unless I change.',
+
+  system: [
+    'My trading system has already defined my edge. My job is not to predict the market. My job is to execute the system exactly as it is designed.',
+    'Every time I break a rule, I move farther away from the life I want.',
+  ],
+
+  wants: [
+    'I want financial freedom.',
+    'I want peace of mind.',
+    'I want a beautiful life where money is a tool, not a source of stress.',
+  ],
+  wantsClose:
+    'That life will never be built through impulsive trades, revenge trading, oversized positions, or breaking my own rules. ' +
+    'It will be built one disciplined trade at a time.',
+
+  // "Today, I choose ___ over ___."
+  choices: [
+    { take: 'Discipline', over: 'emotion' },
+    { take: 'Consistency', over: 'excitement' },
+    { take: 'Process', over: 'profits' },
+    { take: 'Patience', over: 'fear' },
+    { take: 'Execution', over: 'prediction' },
+  ],
+
+  pledge: [
+    'I do not need to make money today.',
+    'I need to become the trader who follows the system every single day.',
+    'If I protect my process, the profits will follow.',
+  ],
+
+  promises: [
+    'I will follow my trading system without exception.',
+    'I will accept small losses without averaging.',
+    'I will respect my predefined position size.',
+    'I will never increase quantity because of emotion.',
+    'I will let winners play out according to the plan.',
+    'I will not judge today’s result. I will judge only whether I followed my rules.',
+  ],
+
+  close: 'My future is being built by the decisions I make in the next few minutes.',
+  mantra: ['Trade the system.', 'Trust the process.', 'Respect the rules.'],
+  last: 'Everything I want is on the other side of consistent discipline.',
 }
 
 /**

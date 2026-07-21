@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { menu } from '@/data/menu'
+import { menuForMode } from '@/data/menu'
+import { useTheme } from '@/context/ThemeContext'
 
 /* Top-level groups shown as a horizontal bar. Groups with children reveal a
    dropdown of those children on hover; leaf groups navigate directly. Clicking
    a group with children still navigates to its landing page (`to`). */
 export default function HorizontalMenu() {
   const { pathname } = useLocation()
-  const groups = menu.filter((m) => !m.isTitle)
+  const { settings } = useTheme()
+  const groups = menuForMode(settings.profileMode).filter((m) => !m.isTitle)
   const navRef = useRef(null)
 
   // The bar wraps to multiple rows when items don't fit, so its height is

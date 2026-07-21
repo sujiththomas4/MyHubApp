@@ -28,6 +28,10 @@ export const THEME_ATTRIBUTES = {
 // Default state — chosen to match the reference "SaaS" look
 // (green accent, dark sidebar, light topbar, fixed vertical layout).
 export const DEFAULT_THEME = {
+  // Which nav sections are visible — see menuForMode() in data/menu.js. Not in
+  // THEME_ATTRIBUTES because it's filtered in JS, not by a CSS selector; it
+  // still persists with the rest of the settings.
+  profileMode: 'full',
   layout: 'vertical',
   colorScheme: 'light',
   topbar: 'light',
