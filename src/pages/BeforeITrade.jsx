@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Assessment from '@/components/trading/Assessment'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import Modal from '@/components/ui/Modal'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import {
+  useDailyReviews, saveDailyReview as apiSaveReview, removeDailyReview as apiRemoveReview,
+} from '@/data/dailyReviewRepo'
 import { usePatterns } from '@/data/chartPatternsRepo'
 import { useJournalDays, setDayPremarket as apiSetPremarket } from '@/data/journalRepo'
 import {
@@ -33,6 +38,15 @@ const KEY = 'hub.beforeITrade'
 const TF_LABEL = { '3m': '3 min', '5m': '5 min' }
 const tfLabel = (id) => TF_LABEL[id] || id
 
+// Short day label for the review history, e.g. "21 Jul".
+const fmtDay = (iso) =>
+  new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+// Full label for the modal title, e.g. "Tue, 21 Jul 2026".
+const fmtFullDay = (iso) =>
+  new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+  })
+
 const todayIso = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -58,6 +72,117 @@ function readState(today) {
   } catch {
     return { checked: [], readMistakes: [], readOn: null, streak: 0 }
   }
+}
+
+/* End-of-day honesty check: tick anything actually done today. Deliberately
+   phrased as "I did this" — the whole value is in admitting it, so the tick is
+   the confession, not a to-do. */
+function ReviewForm({ initial, onSave, onCancel, saving, error }) {
+  /* Three states per rule: 'yes' (did the mistake), 'no' (followed the rule),
+     or unanswered. Editing an existing review fills every row in; a fresh one
+     starts blank so each rule has to be answered deliberately rather than a
+     clean day being the accidental default. */
+  const [answers, setAnswers] = useState(() =>
+    initial
+      ? Object.fromEntries(MISTAKES.map((m) => [m.id, initial.mistakes.includes(m.id) ? 'yes' : 'no']))
+      : {}
+  )
+  const [note, setNote] = useState(initial?.note || '')
+
+  const set = (id, v) => setAnswers((a) => ({ ...a, [id]: a[id] === v ? undefined : v }))
+
+  const slipped = MISTAKES.filter((m) => answers[m.id] === 'yes').length
+  const clean = MISTAKES.filter((m) => answers[m.id] === 'no').length
+  const unanswered = MISTAKES.length - slipped - clean
+
+  const save = () =>
+    onSave({ mistakes: MISTAKES.filter((m) => answers[m.id] === 'yes').map((m) => m.id), note })
+
+  return (
+    <>
+      <div className="dr-tally">
+        <div className="dr-tally-item is-clean">
+          <span>{clean}</span><small>followed</small>
+        </div>
+        <div className="dr-tally-item is-slip">
+          <span>{slipped}</span><small>broken</small>
+        </div>
+        {unanswered > 0 && (
+          <div className="dr-tally-item is-open">
+            <span>{unanswered}</span><small>unanswered</small>
+          </div>
+        )}
+        <p className="dr-tally-note mb-0">
+          {unanswered > 0
+            ? `${unanswered} still to answer — they’ll save as followed.`
+            : slipped === 0
+              ? 'A clean day. This is what it looks like — remember it.'
+              : `${slipped} mistake${slipped > 1 ? 's' : ''} today. Naming it is how it stops.`}
+        </p>
+      </div>
+
+      <div className="dr-list">
+        {MISTAKES.map((m) => {
+          const a = answers[m.id]
+          return (
+            <div
+              key={m.id}
+              className={'dr-item' + (a === 'yes' ? ' is-on' : a === 'no' ? ' is-off' : '')}
+            >
+              <span className="dr-item-icon"><i className={m.icon} /></span>
+              <span className="dr-item-text">
+                <strong>{m.title}</strong>
+                <small>{a === 'yes' ? m.cost : m.rule}</small>
+              </span>
+              {m.severity === 'critical' && <span className="dr-item-sev">Critical</span>}
+
+              {/* Did I do this today? */}
+              <div className="dr-yn" role="group" aria-label={`Did I do this: ${m.title}`}>
+                <button
+                  type="button"
+                  className={'dr-yn-btn is-yes' + (a === 'yes' ? ' active' : '')}
+                  aria-pressed={a === 'yes'}
+                  onClick={() => set(m.id, 'yes')}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  className={'dr-yn-btn is-no' + (a === 'no' ? ' active' : '')}
+                  aria-pressed={a === 'no'}
+                  onClick={() => set(m.id, 'no')}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <label className="form-label small mb-1 mt-3">Anything else about today?</label>
+      <textarea
+        className="form-control"
+        rows={2}
+        placeholder="What happened, what triggered it, what to do differently…"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+
+      {error && (
+        <div className="alert alert-danger py-2 mt-3 mb-0">
+          <strong>Couldn’t save.</strong> <span className="small">{error}</span>
+        </div>
+      )}
+
+      <div className="d-flex gap-2 mt-3">
+        <button className="btn btn-primary" disabled={saving} onClick={save}>
+          <i className="ri-save-line me-1" />{saving ? 'Saving…' : 'Save review'}
+        </button>
+        <button className="btn btn-light" onClick={onCancel} disabled={saving}>Cancel</button>
+      </div>
+    </>
+  )
 }
 
 /* One mistake, told graphically: icon medallion + a faded watermark of the same
@@ -141,6 +266,75 @@ export default function BeforeITrade() {
     }).catch(console.error)
   }
 
+  /* End-of-day review — its own table, so it never touches the journal or the
+     morning checklist state. */
+  const [tab, setTab] = useState('prep') // 'prep' | 'reviews'
+  const reviews = useDailyReviews()
+  // Which day the modal is editing — today, or any day picked from the history.
+  const [reviewDate, setReviewDate] = useState(null)
+  const [savingReview, setSavingReview] = useState(false)
+  const [reviewError, setReviewError] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null) // review pending delete confirm
+  const [deleteError, setDeleteError] = useState(null)
+  const todayReview = reviews.find((r) => r.date === today) || null
+  const editingReview = reviews.find((r) => r.date === reviewDate) || null
+
+  /* Deleting loses the honest record of a day, so it only closes the dialog once
+     the delete actually lands — and says so if it doesn't. */
+  const confirmDelete = () => {
+    const date = deleteTarget?.date
+    setDeleteError(null)
+    return apiRemoveReview(date)
+      .then(() => setDeleteTarget(null))
+      .catch((e) => setDeleteError(e?.message || String(e)))
+  }
+
+  const saveReview = ({ mistakes, note }) => {
+    setSavingReview(true)
+    setReviewError(null)
+    return apiSaveReview({ date: reviewDate, mistakes, note })
+      .then(() => setReviewDate(null))
+      .catch((e) => setReviewError(e?.message || String(e)))
+      .finally(() => setSavingReview(false))
+  }
+
+  /* Consecutive clean days ending today (or yesterday, before today's review
+     exists). A day with any mistake breaks it; an unreviewed day stops the
+     count rather than silently counting as clean. */
+  const cleanStreak = (() => {
+    let n = 0
+    for (const r of reviews) {          // already newest-first
+      if (r.date > today) continue
+      if (r.mistakes.length > 0) break
+      n++
+    }
+    return n
+  })()
+
+  /* Quick view across every reviewed day. `totalChecks` treats each mistake on
+     each day as one rule that either held or didn't, so "followed %" is a real
+     ratio rather than a count of good days. */
+  const stats = (() => {
+    const days = reviews.length
+    const totalChecks = days * MISTAKES.length
+    const broken = reviews.reduce((sum, r) => sum + r.mistakes.length, 0)
+    const followed = totalChecks - broken
+    const counts = {}
+    for (const r of reviews) for (const id of r.mistakes) counts[id] = (counts[id] || 0) + 1
+    const worstId = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0]
+    return {
+      days,
+      totalChecks,
+      broken,
+      followed,
+      followedPct: totalChecks ? Math.round((followed / totalChecks) * 100) : 0,
+      cleanDays: reviews.filter((r) => r.mistakes.length === 0).length,
+      worst: worstId
+        ? { title: MISTAKES.find((m) => m.id === worstId)?.title || worstId, count: counts[worstId] }
+        : null,
+    }
+  })()
+
   const qty = quantityFor(capitalDraft)
   const plans = quantityPlans(capitalDraft)
   // Only the ones starred as "check this daily" belong on a pre-market screen.
@@ -189,15 +383,42 @@ export default function BeforeITrade() {
   return (
     <div className="before-trade">
       <div className="page-title-box d-flex align-items-center">
-        <h4 className="flex-grow-1 mb-0">Before I Trade</h4>
+        <h4 className="flex-grow-1 mb-0">{tab === 'prep' ? 'Before I Trade' : 'Trade Reviews'}</h4>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item"><a href="/">Hub</a></li>
             <li className="breadcrumb-item">Trading Updates</li>
-            <li className="breadcrumb-item active" aria-current="page">Before I Trade</li>
+            <li className="breadcrumb-item active" aria-current="page">
+              {tab === 'prep' ? 'Before I Trade' : 'Reviews'}
+            </li>
           </ol>
         </nav>
       </div>
+
+      {/* Prep before the open vs. the honest look back after it */}
+      <ul className="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
+        <li className="nav-item" role="presentation">
+          <button
+            type="button" role="tab" aria-selected={tab === 'prep'}
+            className={'nav-link' + (tab === 'prep' ? ' active' : '')}
+            onClick={() => setTab('prep')}
+          >
+            <i className="ri-shield-star-line me-1" /> Before I Trade
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            type="button" role="tab" aria-selected={tab === 'reviews'}
+            className={'nav-link' + (tab === 'reviews' ? ' active' : '')}
+            onClick={() => setTab('reviews')}
+          >
+            <i className="ri-history-line me-1" /> Reviews
+            {reviews.length > 0 && <span className="badge bg-secondary ms-1">{reviews.length}</span>}
+          </button>
+        </li>
+      </ul>
+
+      {tab === 'prep' && (<>
 
       {/* 1 — The hard truth */}
       <section className="bt-creed">
@@ -520,27 +741,206 @@ export default function BeforeITrade() {
         </div>
       </div>
 
-      {/* 6 — The full per-trade assessment, kept but out of the way */}
-      <div className="card">
-        <div className="card-header d-flex align-items-center">
-          <h5 className="card-title mb-0 flex-grow-1">
-            <i className="ri-radar-line me-2" />Full pre-trade assessment
-          </h5>
-          <button className="btn btn-sm btn-light" onClick={() => setShowAssessment((v) => !v)}>
-            {showAssessment ? 'Hide' : 'Open'}
-          </button>
-        </div>
-        {showAssessment && (
-          <div className="card-body">
-            <div className="d-flex justify-content-end mb-2">
-              <button className="btn btn-light btn-sm" onClick={() => setAnswers({})}>
-                <i className="ri-refresh-line me-1" />Reset
-              </button>
+      </>)}
+
+      {tab === 'reviews' && (
+        <div className="dr-tab">
+          {/* Quick view — rules followed vs broken across every reviewed day */}
+          <div className="row g-3 mb-4">
+            <div className="col-6 col-lg-3">
+              <div className="dr-stat">
+                <span className="dr-stat-label">Rules followed</span>
+                <span className="dr-stat-value text-success">{stats.followedPct}%</span>
+                <small>{stats.followed} of {stats.totalChecks} across {stats.days} day{stats.days === 1 ? '' : 's'}</small>
+              </div>
             </div>
-            <Assessment answers={answers} onChange={(id, v) => setAnswers((a) => ({ ...a, [id]: v }))} />
+            <div className="col-6 col-lg-3">
+              <div className="dr-stat">
+                <span className="dr-stat-label">Rules broken</span>
+                <span className="dr-stat-value text-danger">{stats.broken}</span>
+                <small>{stats.days ? (stats.broken / stats.days).toFixed(1) : 0} per day on average</small>
+              </div>
+            </div>
+            <div className="col-6 col-lg-3">
+              <div className="dr-stat">
+                <span className="dr-stat-label">Clean days</span>
+                <span className="dr-stat-value text-primary">{stats.cleanDays}<em>/{stats.days}</em></span>
+                <small>{cleanStreak > 0 ? `${cleanStreak} in a row right now` : 'no active streak'}</small>
+              </div>
+            </div>
+            <div className="col-6 col-lg-3">
+              <div className="dr-stat">
+                <span className="dr-stat-label">Most repeated</span>
+                {stats.worst ? (
+                  <>
+                    <span className="dr-stat-worst">{stats.worst.title}</span>
+                    <small>{stats.worst.count} day{stats.worst.count > 1 ? 's' : ''} — this is the one to fix</small>
+                  </>
+                ) : (
+                  <><span className="dr-stat-value text-success">—</span><small>nothing repeating</small></>
+                )}
+              </div>
+            </div>
           </div>
+
+          <div className="bt-section-head">
+            <h5><i className="ri-history-line me-2" />Every reviewed day</h5>
+            <button className="btn btn-primary btn-sm" onClick={() => setReviewDate(today)}>
+              <i className={(todayReview ? 'ri-pencil-line' : 'ri-add-line') + ' me-1'} />
+              {todayReview ? 'Edit today' : 'Review today'}
+            </button>
+          </div>
+
+          <div className="card bt-panel is-patterns">
+            <div className="card-body">
+              {reviews.length === 0 ? (
+                <p className="text-muted text-center mb-0 py-4">
+                  No reviews yet. After the close, hit <strong>Review today</strong> and be honest —
+                  that record is what makes the pattern visible.
+                </p>
+              ) : (
+                <div className="dr-rows">
+                  {reviews.map((r) => {
+                    const broken = r.mistakes.length
+                    const followed = MISTAKES.length - broken
+                    return (
+                      <article
+                        className={'dr-row' + (broken === 0 ? ' is-clean' : broken <= 2 ? ' is-mid' : ' is-bad')}
+                        key={r.date}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setReviewDate(r.date)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setReviewDate(r.date) }
+                        }}
+                      >
+                        <div className="dr-row-date">
+                          <strong>{fmtDay(r.date)}</strong>
+                          <small>{new Date(r.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short' })}</small>
+                          {r.date === today && <span className="dr-row-today">Today</span>}
+                        </div>
+
+                        <div className="dr-row-score">
+                          <span className="dr-row-followed">{followed}</span>
+                          <span className="dr-row-sep">/</span>
+                          <span className="dr-row-total">{MISTAKES.length}</span>
+                          <small>followed</small>
+                        </div>
+
+                        <div className="dr-row-bar" title={`${followed} followed, ${broken} broken`}>
+                          <span style={{ width: `${(followed / MISTAKES.length) * 100}%` }} />
+                        </div>
+
+                        <div className="dr-row-body">
+                          {broken === 0 ? (
+                            <span className="dr-row-clean"><i className="ri-check-double-line me-1" />Clean day — every rule held</span>
+                          ) : (
+                            <div className="dr-chips">
+                              {r.mistakes.map((id) => {
+                                const m = MISTAKES.find((x) => x.id === id)
+                                return <span key={id}>{m ? m.title : id}</span>
+                              })}
+                            </div>
+                          )}
+                          {r.note && <p className="dr-row-note">{r.note}</p>}
+                        </div>
+
+                        <div className="dr-row-actions" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="btn btn-sm btn-ghost-secondary p-1"
+                            title="Edit this review"
+                            onClick={() => setReviewDate(r.date)}
+                          >
+                            <i className="ri-pencil-line" />
+                          </button>
+                          <button
+                            className="btn btn-sm btn-ghost-danger p-1"
+                            title="Delete this review"
+                            onClick={() => setDeleteTarget(r)}
+                          >
+                            <i className="ri-delete-bin-line" />
+                          </button>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Modal
+        open={Boolean(reviewDate)}
+        size="lg"
+        title={reviewDate && (
+          <>
+            <i className="ri-emotion-line me-2 text-primary" />
+            {reviewDate === today ? 'How did I trade today?' : 'Review'} — {fmtFullDay(reviewDate)}
+          </>
         )}
-      </div>
+        onClose={() => { setReviewDate(null); setReviewError(null) }}
+      >
+        <ReviewForm
+          /* Remount per day so switching days resets the ticks to that day's. */
+          key={reviewDate}
+          initial={editingReview}
+          saving={savingReview}
+          error={reviewError}
+          onCancel={() => { setReviewDate(null); setReviewError(null) }}
+          onSave={saveReview}
+        />
+      </Modal>
+
+      {/* 7 — The full per-trade assessment, kept but out of the way */}
+      {tab === 'prep' && (
+        <div className="card">
+          <div className="card-header d-flex align-items-center">
+            <h5 className="card-title mb-0 flex-grow-1">
+              <i className="ri-radar-line me-2" />Full pre-trade assessment
+            </h5>
+            <button className="btn btn-sm btn-light" onClick={() => setShowAssessment((v) => !v)}>
+              {showAssessment ? 'Hide' : 'Open'}
+            </button>
+          </div>
+          {showAssessment && (
+            <div className="card-body">
+              <div className="d-flex justify-content-end mb-2">
+                <button className="btn btn-light btn-sm" onClick={() => setAnswers({})}>
+                  <i className="ri-refresh-line me-1" />Reset
+                </button>
+              </div>
+              <Assessment answers={answers} onChange={(id, v) => setAnswers((a) => ({ ...a, [id]: v }))} />
+            </div>
+          )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this review?"
+        message={deleteTarget && (
+          <>
+            The review for <strong>{fmtFullDay(deleteTarget.date)}</strong> will be permanently removed
+            {deleteTarget.mistakes.length > 0
+              ? <> — including the {deleteTarget.mistakes.length} mistake{deleteTarget.mistakes.length > 1 ? 's' : ''} recorded that day.</>
+              : ' — it was a clean day.'}
+            {/* spans, not divs — ConfirmDialog renders `message` inside a <p> */}
+            <span className="d-block small mt-2">
+              It also drops out of your followed/broken stats and the clean-day streak.
+            </span>
+            {deleteError && (
+              <span className="d-block text-danger small mt-2">
+                <i className="ri-error-warning-line me-1" />{deleteError}
+              </span>
+            )}
+          </>
+        )}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => { setDeleteTarget(null); setDeleteError(null) }}
+      />
 
       {zoom && <ImageLightbox src={zoom.src} alt={zoom.alt} onClose={() => setZoom(null)} />}
     </div>

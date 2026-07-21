@@ -155,14 +155,24 @@ export default function LoanDetail() {
   // (possibly prepaid) balance to zero — reaches the end date with no
   // prepayments, or earlier once you prepay / catch up.
   const map = new Map()
-  for (let k = 0; k <= emisPaid; k++) map.set(addMonths(start, k).getTime(), balanceAfter(loan, k))
+  /* History stops at today. It used to run to addMonths(start, emisPaid), which
+     lands a month PAST the last payment — so a future-dated historical point
+     sorted in after the projection's first point and drew a spike back up. */
+  for (let k = 0; k <= emisPaid; k++) {
+    const t = addMonths(start, k)
+    if (t > today) break
+    map.set(t.getTime(), balanceAfter(loan, k))
+  }
   forwardBalances(outstanding, emi, r).forEach((b, j) => map.set(addMonths(today, j).getTime(), b))
   const proj = [...map.entries()].sort((a, b) => a[0] - b[0])
 
   const chartOptions = {
     chart: { toolbar: { show: false }, fontFamily: 'Poppins, sans-serif' },
     colors: [colors.primary],
-    stroke: { width: chartType === 'bar' ? 0 : 2, curve: 'smooth' },
+    /* 'straight', not 'smooth': a spline through a balance curve overshoots at
+       any step (the lump-sum drop) and invents balances between months that
+       were never owed. */
+    stroke: { width: chartType === 'bar' ? 0 : 2, curve: 'straight' },
     fill: chartType === 'bar' ? { type: 'solid', opacity: 0.85 } : { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.03 } },
     plotOptions: { bar: { columnWidth: '60%', borderRadius: 2 } },
     dataLabels: { enabled: false },

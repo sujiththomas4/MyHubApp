@@ -1,6 +1,4 @@
 import { useCollection, insertRow, updateRow, deleteRow } from '@/lib/api'
-import { isSupabaseConfigured } from '@/lib/supabase'
-import { localInsert, localUpdate, localDelete } from '@/lib/localdb'
 import { stockMarketAccounts as staticAccounts, stockMarketHoldings as staticHoldings } from '@/data/AppData'
 
 /** Data access for stock-market accounts + holdings (Supabase or localStorage). */
@@ -27,8 +25,8 @@ export function useStockHoldings() {
 }
 
 export const addHolding = (h) =>
-  isSupabaseConfigured ? insertRow('stock_holdings', holdingToRow(h)) : Promise.resolve(localInsert('stock_holdings', staticHoldings, h))
+  insertRow('stock_holdings', holdingToRow(h))
 export const editHolding = (h) =>
-  isSupabaseConfigured ? updateRow('stock_holdings', h.id, holdingToRow(h)) : Promise.resolve(localUpdate('stock_holdings', staticHoldings, h.id, h))
+  updateRow('stock_holdings', h.id, holdingToRow(h))
 export const removeHolding = (id) =>
-  isSupabaseConfigured ? deleteRow('stock_holdings', id) : Promise.resolve(localDelete('stock_holdings', staticHoldings, id))
+  deleteRow('stock_holdings', id)

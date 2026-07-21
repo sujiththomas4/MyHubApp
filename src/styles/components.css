@@ -466,28 +466,45 @@
 /* ==========================================================================
    THEME CUSTOMIZER (offcanvas settings panel)
    ========================================================================== */
+/* Floating theme-settings button. It used to be a right-docked tab (rounded on
+   the left, square on the right) that spun as a whole — so the square corners
+   swung around and it read as broken. Now it's a circle floated off the edge,
+   and only the gear icon turns. */
 .customizer-trigger {
   position: fixed;
-  right: 0;
+  right: 1.25rem;
   top: 50%;
   transform: translateY(-50%);
   z-index: 1040;
   background: var(--bs-primary);
   color: #fff;
   border: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 0.5rem 0 0 0.5rem;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
   font-size: 1.35rem;
   cursor: pointer;
-  box-shadow: -2px 2px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.customizer-trigger:hover {
+  transform: translateY(-50%) scale(1.06);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.3);
+}
+/* Spin the icon, not the button — the button carries the shadow and hover
+   transform, and rotating it would fight both. */
+.customizer-trigger i {
+  display: block;
   animation: spin-slow 5s linear infinite;
 }
-@keyframes spin-slow { to { transform: translateY(-50%) rotate(360deg); } }
-.customizer-trigger:hover { animation-play-state: paused; }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.customizer-trigger:hover i { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .customizer-trigger i { animation: none; }
+}
 
 .customizer-backdrop {
   position: fixed;
@@ -942,17 +959,35 @@
 }
 .elp-hero-lots { font-size: 0.8125rem; opacity: 0.85; }
 /* Entry vs. reserve, side by side — the split IS the anti-averaging rule. */
-.elp-hero-split {
+/* The three entry plans, mirroring the Before I Trade screen. */
+.elp-plans {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
   width: 100%;
   margin-top: 0.9rem;
   padding-top: 0.8rem;
   border-top: 1px solid rgba(255, 255, 255, 0.28);
 }
-.elp-hero-split > div { flex: 1; }
-.elp-hero-num { display: block; font-size: 1.3rem; font-weight: 700; line-height: 1.1; }
-.elp-hero-split small { font-size: 0.625rem; opacity: 0.85; }
+.elp-plan {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.4rem 0.2rem;
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+.elp-plan.is-dead { opacity: 0.45; }
+.elp-plan-n {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+.elp-plan-qty { font-size: 1.35rem; font-weight: 700; line-height: 1.05; }
+.elp-plan small { font-size: 0.5625rem; opacity: 0.8; }
 .elp-hero-empty { font-size: 0.8125rem; opacity: 0.95; }
 .elp-hero-empty i { font-size: 1.75rem; }
 
@@ -2113,3 +2148,270 @@
 @media (min-width: 992px) {
   .pattern-view > .col-lg-7 { position: sticky; top: 0; align-self: flex-start; }
 }
+
+/* ==========================================================================
+   Daily trade review — end-of-day honesty check (Before I Trade)
+   ========================================================================== */
+.dr-tally {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.6rem;
+  background: var(--hub-hover-bg);
+  border: 1px solid var(--hub-border);
+}
+.dr-tally-item { display: flex; flex-direction: column; line-height: 1; }
+.dr-tally-item span { font-size: 2rem; font-weight: 700; }
+.dr-tally-item small {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--bs-secondary-color);
+}
+.dr-tally-item.is-clean span { color: var(--bs-success); }
+.dr-tally-item.is-slip span { color: #f06548; }
+.dr-tally-note { flex: 1 1 220px; font-size: 0.8125rem; color: var(--bs-secondary-color); }
+
+.dr-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.dr-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.5rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.dr-item > i { font-size: 1.25rem; color: var(--bs-secondary-color); flex-shrink: 0; }
+
+/* Yes / No — "did I do this today?" */
+.dr-yn { display: flex; flex-shrink: 0; border-radius: 0.4rem; overflow: hidden; }
+.dr-yn-btn {
+  min-width: 46px;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--hub-border);
+  background: var(--hub-card-bg);
+  color: var(--bs-secondary-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.dr-yn-btn.is-yes { border-radius: 0.4rem 0 0 0.4rem; border-right: 0; }
+.dr-yn-btn.is-no { border-radius: 0 0.4rem 0.4rem 0; }
+.dr-yn-btn.is-yes:hover { color: #f06548; border-color: #f06548; }
+.dr-yn-btn.is-no:hover { color: var(--bs-success); border-color: var(--bs-success); }
+/* Yes = I did the mistake, so it's the alarming one. */
+.dr-yn-btn.is-yes.active {
+  background: #f06548;
+  border-color: #f06548;
+  color: #fff;
+}
+.dr-yn-btn.is-no.active {
+  background: var(--bs-success);
+  border-color: var(--bs-success);
+  color: #fff;
+}
+/* Answered "no" — settled, so it recedes rather than competing for attention. */
+.dr-item.is-off { border-color: color-mix(in srgb, var(--bs-success) 35%, transparent); }
+.dr-item.is-off .dr-item-icon { color: var(--bs-success); }
+.dr-item-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 0.4rem;
+  background: var(--hub-hover-bg);
+  color: var(--bs-secondary-color);
+}
+.dr-item-text { flex: 1; min-width: 0; }
+.dr-item-text strong { display: block; font-size: 0.875rem; }
+.dr-item-text small { display: block; font-size: 0.6875rem; color: var(--bs-secondary-color); line-height: 1.3; }
+.dr-item-sev {
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: rgba(240, 101, 72, 0.15);
+  color: #f06548;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+/* Ticked = admitted. Red, because this one actually happened today. */
+.dr-item.is-on {
+  border-color: rgba(240, 101, 72, 0.5);
+  background: rgba(240, 101, 72, 0.08);
+}
+.dr-item.is-on > i,
+.dr-item.is-on .dr-item-icon { color: #f06548; }
+.dr-item.is-on .dr-item-text small { color: #f06548; }
+
+.dr-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.dr-chips span {
+  padding: 0.2rem 0.55rem;
+  border-radius: 2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(240, 101, 72, 0.12);
+  border: 1px solid rgba(240, 101, 72, 0.35);
+  color: #f06548;
+}
+
+/* History strip — one block per reviewed day, oldest left. */
+.dr-hist-label {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.4rem;
+}
+.dr-hist { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.dr-hist-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 46px;
+  padding: 0.35rem 0.3rem;
+  border-radius: 0.4rem;
+  border: 1px solid transparent;
+}
+.dr-hist-count { font-size: 1rem; font-weight: 700; line-height: 1; }
+.dr-hist-date { font-size: 0.5625rem; opacity: 0.8; white-space: nowrap; }
+.dr-hist-day.is-clean { background: color-mix(in srgb, var(--bs-success) 16%, transparent); color: var(--bs-success); border-color: color-mix(in srgb, var(--bs-success) 35%, transparent); }
+.dr-hist-day.is-mid { background: rgba(247, 184, 75, 0.18); color: #d98a0b; border-color: rgba(247, 184, 75, 0.42); }
+.dr-hist-day.is-bad { background: rgba(240, 101, 72, 0.16); color: #f06548; border-color: rgba(240, 101, 72, 0.4); }
+
+/* History days are buttons — click one to open that day's review. */
+.dr-hist-head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.4rem; }
+.dr-hist-head .dr-hist-label { margin-bottom: 0; flex: 1; }
+.dr-hist-day { cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.dr-hist-day:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); }
+.dr-hist-day:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+/* Today gets a ring so it's findable in a long strip. */
+.dr-hist-day.is-today { box-shadow: 0 0 0 2px var(--bs-primary); }
+
+/* ==========================================================================
+   Reviews tab — quick view + one row per reviewed day
+   ========================================================================== */
+.dr-stat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 0.65rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 4px rgba(31, 41, 55, 0.05),
+    0 8px 18px rgba(31, 41, 55, 0.07);
+}
+[data-bs-theme='dark'] .dr-stat {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 8px 18px rgba(0, 0, 0, 0.4);
+}
+.dr-stat-label {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--bs-secondary-color);
+}
+.dr-stat-value { font-size: 2.1rem; font-weight: 700; line-height: 1.1; }
+.dr-stat-value em { font-size: 1.1rem; font-style: normal; opacity: 0.5; }
+.dr-stat-worst { font-size: 1rem; font-weight: 700; line-height: 1.25; margin: 0.2rem 0; }
+.dr-stat small { font-size: 0.6875rem; color: var(--bs-secondary-color); line-height: 1.3; }
+
+.dr-rows { display: flex; flex-direction: column; gap: 0.6rem; }
+.dr-row {
+  display: grid;
+  grid-template-columns: 72px 92px 120px 1fr auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.6rem;
+  background: var(--hub-card-bg);
+  border: 1px solid var(--hub-border);
+  border-left: 4px solid var(--hub-border);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.dr-row:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); }
+.dr-row:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+.dr-row.is-clean { border-left-color: var(--bs-success); }
+.dr-row.is-mid { border-left-color: #f7b84b; }
+.dr-row.is-bad { border-left-color: #f06548; }
+
+.dr-row-date { display: flex; flex-direction: column; line-height: 1.15; }
+.dr-row-date strong { font-size: 0.9375rem; }
+.dr-row-date small { font-size: 0.6875rem; color: var(--bs-secondary-color); }
+.dr-row-today {
+  margin-top: 0.15rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--bs-primary);
+  color: #fff;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  width: fit-content;
+}
+.dr-row-score { display: flex; align-items: baseline; gap: 0.15rem; flex-wrap: wrap; }
+.dr-row-followed { font-size: 1.5rem; font-weight: 700; color: var(--bs-success); line-height: 1; }
+.dr-row-sep, .dr-row-total { color: var(--bs-secondary-color); font-weight: 600; }
+.dr-row-score small {
+  flex-basis: 100%;
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--bs-secondary-color);
+}
+/* How much of the day held, as a bar you can scan down the column. */
+.dr-row-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(240, 101, 72, 0.25);
+  overflow: hidden;
+}
+.dr-row-bar span { display: block; height: 100%; background: var(--bs-success); border-radius: 4px; }
+.dr-row-body { min-width: 0; }
+.dr-row-clean { font-size: 0.8125rem; font-weight: 600; color: var(--bs-success); }
+.dr-row-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+  line-height: 1.4;
+}
+
+
+@media (max-width: 991.98px) {
+  .dr-row { grid-template-columns: 1fr auto; gap: 0.5rem 0.9rem; }
+  .dr-row-bar, .dr-row-body { grid-column: 1 / -1; }
+  /* Actions stay put on mobile — delete has no other entry point. */
+  .dr-row-actions { grid-row: 1; grid-column: 2; }
+}
+
+/* Unanswered count in the review tally */
+.dr-tally-item.is-open span { color: var(--bs-secondary-color); }
+
+@media (max-width: 575.98px) {
+  .dr-item { flex-wrap: wrap; }
+  .dr-yn { width: 100%; }
+  .dr-yn-btn { flex: 1; }
+}
+
+/* Edit / delete on a review row */
+.dr-row-actions { display: flex; gap: 0.15rem; flex-shrink: 0; }

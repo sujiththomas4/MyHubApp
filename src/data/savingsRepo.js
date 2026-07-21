@@ -1,6 +1,4 @@
 import { useCollection, insertRow, updateRow, deleteRow } from '@/lib/api'
-import { isSupabaseConfigured } from '@/lib/supabase'
-import { localInsert, localUpdate, localDelete } from '@/lib/localdb'
 import { savings as staticSavings, savingsCategories as staticCategories } from '@/data/AppData'
 
 /**
@@ -31,8 +29,8 @@ export function useSavingsCategories() {
 
 // CRUD — Supabase when configured, else the localStorage store (persists).
 export const addSaving = (s) =>
-  isSupabaseConfigured ? insertRow('savings', savingToRow(s)) : Promise.resolve(localInsert('savings', staticSavings, s))
+  insertRow('savings', savingToRow(s))
 export const editSaving = (s) =>
-  isSupabaseConfigured ? updateRow('savings', s.id, savingToRow(s)) : Promise.resolve(localUpdate('savings', staticSavings, s.id, s))
+  updateRow('savings', s.id, savingToRow(s))
 export const removeSaving = (id) =>
-  isSupabaseConfigured ? deleteRow('savings', id) : Promise.resolve(localDelete('savings', staticSavings, id))
+  deleteRow('savings', id)

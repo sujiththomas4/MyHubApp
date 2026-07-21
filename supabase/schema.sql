@@ -182,6 +182,17 @@ create table if not exists chart_patterns (
 alter table chart_patterns
   add column if not exists featured boolean not null default false;
 
+-- ---- Daily trade review ---------------------------------------------
+-- One row per trading day: which of the defined mistakes were actually
+-- committed. `mistakes` holds the mistake ids from dailyReview.js, so adding or
+-- renaming a mistake needs no migration.
+create table if not exists daily_reviews (
+  date date primary key,
+  mistakes jsonb not null default '[]'::jsonb,
+  note text,
+  updated_at timestamptz not null default now()
+);
+
 -- =====================================================================
 -- Row Level Security. Personal app → require an authenticated user.
 -- (Enable an auth provider in Supabase → Authentication, e.g. Email.)
@@ -193,7 +204,7 @@ begin
     'app_settings','brokers','loans','installments','loan_prepayments',
     'savings_categories','savings','stock_accounts','stock_holdings',
     'broker_accounts','broker_trades','plantation_entries','plantation_activities',
-    'journal_days','journal_trades','journal_notes','chart_patterns'
+    'journal_days','journal_trades','journal_notes','chart_patterns','daily_reviews'
   ] loop
     execute format('alter table %I enable row level security;', t);
     execute format($p$create policy "authed all" on %I for all to authenticated using (true) with check (true);$p$, t);
@@ -210,7 +221,7 @@ begin
     'app_settings','brokers','loans','installments','loan_prepayments',
     'savings_categories','savings','stock_accounts','stock_holdings',
     'broker_accounts','broker_trades','plantation_entries','plantation_activities',
-    'journal_days','journal_trades','journal_notes','chart_patterns'
+    'journal_days','journal_trades','journal_notes','chart_patterns','daily_reviews'
   ] loop
     execute format('alter publication supabase_realtime add table %I;', t);
   end loop;

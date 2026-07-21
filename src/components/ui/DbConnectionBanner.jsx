@@ -24,8 +24,8 @@ export default function DbConnectionBanner() {
       <span>
         <strong>⚠ Not connected to the database.</strong>{' '}
         {isProd
-          ? 'This deployment has no Supabase credentials, so changes are saved only on this device and will not sync. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the hosting env vars, then redeploy.'
-          : 'Running in local-only mode (no Supabase env vars). Data is stored per-device in localStorage.'}
+          ? 'This deployment has no Supabase credentials. No data can be loaded or saved. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the hosting env vars, then redeploy.'
+          : 'No Supabase env vars found, so every screen will be empty. Add them to .env.local and restart the dev server.'}
       </span>
     </div>
   )

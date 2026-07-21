@@ -65,6 +65,37 @@
   --bs-primary: #02a8b5;
   --bs-primary-rgb: 2, 168, 181;
 }
+/* Near-black rather than pure #000: several accents are derived with
+   color-mix(... , black), which collapses to a dead flat black at #000 and
+   leaves hover/active states indistinguishable from the base. */
+[data-preset='black'] {
+  --bs-primary: #212529;
+  --bs-primary-rgb: 33, 37, 41;
+}
+/* On the dark theme that black would vanish into the surface, so lift it to a
+   light neutral — still "black preset", just inverted to stay visible. */
+[data-bs-theme='dark'][data-preset='black'] {
+  --bs-primary: #e9ecef;
+  --bs-primary-rgb: 233, 236, 239;
+}
+/* Anything filled with the accent assumes white text (Bootstrap's default),
+   which is unreadable once the accent itself is near-white. Flip that text to
+   dark, and shade hover/active toward white instead of black so they stay
+   light enough for it. */
+[data-bs-theme='dark'][data-preset='black'] .btn-primary {
+  --bs-btn-color: #212529;
+  --bs-btn-hover-color: #212529;
+  --bs-btn-active-color: #212529;
+  --bs-btn-disabled-color: #212529;
+  --bs-btn-hover-bg: color-mix(in srgb, var(--bs-primary) 84%, white);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--bs-primary) 80%, white);
+  --bs-btn-active-bg: color-mix(in srgb, var(--bs-primary) 78%, white);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--bs-primary) 74%, white);
+}
+[data-bs-theme='dark'][data-preset='black'] .bg-primary,
+[data-bs-theme='dark'][data-preset='black'] .badge.bg-primary {
+  color: #212529 !important;
+}
 
 :root {
   /* Fallback if no preset attribute is present. */

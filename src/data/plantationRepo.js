@@ -1,6 +1,4 @@
 import { useCollection, insertRow, updateRow, deleteRow } from '@/lib/api'
-import { isSupabaseConfigured } from '@/lib/supabase'
-import { localInsert, localUpdate, localDelete } from '@/lib/localdb'
 import { plantationEntries as staticEntries, plantationActivities as staticActivities } from '@/data/AppData'
 
 /** Plantation income/expense entries + activities (Supabase or localStorage). */
@@ -29,15 +27,15 @@ export function usePlantationActivities() {
 }
 
 export const addEntry = (e) =>
-  isSupabaseConfigured ? insertRow('plantation_entries', entryToRow(e)) : Promise.resolve(localInsert('plantation_entries', staticEntries, e))
+  insertRow('plantation_entries', entryToRow(e))
 export const editEntry = (e) =>
-  isSupabaseConfigured ? updateRow('plantation_entries', e.id, entryToRow(e)) : Promise.resolve(localUpdate('plantation_entries', staticEntries, e.id, e))
+  updateRow('plantation_entries', e.id, entryToRow(e))
 export const removeEntry = (id) =>
-  isSupabaseConfigured ? deleteRow('plantation_entries', id) : Promise.resolve(localDelete('plantation_entries', staticEntries, id))
+  deleteRow('plantation_entries', id)
 
 export const addActivity = (a) =>
-  isSupabaseConfigured ? insertRow('plantation_activities', activityToRow(a)) : Promise.resolve(localInsert('plantation_activities', staticActivities, a))
+  insertRow('plantation_activities', activityToRow(a))
 export const editActivity = (a) =>
-  isSupabaseConfigured ? updateRow('plantation_activities', a.id, activityToRow(a)) : Promise.resolve(localUpdate('plantation_activities', staticActivities, a.id, a))
+  updateRow('plantation_activities', a.id, activityToRow(a))
 export const removeActivity = (id) =>
-  isSupabaseConfigured ? deleteRow('plantation_activities', id) : Promise.resolve(localDelete('plantation_activities', staticActivities, id))
+  deleteRow('plantation_activities', id)

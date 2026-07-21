@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  POPUP_INTERVAL_MS, SNOOZE_OPTIONS, TRADE_RULES, levelsByTier, quantityFor,
+  POPUP_INTERVAL_MS, SNOOZE_OPTIONS, TRADE_RULES, levelsByTier, quantityFor, quantityPlans,
 } from './entryLevels'
 
 /**
@@ -48,6 +48,7 @@ export default function EntryLevelsPopup({ capital }) {
   const [visible, setVisible] = useState(false)
   const [snoozedUntil, setSnoozedUntil] = useState(readSnooze)
   const qty = quantityFor(capital)
+  const plans = quantityPlans(capital)
   const tiers = levelsByTier()
 
   // Held in a ref so the interval below never needs to be torn down/recreated
@@ -140,15 +141,19 @@ export default function EntryLevelsPopup({ capital }) {
                 <span className="elp-hero-label">Max quantity</span>
                 <span className="elp-hero-value">{qty.maxQty}</span>
                 <span className="elp-hero-lots">{qty.lots} lot{qty.lots > 1 ? 's' : ''}</span>
-                <div className="elp-hero-split">
-                  <div>
-                    <span className="elp-hero-num">{qty.entryQty}</span>
-                    <small>to enter</small>
-                  </div>
-                  <div>
-                    <span className="elp-hero-num">{qty.canAverage ? qty.maxQty - qty.entryQty : 0}</span>
-                    <small>{qty.canAverage ? 'for 1 average' : 'no average'}</small>
-                  </div>
+
+                {/* Same three plans as the Before I Trade screen — decide which
+                    one BEFORE entering, so an average is planned, not improvised. */}
+                <div className="elp-plans">
+                  {(plans || []).map((p) => (
+                    <div className={'elp-plan' + (p.viable ? '' : ' is-dead')} key={p.entries}>
+                      <span className="elp-plan-n">
+                        {p.entries} {p.entries === 1 ? 'trade' : 'entries'}
+                      </span>
+                      <span className="elp-plan-qty">{p.viable ? p.qtyPerEntry : '—'}</span>
+                      <small>{p.viable ? (p.entries === 1 ? 'all at once' : 'qty each') : 'too small'}</small>
+                    </div>
+                  ))}
                 </div>
               </>
             ) : (

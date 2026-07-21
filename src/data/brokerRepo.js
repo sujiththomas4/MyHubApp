@@ -1,6 +1,4 @@
 import { useCollection, insertRow, updateRow, deleteRow } from '@/lib/api'
-import { isSupabaseConfigured } from '@/lib/supabase'
-import { localInsert, localUpdate, localDelete } from '@/lib/localdb'
 import { brokerModules } from '@/data/AppData'
 
 /**
@@ -33,8 +31,8 @@ export function useBrokerTrades() {
 }
 
 export const addTrade = (t) =>
-  isSupabaseConfigured ? insertRow('broker_trades', tradeToRow(t)) : Promise.resolve(localInsert('broker_trades', staticTrades, t))
+  insertRow('broker_trades', tradeToRow(t))
 export const editTrade = (t) =>
-  isSupabaseConfigured ? updateRow('broker_trades', t.id, tradeToRow(t)) : Promise.resolve(localUpdate('broker_trades', staticTrades, t.id, t))
+  updateRow('broker_trades', t.id, tradeToRow(t))
 export const removeTrade = (id) =>
-  isSupabaseConfigured ? deleteRow('broker_trades', id) : Promise.resolve(localDelete('broker_trades', staticTrades, id))
+  deleteRow('broker_trades', id)

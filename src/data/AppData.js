@@ -41,9 +41,13 @@ export const loans = [
     bankName: 'Mashreq Bank',
     amount: 209000,
     currency: 'AED',
-    startDate: '2026-02-01',
-    endDate: '2029-11-05',
-    emi: 5150,
+    /* First installment 05 Dec 2025, 48 EMIs, last one 05 Nov 2029.
+       endDate is start + tenure (the convention tenureMonths() counts, and the
+       one the other loans use) — so 05 Dec 2029, one month past the final
+       payment. Using the bank's last-payment date would give 47. */
+    startDate: '2025-12-05',
+    endDate: '2029-12-05',
+    emi: 5211,
     outstandingAmount: 178827,
     location: 'UAE',
   },
@@ -213,12 +217,15 @@ export const installments = [
   { id: 'loan-south-indian-emi-14', loanId: 'loan-south-indian', number: 14, date: '2026-05-01', amount: 12680, status: 'paid' },
   { id: 'loan-south-indian-emi-15', loanId: 'loan-south-indian', number: 15, date: '2026-06-01', amount: 12680, status: 'paid' },
   { id: 'loan-south-indian-emi-16', loanId: 'loan-south-indian', number: 16, date: '2026-07-01', amount: 12680, status: 'not paid' },
-  // loan-mashreq
-  { id: 'loan-mashreq-emi-1', loanId: 'loan-mashreq', number: 1, date: '2026-03-01', amount: 5150, status: 'paid' },
-  { id: 'loan-mashreq-emi-2', loanId: 'loan-mashreq', number: 2, date: '2026-04-01', amount: 5150, status: 'paid' },
-  { id: 'loan-mashreq-emi-3', loanId: 'loan-mashreq', number: 3, date: '2026-05-01', amount: 5150, status: 'paid' },
-  { id: 'loan-mashreq-emi-4', loanId: 'loan-mashreq', number: 4, date: '2026-06-01', amount: 5150, status: 'paid' },
-  { id: 'loan-mashreq-emi-5', loanId: 'loan-mashreq', number: 5, date: '2026-07-01', amount: 5150, status: 'not paid' },
+  // loan-mashreq — 48 EMIs of 5211 from 05 Dec 2025; 8 due so far.
+  { id: 'loan-mashreq-emi-1', loanId: 'loan-mashreq', number: 1, date: '2025-12-05', amount: 5211, status: 'paid' },
+  { id: 'loan-mashreq-emi-2', loanId: 'loan-mashreq', number: 2, date: '2026-01-05', amount: 5211, status: 'paid' },
+  { id: 'loan-mashreq-emi-3', loanId: 'loan-mashreq', number: 3, date: '2026-02-05', amount: 5211, status: 'paid' },
+  { id: 'loan-mashreq-emi-4', loanId: 'loan-mashreq', number: 4, date: '2026-03-05', amount: 5211, status: 'paid' },
+  { id: 'loan-mashreq-emi-5', loanId: 'loan-mashreq', number: 5, date: '2026-04-05', amount: 5211, status: 'paid' },
+  { id: 'loan-mashreq-emi-6', loanId: 'loan-mashreq', number: 6, date: '2026-05-05', amount: 5211, status: 'paid' },
+  { id: 'loan-mashreq-emi-7', loanId: 'loan-mashreq', number: 7, date: '2026-06-05', amount: 5211, status: 'paid' },
+  { id: 'loan-mashreq-emi-8', loanId: 'loan-mashreq', number: 8, date: '2026-07-05', amount: 5211, status: 'paid' },
   // loan-kunjumon-appappi (2 EMIs paid)
   { id: 'loan-kunjumon-appappi-emi-1', loanId: 'loan-kunjumon-appappi', number: 1, date: '2026-06-01', amount: 100000, status: 'paid' },
   { id: 'loan-kunjumon-appappi-emi-2', loanId: 'loan-kunjumon-appappi', number: 2, date: '2026-07-01', amount: 100000, status: 'paid' },

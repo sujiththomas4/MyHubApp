@@ -71,6 +71,7 @@ export const THEME_OPTIONS = {
       { value: 'purple', label: 'Purple', color: '#6559cc' },
       { value: 'orange', label: 'Orange', color: '#f1963b' },
       { value: 'teal', label: 'Teal', color: '#02a8b5' },
+      { value: 'black', label: 'Black', color: '#212529' },
     ],
   },
   topbar: {

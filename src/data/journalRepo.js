@@ -1,6 +1,4 @@
 import { useCollection, insertRow, updateRow, deleteRow, upsertRow, uploadImage } from '@/lib/api'
-import { isSupabaseConfigured } from '@/lib/supabase'
-import { localInsert, localUpdate, localDelete, localUpsert } from '@/lib/localdb'
 
 /**
  * journalRepo.js — trading journal: days (+ premarket), trades, notes.
@@ -69,23 +67,23 @@ export function useJournalNotes() {
 }
 
 export const addDay = (d) =>
-  isSupabaseConfigured ? upsertRow('journal_days', { date: d.date, note: d.note, premarket: d.premarket }, 'date') : Promise.resolve(localUpsert('journal_days', staticDays, d, 'date'))
+  upsertRow('journal_days', { date: d.date, note: d.note, premarket: d.premarket }, 'date')
 // Upsert so the day row is created if it doesn't exist yet.
 export const setDayPremarket = (date, premarket) =>
-  isSupabaseConfigured ? upsertRow('journal_days', { date, premarket }, 'date') : Promise.resolve(localUpsert('journal_days', staticDays, { date, premarket }, 'date'))
+  upsertRow('journal_days', { date, premarket }, 'date')
 export const setDayNote = (date, note) =>
-  isSupabaseConfigured ? upsertRow('journal_days', { date, note }, 'date') : Promise.resolve(localUpsert('journal_days', staticDays, { date, note }, 'date'))
+  upsertRow('journal_days', { date, note }, 'date')
 
 export const addTrade = (t) =>
-  isSupabaseConfigured ? insertRow('journal_trades', tradeToRow(t)) : Promise.resolve(localInsert('journal_trades', staticTrades, t))
+  insertRow('journal_trades', tradeToRow(t))
 export const editTrade = (t) =>
-  isSupabaseConfigured ? updateRow('journal_trades', t.id, tradeToRow(t)) : Promise.resolve(localUpdate('journal_trades', staticTrades, t.id, t))
+  updateRow('journal_trades', t.id, tradeToRow(t))
 export const removeTrade = (id) =>
-  isSupabaseConfigured ? deleteRow('journal_trades', id) : Promise.resolve(localDelete('journal_trades', staticTrades, id))
+  deleteRow('journal_trades', id)
 
 export const addNote = async (n) =>
-  isSupabaseConfigured ? insertRow('journal_notes', noteToRow(await withUploadedImages(n))) : Promise.resolve(localInsert('journal_notes', staticNotes, n))
+  insertRow('journal_notes', noteToRow(await withUploadedImages(n)))
 export const editNote = async (n) =>
-  isSupabaseConfigured ? updateRow('journal_notes', n.id, noteToRow(await withUploadedImages(n))) : Promise.resolve(localUpdate('journal_notes', staticNotes, n.id, n))
+  updateRow('journal_notes', n.id, noteToRow(await withUploadedImages(n)))
 export const removeNote = (id) =>
-  isSupabaseConfigured ? deleteRow('journal_notes', id) : Promise.resolve(localDelete('journal_notes', staticNotes, id))
+  deleteRow('journal_notes', id)

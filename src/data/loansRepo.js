@@ -1,6 +1,4 @@
 import { useCollection, insertRow, updateRow, deleteRow } from '@/lib/api'
-import { isSupabaseConfigured } from '@/lib/supabase'
-import { localInsert, localUpdate, localDelete } from '@/lib/localdb'
 import { loans as staticLoans, installments as staticInstallments } from '@/data/AppData'
 
 /** Loans + installments + lump-sum prepayments (Supabase or localStorage). */
@@ -29,14 +27,10 @@ export function usePrepayments() {
 
 // Prepayments
 export const addPrepayment = (p) =>
-  isSupabaseConfigured
-    ? insertRow('loan_prepayments', { id: p.id, loan_id: p.loanId, date: p.date, amount: p.amount, note: p.note })
-    : Promise.resolve(localInsert('loan_prepayments', [], p))
+  insertRow('loan_prepayments', { id: p.id, loan_id: p.loanId, date: p.date, amount: p.amount, note: p.note })
 export const removePrepayment = (id) =>
-  isSupabaseConfigured ? deleteRow('loan_prepayments', id) : Promise.resolve(localDelete('loan_prepayments', [], id))
+  deleteRow('loan_prepayments', id)
 
 // Mark an installment paid / not paid (updates the stored row's status).
 export const setInstallmentStatus = (id, status) =>
-  isSupabaseConfigured
-    ? updateRow('installments', id, { status })
-    : Promise.resolve(localUpdate('installments', staticInstallments, id, { status }))
+  updateRow('installments', id, { status })
