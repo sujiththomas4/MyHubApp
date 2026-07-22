@@ -17,7 +17,7 @@ export const staticPatterns = [
 const rowToPattern = (r) => ({
   id: r.id, title: r.title, timeframe: r.timeframe, image: r.image_url,
   conditions: r.conditions || [], notes: r.notes || '',
-  featured: Boolean(r.featured),
+  featured: Boolean(r.featured), morning: Boolean(r.morning),
 })
 
 const dataUrlToBlob = (dataUrl) => {
@@ -34,18 +34,33 @@ export function usePatterns() {
   return data
 }
 
-export async function addPattern(p) {
+// App pattern -> DB row, uploading a freshly-attached (data-URL) image first so
+// the row only ever stores a hosted URL.
+async function toRow(p) {
   let image = p.image
   if (image && image.startsWith('data:')) image = await uploadImage(dataUrlToBlob(image), 'patterns')
-  return insertRow('chart_patterns', {
+  return {
     id: p.id, title: p.title, timeframe: p.timeframe, image_url: image || null,
-    conditions: p.conditions, notes: p.notes, featured: Boolean(p.featured),
-  })
+    conditions: p.conditions, notes: p.notes,
+    featured: Boolean(p.featured), morning: Boolean(p.morning),
+  }
+}
+
+export async function addPattern(p) {
+  return insertRow('chart_patterns', await toRow(p))
+}
+
+export async function editPattern(p) {
+  return updateRow('chart_patterns', p.id, await toRow(p))
 }
 
 /** Toggle "check this daily" without reopening the pattern. */
 export const setPatternFeatured = (id, featured) =>
   updateRow('chart_patterns', id, { featured })
+
+/** Toggle "Morning Opening Trades" without reopening the pattern. */
+export const setPatternMorning = (id, morning) =>
+  updateRow('chart_patterns', id, { morning })
 
 export const removePattern = (id) =>
   deleteRow('chart_patterns', id)

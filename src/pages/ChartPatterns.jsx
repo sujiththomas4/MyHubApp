@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { usePatterns, addPattern as apiAddPattern, removePattern as apiRemovePattern, setPatternFeatured as apiSetFeatured } from '@/data/chartPatternsRepo'
+import { usePatterns, addPattern as apiAddPattern, editPattern as apiEditPattern, removePattern as apiRemovePattern, setPatternFeatured as apiSetFeatured, setPatternMorning as apiSetMorning } from '@/data/chartPatternsRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import ImageDropZone from '@/components/ui/ImageDropZone'
 import MultiSelect from '@/components/ui/MultiSelect'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import MorningTrades from '@/components/trading/MorningTrades'
 
 /**
  * ChartPatterns.jsx  (DRAFT)
@@ -65,6 +66,7 @@ function PatternForm({ initial, onSave, onCancel }) {
   const [conditions, setConditions] = useState(initial?.conditions || [])
   const [notes, setNotes] = useState(initial?.notes || '')
   const [featured, setFeatured] = useState(initial?.featured || false)
+  const [morning, setMorning] = useState(initial?.morning || false)
   const [condQuery, setCondQuery] = useState('')
 
   const toggle = (opt) =>
@@ -83,7 +85,7 @@ function PatternForm({ initial, onSave, onCancel }) {
     .filter((g) => g.options.length > 0)
 
   const save = () =>
-    onSave({ id: initial?.id || 'p' + rid(), title: title.trim() || 'Untitled pattern', timeframe, image, conditions, notes: notes.trim(), featured })
+    onSave({ id: initial?.id || 'p' + rid(), title: title.trim() || 'Untitled pattern', timeframe, image, conditions, notes: notes.trim(), featured, morning })
 
   return (
     <>
@@ -154,13 +156,21 @@ function PatternForm({ initial, onSave, onCancel }) {
         placeholder="e.g. Enter on retest hold above VWAP, SL below 9 EMA…"
         value={notes} onChange={(e) => setNotes(e.target.value)} />
 
-      {/* Featured patterns are surfaced on the Before I Trade screen. */}
+      {/* Featured + Morning patterns are surfaced on the Before I Trade screen. */}
       <label className={'pattern-featured' + (featured ? ' is-on' : '')}>
         <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
         <i className={featured ? 'ri-star-fill' : 'ri-star-line'} />
         <span>
           <strong>Featured — check this daily</strong>
           <small>Shows up in “Patterns to review” on the Before I Trade screen.</small>
+        </span>
+      </label>
+      <label className={'pattern-featured is-morning' + (morning ? ' is-on' : '')}>
+        <input type="checkbox" checked={morning} onChange={(e) => setMorning(e.target.checked)} />
+        <i className={morning ? 'ri-sun-fill' : 'ri-sun-line'} />
+        <span>
+          <strong>Morning Opening Trades</strong>
+          <small>Shows in the Morning tab of “Patterns to review”.</small>
         </span>
       </label>
 
@@ -184,7 +194,7 @@ const ConditionChips = ({ conditions }) => (
 )
 
 // --- Gallery card ------------------------------------------------------------
-function PatternCard({ pattern, onOpen, onDelete, onToggleFeatured }) {
+function PatternCard({ pattern, onOpen, onEdit, onDelete, onToggleFeatured, onToggleMorning }) {
   return (
     <div className={'card h-100 pattern-card' + (pattern.featured ? ' is-featured' : '')}>
       <div className="pattern-thumb" role="button" onClick={onOpen}>
@@ -194,21 +204,34 @@ function PatternCard({ pattern, onOpen, onDelete, onToggleFeatured }) {
           <div className="pattern-thumb-empty"><i className="ri-line-chart-line" /></div>
         )}
         <span className="badge bg-dark pattern-tf">{tfLabel(pattern.timeframe)}</span>
-        {pattern.featured && (
-          <span className="pattern-featured-badge" title="Checked daily">
-            <i className="ri-star-fill" />Daily
-          </span>
-        )}
+        <div className="pattern-flags">
+          {pattern.morning && (
+            <span className="pattern-flag is-morning" title="Morning Opening Trades"><i className="ri-sun-fill" />Morning</span>
+          )}
+          {pattern.featured && (
+            <span className="pattern-flag is-daily" title="Checked daily"><i className="ri-star-fill" />Daily</span>
+          )}
+        </div>
       </div>
       <div className="card-body">
         <div className="d-flex align-items-start">
           <h6 className="mb-2 flex-grow-1" role="button" onClick={onOpen}>{pattern.title}</h6>
+          <button
+            className={'btn btn-sm p-0 ms-2 pattern-sun' + (pattern.morning ? ' is-on' : '')}
+            title={pattern.morning ? 'Remove from Morning Opening Trades' : 'Mark as Morning Opening Trades'}
+            onClick={onToggleMorning}
+          >
+            <i className={pattern.morning ? 'ri-sun-fill' : 'ri-sun-line'} />
+          </button>
           <button
             className={'btn btn-sm p-0 ms-2 pattern-star' + (pattern.featured ? ' is-on' : '')}
             title={pattern.featured ? 'Remove from daily review' : 'Check this daily'}
             onClick={onToggleFeatured}
           >
             <i className={pattern.featured ? 'ri-star-fill' : 'ri-star-line'} />
+          </button>
+          <button className="btn btn-sm btn-ghost-secondary p-0 ms-2" title="Edit" onClick={onEdit}>
+            <i className="ri-pencil-line" />
           </button>
           <button className="btn btn-sm btn-ghost-danger p-0 ms-2" title="Delete" onClick={onDelete}>
             <i className="ri-delete-bin-line" />
@@ -225,10 +248,13 @@ function PatternCard({ pattern, onOpen, onDelete, onToggleFeatured }) {
 export default function ChartPatterns() {
   const livePatterns = usePatterns()
   const [patterns, setPatterns] = useState([])
+  const [mainTab, setMainTab] = useState('patterns') // 'patterns' | 'morning'
   const [filter, setFilter] = useState('all') // 'all' | '3m' | '5m'
+  const [morningOnly, setMorningOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [condFilter, setCondFilter] = useState([]) // conditions that must all be present
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(null) // pattern being edited
   const [viewing, setViewing] = useState(null) // pattern being viewed
   const [deleteTarget, setDeleteTarget] = useState(null) // pattern pending delete confirm
   const [saveError, setSaveError] = useState(null) // surfaced instead of console-only
@@ -238,6 +264,7 @@ export default function ChartPatterns() {
     const q = search.trim().toLowerCase()
     return patterns.filter((p) => {
       if (filter !== 'all' && p.timeframe !== filter) return false
+      if (morningOnly && !p.morning) return false
       if (!condFilter.every((c) => p.conditions.includes(c))) return false
       if (q) {
         const haystack = [p.title, p.notes, ...p.conditions].join(' ').toLowerCase()
@@ -245,12 +272,13 @@ export default function ChartPatterns() {
       }
       return true
     })
-  }, [patterns, filter, search, condFilter])
+  }, [patterns, filter, morningOnly, search, condFilter])
 
   useEffect(() => { setPatterns(livePatterns) }, [livePatterns])
 
-  const filtersActive = search.trim() || condFilter.length > 0 || filter !== 'all'
-  const clearFilters = () => { setSearch(''); setCondFilter([]); setFilter('all') }
+  const filtersActive = search.trim() || condFilter.length > 0 || filter !== 'all' || morningOnly
+  const clearFilters = () => { setSearch(''); setCondFilter([]); setFilter('all'); setMorningOnly(false) }
+  const morningCount = patterns.filter((p) => p.morning).length
 
   /* Only close the form once the write actually lands. Adding to local state and
      closing optimistically meant a rejected insert looked identical to a
@@ -263,6 +291,13 @@ export default function ChartPatterns() {
       .catch((e) => setSaveError(e?.message || String(e)))
   }
 
+  const savePatternEdit = (p) => {
+    setSaveError(null)
+    return apiEditPattern(p)
+      .then(() => setEditing(null))
+      .catch((e) => setSaveError(e?.message || String(e)))
+  }
+
   // Optimistic, but put it back if the write is rejected.
   const toggleFeatured = (p) => {
     const featured = !p.featured
@@ -270,6 +305,16 @@ export default function ChartPatterns() {
     setPatterns((ps) => ps.map((x) => (x.id === p.id ? { ...x, featured } : x)))
     apiSetFeatured(p.id, featured).catch((e) => {
       setPatterns((ps) => ps.map((x) => (x.id === p.id ? { ...x, featured: !featured } : x)))
+      setSaveError(e?.message || String(e))
+    })
+  }
+
+  const toggleMorning = (p) => {
+    const morning = !p.morning
+    setSaveError(null)
+    setPatterns((ps) => ps.map((x) => (x.id === p.id ? { ...x, morning } : x)))
+    apiSetMorning(p.id, morning).catch((e) => {
+      setPatterns((ps) => ps.map((x) => (x.id === p.id ? { ...x, morning: !morning } : x)))
       setSaveError(e?.message || String(e))
     })
   }
@@ -295,6 +340,31 @@ export default function ChartPatterns() {
         </nav>
       </div>
 
+      {/* Patterns library vs. dated morning-trade observations */}
+      <ul className="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
+        <li className="nav-item" role="presentation">
+          <button
+            type="button" role="tab" aria-selected={mainTab === 'patterns'}
+            className={'nav-link' + (mainTab === 'patterns' ? ' active' : '')}
+            onClick={() => setMainTab('patterns')}
+          >
+            <i className="ri-shapes-line me-1" /> Chart Patterns
+          </button>
+        </li>
+        <li className="nav-item" role="presentation">
+          <button
+            type="button" role="tab" aria-selected={mainTab === 'morning'}
+            className={'nav-link' + (mainTab === 'morning' ? ' active' : '')}
+            onClick={() => setMainTab('morning')}
+          >
+            <i className="ri-sun-line me-1" /> Morning Trades
+          </button>
+        </li>
+      </ul>
+
+      {mainTab === 'morning' && <MorningTrades />}
+
+      {mainTab === 'patterns' && (<>
       {/* Failures from the star toggle / delete, which have no form to report in */}
       {saveError && !adding && (
         <div className="alert alert-danger d-flex align-items-center gap-2 py-2">
@@ -332,7 +402,19 @@ export default function ChartPatterns() {
 
           <MultiSelect label="Conditions" groups={INDICATORS} selected={condFilter} onChange={setCondFilter} />
 
-          <button className="btn btn-primary btn-sm ms-auto" onClick={() => setAdding(true)}>
+          <button
+            className={'btn btn-sm ' + (morningOnly ? 'btn-warning' : 'btn-light')}
+            onClick={() => setMorningOnly((v) => !v)}
+            title="Show only Morning Opening Trades"
+          >
+            <i className="ri-sun-line me-1" />Morning
+            {morningCount > 0 && <span className={'badge ms-1 ' + (morningOnly ? 'bg-dark' : 'bg-warning')}>{morningCount}</span>}
+          </button>
+
+          <button className="btn btn-soft-warning btn-sm ms-auto" onClick={() => setMainTab('morning')}>
+            <i className="ri-sun-line me-1" /> Morning trades
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>
             <i className="ri-add-line me-1" /> Add pattern
           </button>
         </div>
@@ -356,7 +438,9 @@ export default function ChartPatterns() {
                   <PatternCard
                     pattern={p}
                     onToggleFeatured={() => toggleFeatured(p)}
+                    onToggleMorning={() => toggleMorning(p)}
                     onOpen={() => setViewing(p)}
+                    onEdit={() => { setSaveError(null); setEditing(p) }}
                     onDelete={() => setDeleteTarget(p)}
                   />
                 </div>
@@ -365,6 +449,7 @@ export default function ChartPatterns() {
           )}
         </div>
       </div>
+      </>)}
 
       {/* Add pattern popup */}
       <Modal open={adding} size="xl" title={<><i className="ri-add-line me-2 text-primary" />Add chart pattern</>} onClose={() => { setAdding(false); setSaveError(null) }}>
@@ -379,6 +464,33 @@ export default function ChartPatterns() {
           </div>
         )}
         <PatternForm onSave={addPattern} onCancel={() => { setAdding(false); setSaveError(null) }} />
+      </Modal>
+
+      {/* Edit pattern popup */}
+      <Modal
+        open={Boolean(editing)}
+        size="xl"
+        title={<><i className="ri-pencil-line me-2 text-primary" />Edit chart pattern</>}
+        onClose={() => { setEditing(null); setSaveError(null) }}
+      >
+        {saveError && (
+          <div className="alert alert-danger d-flex align-items-start gap-2 py-2">
+            <i className="ri-error-warning-line mt-1" />
+            <div>
+              <strong>Couldn’t save this pattern.</strong>
+              <div className="small">{saveError}</div>
+              <div className="small mt-1">Nothing was lost — fix the issue and save again.</div>
+            </div>
+          </div>
+        )}
+        {editing && (
+          <PatternForm
+            key={editing.id}
+            initial={editing}
+            onSave={savePatternEdit}
+            onCancel={() => { setEditing(null); setSaveError(null) }}
+          />
+        )}
       </Modal>
 
       {/* View pattern popup */}

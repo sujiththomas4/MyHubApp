@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import tharImg from '@/assets/thar.jpg'
+import boatImg from '@/assets/boat.jpg'
+import manaliImg from '@/assets/manali.jpg'
 import Assessment from '@/components/trading/Assessment'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import Modal from '@/components/ui/Modal'
@@ -269,6 +272,7 @@ export default function BeforeITrade() {
   /* End-of-day review — its own table, so it never touches the journal or the
      morning checklist state. */
   const [tab, setTab] = useState('prep') // 'prep' | 'reviews'
+  const [patternTab, setPatternTab] = useState('daily') // 'daily' | 'morning'
   const reviews = useDailyReviews()
   // Which day the modal is editing — today, or any day picked from the history.
   const [reviewDate, setReviewDate] = useState(null)
@@ -339,6 +343,8 @@ export default function BeforeITrade() {
   const plans = quantityPlans(capitalDraft)
   // Only the ones starred as "check this daily" belong on a pre-market screen.
   const dailyPatterns = patterns.filter((p) => p.featured)
+  const morningPatterns = patterns.filter((p) => p.morning)
+  const shownPatterns = patternTab === 'morning' ? morningPatterns : dailyPatterns
 
   useEffect(() => {
     try {
@@ -515,6 +521,24 @@ export default function BeforeITrade() {
         )}
       </section>
 
+      {/* 1b — The life it's all for */}
+      <section className="bt-vision">
+        <div className="bt-vision-text">
+          <div className="bt-vision-kicker"><i className="ri-road-map-line me-2" />{CREED.vision.kicker}</div>
+          <div className="bt-vision-lines">
+            {CREED.vision.lines.map((l) => <p key={l}>{l}</p>)}
+          </div>
+          <p className="bt-vision-close"><i className="ri-key-2-line me-2" />{CREED.vision.close}</p>
+        </div>
+        <div className="bt-vision-photos">
+          <img className="bt-vision-photo-main" src={tharImg} alt="The Thar on the open road" />
+          <div className="bt-vision-photo-row">
+            <img src={boatImg} alt="Kerala backwaters" />
+            <img src={manaliImg} alt="Manali mountains" />
+          </div>
+        </div>
+      </section>
+
       {/* 2 — What actually cost money */}
       <div className="bt-section-head">
         <h5><i className="ri-money-rupee-circle-line me-2" />The mistakes that cost me money</h5>
@@ -683,7 +707,7 @@ export default function BeforeITrade() {
               <div className="row g-3">
                 {plans.map((p) => (
                   <div className="col-md-4" key={p.entries}>
-                    <div className={'bt-plan' + (p.viable ? '' : ' is-dead')}>
+                    <div className={'bt-plan bt-plan-e' + p.entries + (p.viable ? '' : ' is-dead')}>
                       <div className="bt-plan-head">
                         {p.entries} {p.entries === 1 ? 'entry' : 'entries'}
                         <small>{p.entries === 1 ? 'no averaging' : `1 entry + ${p.entries - 1} average${p.entries > 2 ? 's' : ''}`}</small>
@@ -726,11 +750,37 @@ export default function BeforeITrade() {
       </div>
       <div className="card bt-panel is-patterns mb-4">
         <div className="card-body">
-          {dailyPatterns.length === 0 ? (
+          <ul className="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
+            <li className="nav-item" role="presentation">
+              <button
+                type="button" role="tab" aria-selected={patternTab === 'daily'}
+                className={'nav-link' + (patternTab === 'daily' ? ' active' : '')}
+                onClick={() => setPatternTab('daily')}
+              >
+                <i className="ri-star-line me-1" />Daily
+                {dailyPatterns.length > 0 && <span className="badge bg-secondary ms-1">{dailyPatterns.length}</span>}
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                type="button" role="tab" aria-selected={patternTab === 'morning'}
+                className={'nav-link' + (patternTab === 'morning' ? ' active' : '')}
+                onClick={() => setPatternTab('morning')}
+              >
+                <i className="ri-sun-line me-1" />Morning Opening Trades
+                {morningPatterns.length > 0 && <span className="badge bg-warning ms-1">{morningPatterns.length}</span>}
+              </button>
+            </li>
+          </ul>
+
+          {shownPatterns.length === 0 ? (
             <p className="text-muted text-center mb-0 py-3">
               {patterns.length === 0 ? (
                 <>No patterns saved yet. <Link to="/trading/chart-patterns">Add the setups you trade</Link> so
                 they’re in front of you every morning.</>
+              ) : patternTab === 'morning' ? (
+                <>No patterns tagged “Morning Opening Trades”.{' '}
+                <Link to="/trading/chart-patterns">Tag the ones you watch at the open</Link> and they’ll appear here.</>
               ) : (
                 <>None of your {patterns.length} patterns are marked for daily review.{' '}
                 <Link to="/trading/chart-patterns">Star the ones that matter</Link> and they’ll appear here.</>
@@ -741,7 +791,7 @@ export default function BeforeITrade() {
                the chart on the right — so the notes are readable rather than
                truncated under a thumbnail. */
             <div className="bt-pattern-rows">
-              {dailyPatterns.map((p) => (
+              {shownPatterns.map((p) => (
                 <article className="bt-prow" key={p.id}>
                   <div className="bt-prow-text">
                     <header className="bt-prow-head">

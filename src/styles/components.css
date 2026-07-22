@@ -154,13 +154,16 @@
 /* Chart pattern gallery */
 .pattern-card .pattern-thumb {
   position: relative;
-  height: 170px;
+  height: 190px;
   overflow: hidden;
   border-radius: 0.5rem 0.5rem 0 0;
-  background: var(--hub-light, #f3f6f9);
+  /* Slightly darker so a letterboxed chart reads as a framed image, not a gap. */
+  background: color-mix(in srgb, var(--bs-body-color) 6%, var(--hub-card-bg));
   cursor: pointer;
 }
-.pattern-card .pattern-thumb img { width: 100%; height: 100%; object-fit: cover; }
+/* `contain`, not `cover` — show the WHOLE chart within the card rather than
+   cropping it. It's a chart; a cropped corner is useless. */
+.pattern-card .pattern-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .pattern-thumb-empty {
   display: flex;
   align-items: center;
@@ -1883,15 +1886,25 @@
 
 /* ---- The three entry plans ---- */
 .bt-plan {
+  --plan: var(--bs-primary);
   height: 100%;
   padding: 0.9rem 1rem;
   border-radius: 0.65rem;
-  background: var(--hub-card-bg);
-  border: 1px solid var(--hub-border);
-  border-top: 3px solid var(--bs-primary);
+  /* Faint wash of the plan colour so the whole card reads at a glance. */
+  background: color-mix(in srgb, var(--plan) 7%, var(--hub-card-bg));
+  border: 1px solid color-mix(in srgb, var(--plan) 25%, var(--hub-border));
+  border-top: 3px solid var(--plan);
   text-align: center;
 }
-.bt-plan.is-dead { border-top-color: var(--hub-border); opacity: 0.6; }
+/* 1 entry = safest (green), 2 = caution (orange), 3 = most averaging (red). */
+.bt-plan-e1 { --plan: #0ab39c; }
+.bt-plan-e2 { --plan: #f1963b; }
+.bt-plan-e3 { --plan: #f0736a; }
+.bt-plan.is-dead {
+  --plan: var(--hub-border);
+  background: var(--hub-card-bg);
+  opacity: 0.6;
+}
 .bt-plan-head { font-size: 0.9375rem; font-weight: 700; }
 .bt-plan-head small {
   display: block;
@@ -1904,7 +1917,7 @@
   font-weight: 700;
   line-height: 1.05;
   margin: 0.4rem 0 0.1rem;
-  color: var(--bs-primary);
+  color: var(--plan);
 }
 .bt-plan-qty small {
   display: block;
@@ -1921,9 +1934,9 @@
   max-width: 60px;
   padding: 0.15rem 0;
   border-radius: 0.25rem;
-  background: color-mix(in srgb, var(--bs-primary) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--bs-primary) 32%, transparent);
-  color: var(--bs-primary);
+  background: color-mix(in srgb, var(--plan) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--plan) 34%, transparent);
+  color: var(--plan);
   font-size: 0.6875rem;
   font-weight: 700;
 }
@@ -2052,27 +2065,42 @@
   background: color-mix(in srgb, #f7b84b 10%, var(--hub-card-bg));
 }
 .pattern-featured.is-on > i { color: #f7b84b; }
+/* Morning variant of the same checkbox — orange sun instead of amber star. */
+.pattern-featured.is-morning.is-on {
+  border-color: #f1963b;
+  background: color-mix(in srgb, #f1963b 10%, var(--hub-card-bg));
+}
+.pattern-featured.is-morning.is-on > i { color: #f1963b; }
 
-/* Star toggle + badge on the gallery card */
+/* Toggles + badges on the gallery card */
 .pattern-star { color: var(--bs-secondary-color); border: 0; background: transparent; line-height: 1; }
 .pattern-star:hover, .pattern-star.is-on { color: #f7b84b; }
+.pattern-sun { color: var(--bs-secondary-color); border: 0; background: transparent; line-height: 1; }
+.pattern-sun:hover, .pattern-sun.is-on { color: #f1963b; }
 .pattern-card.is-featured { border-color: #f7b84b; }
-.pattern-featured-badge {
+
+.pattern-flags {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+.pattern-flag {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
   padding: 0.15rem 0.45rem;
   border-radius: 0.25rem;
-  background: #f7b84b;
-  color: #3d2c05;
   font-size: 0.625rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.pattern-flag.is-daily { background: #f7b84b; color: #3d2c05; }
+.pattern-flag.is-morning { background: #f1963b; color: #3d2202; }
 
 /* ---- Patterns to review: one full-width row each, text left / chart right ---- */
 .bt-pattern-rows { display: flex; flex-direction: column; gap: 0.85rem; }
@@ -2621,4 +2649,115 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 0.8125rem;
+}
+
+/* Morning-trade card screenshots — compact, uniform height, click to zoom. */
+.mt-shot {
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--bs-body-color) 5%, var(--hub-card-bg));
+}
+.mt-shots + .mt-shots { margin-top: 0.25rem; }
+
+/* Morning-trade card: day numbers beside the global image, centred. */
+.mt-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem;
+  text-align: center;
+}
+.mt-stat { display: flex; flex-direction: column; min-width: 64px; }
+.mt-stat-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bs-secondary-color);
+}
+.mt-stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+
+/* The +5min change — big and colour-loud so it grabs attention. */
+.mt-change { font-size: 1.35rem; font-weight: 800; line-height: 1; }
+
+/* ---- The vision: what the discipline is all FOR (Before I Trade) ---- */
+.bt-vision {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  gap: 1.6rem;
+  padding: 1.35rem 1.6rem 1.4rem;
+  margin-bottom: 1.75rem;
+  border-radius: 0.9rem;
+  color: #fff;
+  /* Warm, hopeful — the opposite of the dark creed, so it reads as the reward. */
+  background:
+    radial-gradient(900px 240px at 100% -10%, rgba(255, 209, 102, 0.35), transparent 60%),
+    linear-gradient(135deg, #0f7d6e 0%, #12a594 55%, #1f8f6a 100%);
+  box-shadow: 0 16px 42px rgba(15, 125, 110, 0.4);
+}
+.bt-vision-text { flex: 1 1 0; min-width: 0; }
+/* Travel collage: the Thar up top, Kerala + Manali beneath — the trip made real. */
+.bt-vision-photos {
+  flex: 0 0 320px;
+  max-width: 320px;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.bt-vision-photos img {
+  width: 100%;
+  object-fit: cover;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  display: block;
+}
+.bt-vision-photo-main { height: 150px; }
+.bt-vision-photo-row { display: flex; gap: 0.6rem; }
+.bt-vision-photo-row img { height: 100px; }
+@media (max-width: 767.98px) {
+  .bt-vision { flex-direction: column; }
+  .bt-vision-photos { flex-basis: auto; max-width: 100%; }
+  .bt-vision-photo-main { height: 170px; }
+  .bt-vision-photo-row img { height: 120px; }
+}
+.bt-vision-kicker {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.bt-vision-lines p {
+  margin: 0 0 0.55rem;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  font-weight: 500;
+  color: #fff;
+}
+.bt-vision-lines p:last-child { margin-bottom: 0; }
+.bt-vision-close {
+  display: flex;
+  align-items: baseline;
+  margin: 1rem 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-style: italic;
+  color: #fff5d6;
+}
+@media (max-width: 767.98px) {
+  .bt-vision { padding: 1.1rem; }
+  .bt-vision-lines p { font-size: 1rem; }
 }

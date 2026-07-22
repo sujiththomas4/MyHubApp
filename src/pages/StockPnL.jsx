@@ -152,7 +152,10 @@ export default function StockPnL({ region }) {
       plotOptions: { bar: { columnWidth: '45%', borderRadius: 4, distributed: true } },
       colors: rows.map((a) => (a.pnlInr >= 0 ? '#0ab39c' : '#f06548')),
       dataLabels: { enabled: false }, legend: { show: false },
-      xaxis: { categories: rows.map((a) => a.StockmarketAccountName), axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: colors.text, fontSize: '11px' } } },
+      /* Include the holder so two accounts of the same broker are distinct —
+         identical category labels get collapsed by ApexCharts (one bar doubled,
+         the next blank). */
+      xaxis: { categories: rows.map((a) => (a.holder ? `${a.StockmarketAccountName} · ${a.holder}` : a.StockmarketAccountName)), axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: colors.text, fontSize: '11px' }, rotate: -45, hideOverlappingLabels: false } },
       yaxis: { labels: { style: { colors: colors.text, fontSize: '11px' }, formatter: (v) => money(v, 'INR') } },
       grid: { borderColor: colors.grid, strokeDashArray: 3 },
       tooltip: { theme: 'light', y: { formatter: (v) => money(v, 'INR') } },

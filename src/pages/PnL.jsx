@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
 import { brokerStats, compoundedReturn, money, fmtMonth, fmtDate } from '@/data/AppData'
@@ -15,8 +16,43 @@ import { useCapital } from '@/context/CapitalContext'
 const pnlClass = (n) => (n > 0 ? 'text-success' : n < 0 ? 'text-danger' : 'text-muted')
 const netOf = (t) => t.grossPnl - t.brokerage - t.govtCharges
 
+const PERIODS = [
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'yearly', label: 'Yearly' },
+]
+
+// Monday of the ISO week containing `d`, as YYYY-MM-DD.
+const weekStart = (d) => {
+  const dt = new Date(d + 'T00:00:00')
+  const dow = (dt.getDay() + 6) % 7 // Mon=0 … Sun=6
+  dt.setDate(dt.getDate() - dow)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
+/* Bucket trades into a period and return [{ key, label, net }], oldest first. */
+function bucketByPeriod(trades, period) {
+  const keyOf = (date) =>
+    period === 'daily' ? date
+      : period === 'weekly' ? weekStart(date)
+      : period === 'monthly' ? date.slice(0, 7)
+      : date.slice(0, 4) // yearly
+  const labelOf = (key) =>
+    period === 'daily' ? fmtDate(key)
+      : period === 'weekly' ? `w/c ${fmtDate(key)}`
+      : period === 'monthly' ? fmtMonth(key + '-01')
+      : key
+  const map = new Map()
+  trades.forEach((t) => { const k = keyOf(t.date); map.set(k, (map.get(k) || 0) + t.net) })
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, net]) => ({ key, label: labelOf(key), net: Math.round(net) }))
+}
+
 export default function PnL() {
   const colors = useChartColors()
+  const [period, setPeriod] = useState('monthly') // daily | weekly | monthly | yearly
   const { getCapital, accounts: capitalAccounts } = useCapital()
   const allAccounts = useBrokerAccounts()
   const allTrades = useBrokerTrades()
@@ -55,9 +91,6 @@ export default function PnL() {
   const cumSeries = days.map(([date, n]) => { cum += n; return [new Date(date + 'T00:00:00').getTime(), Math.round(cum)] })
 
   // Monthly net
-  const byMonth = new Map()
-  trades.forEach((t) => { const k = t.date.slice(0, 7); byMonth.set(k, (byMonth.get(k) || 0) + t.net) })
-  const months = [...byMonth.entries()].sort((a, b) => a[0].localeCompare(b[0]))
 
   // Per-module rollup
   const modules = brokerModuleMeta.map((m) => {
@@ -122,17 +155,19 @@ export default function PnL() {
     },
     series: [{ name: 'Cumulative P&L', data: cumSeries }],
   }
-  const monthlyBar = {
+  // Period bar — same chart, re-bucketed daily / weekly / monthly / yearly.
+  const periodBuckets = bucketByPeriod(trades, period)
+  const periodBar = {
     options: {
       chart: { toolbar: { show: false }, fontFamily: 'Poppins, sans-serif' },
       plotOptions: { bar: { columnWidth: '50%', borderRadius: 3, colors: { ranges: [{ from: -1e9, to: -0.01, color: '#f06548' }, { from: 0, to: 1e9, color: '#0ab39c' }] } } },
       dataLabels: { enabled: false }, legend: { show: false },
-      xaxis: { categories: months.map(([k]) => fmtMonth(k + '-01')), axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: colors.text, fontSize: '11px' } } },
+      xaxis: { categories: periodBuckets.map((b) => b.label), axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: colors.text, fontSize: '11px' }, rotate: -45, hideOverlappingLabels: true } },
       yaxis: { labels: { style: { colors: colors.text, fontSize: '11px' }, formatter: (v) => money(v, 'INR') } },
       grid: { borderColor: colors.grid, strokeDashArray: 3 },
       tooltip: { theme: 'light', y: { formatter: (v) => money(v, 'INR') } },
     },
-    series: [{ name: 'Net P&L', data: months.map(([, n]) => Math.round(n)) }],
+    series: [{ name: 'Net P&L', data: periodBuckets.map((b) => b.net) }],
   }
 
   return (
@@ -209,8 +244,26 @@ export default function PnL() {
       </div>
 
       <div className="card">
-        <div className="card-header"><h5 className="card-title mb-0">Monthly P&amp;L</h5></div>
-        <div className="card-body"><ReactApexChart key={colors.primary + 'mo'} options={monthlyBar.options} series={monthlyBar.series} type="bar" height={280} /></div>
+        <div className="card-header d-flex align-items-center flex-wrap gap-2">
+          <h5 className="card-title mb-0 flex-grow-1">P&amp;L over time</h5>
+          <div className="btn-group btn-group-sm" role="group" aria-label="Period">
+            {PERIODS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={'btn ' + (period === p.id ? 'btn-primary' : 'btn-light')}
+                onClick={() => setPeriod(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="card-body">
+          {periodBuckets.length === 0
+            ? <p className="text-muted text-center mb-0 py-4">No trades booked yet.</p>
+            : <ReactApexChart key={colors.primary + period} options={periodBar.options} series={periodBar.series} type="bar" height={280} />}
+        </div>
       </div>
 
       {/* Per-business report */}

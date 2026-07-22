@@ -180,13 +180,52 @@ create table if not exists chart_patterns (
   image_url text,               -- storage URL
   conditions jsonb not null default '[]'::jsonb,
   notes text,
-  featured boolean not null default false  -- surfaced on "Before I Trade"
+  featured boolean not null default false,  -- daily review on "Before I Trade"
+  morning boolean not null default false    -- "Morning Opening Trades" review
 );
 
 -- `create table if not exists` is a no-op on an existing database, so add the
--- column explicitly for projects created before patterns could be featured.
+-- columns explicitly for projects created before these flags existed.
 alter table chart_patterns
   add column if not exists featured boolean not null default false;
+alter table chart_patterns
+  add column if not exists morning boolean not null default false;
+
+-- ---- Morning trades -------------------------------------------------
+-- A dated pre-open observation: global-market + chart screenshots, a rich-text
+-- note, market breadth (advances/declines) and the pre-market move (+/-).
+create table if not exists morning_trades (
+  id text primary key,
+  date date not null,
+  observation text,
+  advances int,
+  declines int,
+  premarket numeric,               -- pre-market price move (+/-)
+  premarket_image text,            -- pre-market opening screenshot
+  premium_ce numeric,              -- previous-day premium, CE
+  premium_pe numeric,              -- previous-day premium, PE
+  candle_moved numeric,            -- Close - Open
+  global_image text,
+  chart_image text,
+  nifty5_image text,               -- Nifty after 5 min
+  ce5_image text,                  -- CE after 5 min
+  pe5_image text,                  -- PE after 5 min
+  updated_at timestamptz not null default now()
+);
+-- Columns added after the table shipped (no-op on a fresh create above).
+alter table morning_trades
+  add column if not exists premarket_image text,
+  add column if not exists premium_ce numeric,
+  add column if not exists premium_pe numeric,
+  add column if not exists candle_moved numeric,
+  add column if not exists nifty5_image text,
+  add column if not exists ce5_image text,
+  add column if not exists pe5_image text,
+  add column if not exists ce_prev_image text,
+  add column if not exists pe_prev_image text,
+  add column if not exists nifty5_change numeric,
+  add column if not exists ce5_change numeric,
+  add column if not exists pe5_change numeric;
 
 -- ---- Daily trade review ---------------------------------------------
 -- One row per trading day: which of the defined mistakes were actually
@@ -210,7 +249,7 @@ begin
     'app_settings','brokers','loans','installments','loan_prepayments',
     'savings_categories','savings','stock_accounts','stock_holdings',
     'broker_accounts','broker_trades','plantation_entries','plantation_activities',
-    'journal_days','journal_trades','journal_notes','chart_patterns','daily_reviews'
+    'journal_days','journal_trades','journal_notes','chart_patterns','daily_reviews','morning_trades'
   ] loop
     execute format('alter table %I enable row level security;', t);
     execute format($p$create policy "authed all" on %I for all to authenticated using (true) with check (true);$p$, t);
@@ -227,7 +266,7 @@ begin
     'app_settings','brokers','loans','installments','loan_prepayments',
     'savings_categories','savings','stock_accounts','stock_holdings',
     'broker_accounts','broker_trades','plantation_entries','plantation_activities',
-    'journal_days','journal_trades','journal_notes','chart_patterns','daily_reviews'
+    'journal_days','journal_trades','journal_notes','chart_patterns','daily_reviews','morning_trades'
   ] loop
     execute format('alter publication supabase_realtime add table %I;', t);
   end loop;

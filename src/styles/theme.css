@@ -136,6 +136,14 @@
   --bs-btn-hover-bg: var(--bs-primary);
   --bs-btn-hover-border-color: var(--bs-primary);
 }
+.btn-soft-warning {
+  --bs-btn-color: #b9770b;
+  --bs-btn-bg: color-mix(in srgb, #f1963b 16%, transparent);
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #f1963b;
+  --bs-btn-hover-border-color: #f1963b;
+}
 .text-primary { color: var(--bs-primary) !important; }
 .bg-primary { background-color: var(--bs-primary) !important; }
 .link-primary { color: var(--bs-primary) !important; }

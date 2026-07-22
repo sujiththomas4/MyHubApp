@@ -82,6 +82,19 @@ export const CREED = {
   close: 'My future is being built by the decisions I make in the next few minutes.',
   mantra: ['Trade the system.', 'Trust the process.', 'Respect the rules.'],
   last: 'Everything I want is on the other side of consistent discipline.',
+
+  /* The life this is all FOR — read it, feel it, then trade like it matters. */
+  vision: {
+    kicker: 'This is what I’m trading for',
+    lines: [
+      'A Thar in the driveway and the road wide open — across Kerala, across India, across the world.',
+      'Land in Mumbai on my own terms. Book the hotel. Book the table at the bar. Trade from there, make the money.',
+      'Then go and see the people I love — visit relatives, wander, explore, with nowhere I have to be.',
+      'No meetings. No deadlines. No “new framework” to relearn. No client on a call at 9pm.',
+      'Just me, the market, and a freedom that answers to no one.',
+    ],
+    close: 'And all of it is bought with one currency — the discipline I show TODAY. Not tomorrow. Today.',
+  },
 }
 
 /**
@@ -311,6 +324,6 @@ export const SCREENS_OPEN = [
   { id: 'chain', label: 'Option chain', hint: 'Read the decay before buying', icon: 'ri-table-2' },
   { id: 'premium', label: 'Premium chart', hint: 'The thing I’m actually buying', icon: 'ri-funds-fill' },
   { id: 'nifty', label: 'Nifty index + Future', hint: 'Both open, side by side', icon: 'ri-line-chart-fill' },
-  { id: 'vix', label: 'VIX chart', hint: 'Volatility regime for the day', icon: 'ri-pulse-fill' },
+  { id: 'vix', label: 'VIX & Crude Oil', hint: 'Volatility regime + crude for the day', icon: 'ri-pulse-fill' },
   { id: 'global', label: 'Global market / Dow', hint: 'On its own chart, visible all session', icon: 'ri-earth-fill' },
 ]
