@@ -11,12 +11,16 @@ create table if not exists app_settings (
 );
 
 -- ---- Brokers (shared capital) ---------------------------------------
+-- Capital pool per (broker, holder) — the same broker can be held under two
+-- names, each with its own capital.
 create table if not exists brokers (
-  slug text primary key,
+  slug text not null,
+  holder text not null default '',
   name text not null,
   icon text,
   currency text not null default 'INR',
-  capital numeric not null default 0
+  capital numeric not null default 0,
+  primary key (slug, holder)
 );
 
 -- ---- Loans + installments -------------------------------------------
@@ -74,6 +78,7 @@ create table if not exists stock_accounts (
   id text primary key,
   slug text not null,
   account_name text not null,   -- StockmarketAccountName
+  holder text not null default '',  -- account holder name
   region text not null,         -- India | UAE
   currency text not null default 'INR',
   icon text
@@ -95,6 +100,7 @@ create table if not exists broker_accounts (
   module text not null,         -- option-buying | option-selling | intraday-stocks
   slug text not null,           -- broker slug (references brokers.slug logically)
   broker text not null,
+  holder text not null default '',  -- account holder; (slug, holder) -> brokers capital
   icon text,
   currency text not null default 'INR'
 );

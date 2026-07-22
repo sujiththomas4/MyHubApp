@@ -1,7 +1,7 @@
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
 import { money, fmtMonth as fmtDate, trajectory, slugOf, tenureMonths, balanceAfter } from '@/data/AppData'
-import { useLoans, useInstallments } from '@/data/loansRepo'
+import { useLoans, useInstallments, usePrepayments } from '@/data/loansRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useFx } from '@/context/FxContext'
 
@@ -116,14 +116,19 @@ export default function Loans() {
   const { toINR, aedToInr } = useFx()
   const loans = useLoans()
   const installments = useInstallments()
+  const prepayments = usePrepayments()
   const palette = [colors.primary, '#4b93ff', '#f7b84b']
 
   // Paid count from the LIVE installments (so marks made on the detail page are
-  // reflected here); outstanding = amortized balance at that count.
+  // reflected here); outstanding = amortized balance at that count, LESS any
+  // lump-sum prepayments — same as the loan detail page. Without the prepayment
+  // subtraction this list overstated every balance.
   const rows = loans.map((l) => {
     const numberOfInstallments = tenureMonths(l)
     const installmentsPaid = installments.filter((i) => i.loanId === l.id && i.status === 'paid').length
-    return { ...l, numberOfInstallments, installmentsPaid, outstanding: balanceAfter(l, installmentsPaid) }
+    const prepaid = prepayments.filter((p) => p.loanId === l.id).reduce((s, p) => s + p.amount, 0)
+    const outstanding = Math.max(0, balanceAfter(l, installmentsPaid) - prepaid)
+    return { ...l, numberOfInstallments, installmentsPaid, prepaid, outstanding }
   })
 
   // Aggregates

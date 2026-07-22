@@ -254,11 +254,14 @@ export const prepayments = []
  * are the seed/default values.
  *   slug, name, icon, currency, capital.
  * =========================================================================== */
+// Capital accounts — one per (slug, holder). `holder` '' = the primary/only
+// holder. Add a second row with the same slug + a different holder to split a
+// broker's capital across two accounts.
 export const brokers = [
-  { slug: 'zerodha', name: 'Zerodha', icon: 'ri-stock-line', currency: 'INR', capital: 200000 },
-  { slug: 'dhan', name: 'Dhan', icon: 'ri-exchange-funds-line', currency: 'INR', capital: 150000 },
-  { slug: 'upstox', name: 'Upstox', icon: 'ri-funds-line', currency: 'INR', capital: 100000 },
-  { slug: 'tradesmart', name: 'Tradesmart', icon: 'ri-bar-chart-box-line', currency: 'INR', capital: 80000 },
+  { slug: 'zerodha', holder: '', name: 'Zerodha', icon: 'ri-stock-line', currency: 'INR', capital: 200000 },
+  { slug: 'dhan', holder: '', name: 'Dhan', icon: 'ri-exchange-funds-line', currency: 'INR', capital: 150000 },
+  { slug: 'upstox', holder: '', name: 'Upstox', icon: 'ri-funds-line', currency: 'INR', capital: 100000 },
+  { slug: 'tradesmart', holder: '', name: 'Tradesmart', icon: 'ri-bar-chart-box-line', currency: 'INR', capital: 80000 },
 ]
 
 /* ===========================================================================

@@ -15,7 +15,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog'
 const pnlClass = (n) => (n > 0 ? 'text-success' : n < 0 ? 'text-danger' : 'text-muted')
 const rid = () => Math.random().toString(36).slice(2, 8)
 
-function HoldingForm({ initial, currency, onSave, onCancel }) {
+function HoldingForm({ initial, currency, holderOptions = [], holder, onHolder, onSave, onCancel }) {
   const [f, setF] = useState({
     name: initial?.name || '',
     qty: initial?.qty ?? '',
@@ -38,6 +38,14 @@ function HoldingForm({ initial, currency, onSave, onCancel }) {
   return (
     <>
       <div className="row g-2">
+        {holderOptions.length > 1 && (
+          <div className="col-md-4">
+            <label className="form-label small mb-1">Account holder</label>
+            <select className="form-select form-select-sm" value={holder} onChange={(e) => onHolder(e.target.value)}>
+              {holderOptions.map((h) => <option key={h || '__primary'} value={h}>{h || 'Primary'}</option>)}
+            </select>
+          </div>
+        )}
         <div className="col-md-5">
           <label className="form-label small mb-1">Stock / instrument</label>
           <input className="form-control form-control-sm" placeholder="e.g. Infosys" value={f.name} onChange={(e) => set('name', e.target.value)} autoFocus />
@@ -75,16 +83,32 @@ export default function StockAccount() {
   const { slug } = useParams()
   const accounts = useStockAccounts()
   const holdings = useStockHoldings()
-  const account = useMemo(() => accounts.find((a) => a.slug === slug), [accounts, slug])
+
+  // A broker can hold several accounts (one per holder). Aggregate them; the
+  // holding form picks which holder a line belongs to.
+  const brokerAccounts = useMemo(() => accounts.filter((a) => a.slug === slug), [accounts, slug])
+  const account = brokerAccounts.find((a) => !a.holder) || brokerAccounts[0]
+  const accIds = useMemo(() => new Set(brokerAccounts.map((a) => a.id)), [brokerAccounts])
+  const holderById = useMemo(() => {
+    const m = new Map()
+    brokerAccounts.forEach((a) => m.set(a.id, a.holder || ''))
+    return m
+  }, [brokerAccounts])
+  const holderOptions = useMemo(
+    () => [...new Set(brokerAccounts.map((a) => a.holder || ''))].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b))),
+    [brokerAccounts]
+  )
+  const showHolder = holderOptions.length > 1
 
   const [items, setItems] = useState([])
   const [adding, setAdding] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+  const [formHolder, setFormHolder] = useState('')
 
   useEffect(() => {
-    setItems(account ? holdings.filter((h) => h.accountId === account.id) : [])
-  }, [holdings, account])
+    setItems(holdings.filter((h) => accIds.has(h.accountId)))
+  }, [holdings, accIds])
   useEffect(() => { setAdding(false); setEditRow(null); setDeleteRow(null) }, [slug])
 
   if (!account) {
@@ -103,14 +127,27 @@ export default function StockAccount() {
   const s = stockSum(items)
   const rows = [...items].sort((a, b) => (b.currentValue - b.invested) - (a.currentValue - a.invested))
 
-  const addItem = (x) => { const row = { ...x, accountId: account.id }; setItems((xs) => [...xs, row]); setAdding(false); addHolding(row).catch(console.error) }
-  const updateItem = (x) => { const row = { ...x, accountId: account.id }; setItems((xs) => xs.map((i) => (i.id === x.id ? { ...i, ...row } : i))); setEditRow(null); editHolding(row).catch(console.error) }
+  // Which stock_account a holding belongs to, from the selected holder.
+  const accountIdForHolder = (holder) => {
+    const ex = brokerAccounts.find((a) => (a.holder || '') === (holder || ''))
+    return (ex || account).id
+  }
+  const openAdd = () => { setFormHolder(''); setAdding(true) }
+  const openEdit = (h) => { setFormHolder(holderById.get(h.accountId) || ''); setEditRow(h) }
+
+  const addItem = (x) => { const row = { ...x, accountId: accountIdForHolder(formHolder) }; setItems((xs) => [...xs, row]); setAdding(false); addHolding(row).catch(console.error) }
+  const updateItem = (x) => { const row = { ...x, accountId: accountIdForHolder(formHolder) }; setItems((xs) => xs.map((i) => (i.id === x.id ? { ...i, ...row } : i))); setEditRow(null); editHolding(row).catch(console.error) }
   const confirmDelete = () => { const id = deleteRow.id; setItems((xs) => xs.filter((i) => i.id !== id)); setDeleteRow(null); removeHolding(id).catch(console.error) }
 
   return (
     <div className="stock-market">
       <div className="page-title-box d-flex align-items-center">
-        <h4 className="flex-grow-1 mb-0"><i className={account.icon + ' me-2 text-muted'} />{account.StockmarketAccountName}</h4>
+        <h4 className="flex-grow-1 mb-0">
+          <i className={account.icon + ' me-2 text-muted'} />{account.StockmarketAccountName}
+          {showHolder
+            ? <span className="text-muted fs-14 ms-2">· {holderOptions.length} holders</span>
+            : account.holder && <span className="text-muted fs-14 ms-2">· {account.holder}</span>}
+        </h4>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item"><a href="/">Hub</a></li>
@@ -147,26 +184,29 @@ export default function StockAccount() {
       <div className="card">
         <div className="card-header d-flex align-items-center">
           <h5 className="card-title mb-0 flex-grow-1">Holdings</h5>
-          <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><i className="ri-add-line me-1" />Add holding</button>
+          <button className="btn btn-primary btn-sm" onClick={openAdd}><i className="ri-add-line me-1" />Add holding</button>
         </div>
         <div className="card-body p-0">
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
                 <tr>
-                  <th>Stock</th><th className="text-center">Qty</th>
+                  <th>Stock</th>
+                  {showHolder && <th>Holder</th>}
+                  <th className="text-center">Qty</th>
                   <th className="text-end">Invested</th><th className="text-end">Value</th>
                   <th className="text-end">P&amp;L</th><th>Note</th><th className="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center text-muted py-4">No holdings yet.</td></tr>
+                  <tr><td colSpan={8} className="text-center text-muted py-4">No holdings yet.</td></tr>
                 ) : rows.map((x) => {
                   const pnl = x.currentValue - x.invested
                   return (
                     <tr key={x.id}>
                       <td className="fw-medium">{x.name}</td>
+                      {showHolder && <td className="text-muted small">{holderById.get(x.accountId) || 'Primary'}</td>}
                       <td className="text-center">{x.qty}</td>
                       <td className="text-end">{money(x.invested, cur)}</td>
                       <td className="text-end">{money(x.currentValue, cur)}</td>
@@ -176,7 +216,7 @@ export default function StockAccount() {
                       <td className="text-muted small">{x.note}</td>
                       <td className="text-center">
                         <div className="d-flex gap-1 justify-content-center">
-                          <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => setEditRow(x)}><i className="ri-pencil-line" /></button>
+                          <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => openEdit(x)}><i className="ri-pencil-line" /></button>
                           <button className="btn btn-sm btn-ghost-danger p-1" title="Delete" onClick={() => setDeleteRow(x)}><i className="ri-delete-bin-line" /></button>
                         </div>
                       </td>
@@ -186,7 +226,7 @@ export default function StockAccount() {
               </tbody>
               <tfoot>
                 <tr className="fw-semibold border-top">
-                  <td colSpan={2}>Total</td>
+                  <td colSpan={showHolder ? 3 : 2}>Total</td>
                   <td className="text-end">{money(s.invested, cur)}</td>
                   <td className="text-end">{money(s.value, cur)}</td>
                   <td className={'text-end ' + pnlClass(s.pnl)}>{money(s.pnl, cur)}</td>
@@ -210,6 +250,9 @@ export default function StockAccount() {
           key={editRow?.id || 'new'}
           initial={editRow}
           currency={cur}
+          holderOptions={holderOptions}
+          holder={formHolder}
+          onHolder={setFormHolder}
           onSave={editRow ? updateItem : addItem}
           onCancel={() => { setAdding(false); setEditRow(null) }}
         />

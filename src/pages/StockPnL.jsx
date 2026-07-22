@@ -1,9 +1,86 @@
+import { Fragment, useState } from 'react'
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
 import { stockSum, money } from '@/data/AppData'
-import { useStockAccounts, useStockHoldings } from '@/data/stockRepo'
+import {
+  useStockAccounts, useStockHoldings,
+  addStockAccount as apiAddAccount, editStockAccount as apiEditAccount, removeStockAccount as apiRemoveAccount,
+} from '@/data/stockRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useFx } from '@/context/FxContext'
+import Modal from '@/components/ui/Modal'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+
+const REGIONS = ['India', 'UAE']
+const CURRENCIES = ['INR', 'AED']
+const rid = () => Math.random().toString(36).slice(2, 8)
+const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
+/* Account form used three ways:
+   - `initial`: edit an existing account (all fields editable)
+   - `broker` : add another holder under a broker (broker fields locked)
+   - neither  : add a brand-new broker */
+function AccountForm({ initial, broker, onSave, onCancel }) {
+  const editing = Boolean(initial)
+  const locked = Boolean(broker)
+  const [name, setName] = useState(initial?.StockmarketAccountName || broker?.StockmarketAccountName || '')
+  const [holder, setHolder] = useState(initial?.holder || '')
+  const [region, setRegion] = useState(initial?.region || broker?.region || 'India')
+  const [currency, setCurrency] = useState(initial?.currency || broker?.currency || 'INR')
+
+  const save = () => {
+    if (editing) {
+      // DB column names — updateRow passes the patch straight through.
+      onSave({ account_name: name.trim() || initial.StockmarketAccountName, holder: holder.trim(), region, currency })
+      return
+    }
+    const slug = broker?.slug || slugify(name) || 'account'
+    const hs = slugify(holder) || 'primary'
+    onSave({
+      id: `sm-${slug}-${hs}-${rid()}`,
+      slug,
+      StockmarketAccountName: name.trim() || broker?.StockmarketAccountName || 'Account',
+      holder: holder.trim(),
+      region,
+      currency,
+      icon: broker?.icon || 'ri-stock-line',
+    })
+  }
+
+  return (
+    <>
+      <div className="row g-3">
+        <div className="col-md-6">
+          <label className="form-label small mb-1">Broker</label>
+          <input className="form-control form-control-sm" placeholder="e.g. Zerodha" value={name} disabled={locked} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="col-md-6">
+          <label className="form-label small mb-1">Account holder</label>
+          <input className="form-control form-control-sm" placeholder="e.g. Sujith / Priya" value={holder} onChange={(e) => setHolder(e.target.value)} autoFocus />
+          <div className="form-text small">Leave blank for the primary account.</div>
+        </div>
+        <div className="col-md-6">
+          <label className="form-label small mb-1">Region</label>
+          <select className="form-select form-select-sm" value={region} disabled={locked} onChange={(e) => setRegion(e.target.value)}>
+            {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="col-md-6">
+          <label className="form-label small mb-1">Currency</label>
+          <select className="form-select form-select-sm" value={currency} disabled={locked} onChange={(e) => setCurrency(e.target.value)}>
+            {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="d-flex gap-2 mt-3">
+        <button className="btn btn-primary btn-sm" onClick={save}>
+          <i className="ri-save-line me-1" />{editing ? 'Save changes' : 'Add account'}
+        </button>
+        <button className="btn btn-light btn-sm" onClick={onCancel}>Cancel</button>
+      </div>
+    </>
+  )
+}
 
 /**
  * StockPnL.jsx
@@ -19,6 +96,10 @@ export default function StockPnL({ region }) {
   const { toINR, aedToInr } = useFx()
   const stockMarketAccounts = useStockAccounts()
   const stockMarketHoldings = useStockHoldings()
+
+  const [addFor, setAddFor] = useState(null)   // null | 'new' | broker object
+  const [editTarget, setEditTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const accts = stockMarketAccounts.filter((a) => !region || a.region === region)
   const rows = accts.map((a) => {
@@ -42,6 +123,28 @@ export default function StockPnL({ region }) {
     const val = rs.reduce((t, a) => t + a.valueInr, 0)
     return { region: rg, invested: inv, value: val, pnl: val - inv, pnlPct: inv ? ((val - inv) / inv) * 100 : 0, count: rs.length }
   })
+
+  // Two-level grouping: region -> broker -> accounts. First-seen order kept, so
+  // adding an account slots into its region/broker section automatically.
+  const regionGroups = []
+  const rIdx = new Map()
+  rows.forEach((a) => {
+    if (!rIdx.has(a.region)) {
+      rIdx.set(a.region, regionGroups.length)
+      regionGroups.push({ region: a.region, bIdx: new Map(), brokers: [], count: 0 })
+    }
+    const rg = regionGroups[rIdx.get(a.region)]
+    rg.count++
+    if (!rg.bIdx.has(a.slug)) {
+      rg.bIdx.set(a.slug, rg.brokers.length)
+      rg.brokers.push({ slug: a.slug, name: a.StockmarketAccountName, icon: a.icon, region: a.region, currency: a.currency, accounts: [] })
+    }
+    rg.brokers[rg.bIdx.get(a.slug)].accounts.push(a)
+  })
+
+  const saveAccount = (a) => { apiAddAccount(a).catch(console.error); setAddFor(null) }
+  const saveEdit = (patch) => { apiEditAccount(editTarget.id, patch).catch(console.error); setEditTarget(null) }
+  const confirmDeleteAccount = () => { apiRemoveAccount(deleteTarget.id).catch(console.error); setDeleteTarget(null) }
 
   const bar = {
     options: {
@@ -99,40 +202,74 @@ export default function StockPnL({ region }) {
         {/* By account */}
         <div className="col-xl-7">
           <div className="card">
-            <div className="card-header"><h5 className="card-title mb-0">By account</h5></div>
+            <div className="card-header d-flex align-items-center">
+              <h5 className="card-title mb-0 flex-grow-1">By account</h5>
+              <button className="btn btn-soft-primary btn-sm" onClick={() => setAddFor('new')}><i className="ri-add-line me-1" />Add account</button>
+            </div>
             <div className="card-body p-0">
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0">
                   <thead className="table-light">
                     <tr>
-                      <th>Account</th><th>Region</th><th className="text-end">Invested</th>
+                      <th>Account holder</th><th className="text-end">Invested</th>
                       <th className="text-end">Value</th><th className="text-end">P&amp;L</th><th className="text-end">Return</th>
+                      <th style={{ width: 76 }} />
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((a) => (
-                      <tr key={a.id}>
-                        <td>
-                          <Link to={`/investments/${a.slug}`} className="text-reset fw-medium">
-                            <i className={a.icon + ' me-2 text-muted'} />{a.StockmarketAccountName}
-                          </Link>
-                          <span className="badge bg-light text-body border ms-2">{a.currency}</span>
-                        </td>
-                        <td className="text-muted">{a.region}</td>
-                        <td className="text-end">{money(a.invested, a.currency)}</td>
-                        <td className="text-end">{money(a.value, a.currency)}</td>
-                        <td className={'text-end fw-semibold ' + pnlClass(a.pnl)}>{money(a.pnl, a.currency)}</td>
-                        <td className={'text-end ' + pnlClass(a.pnl)}>{a.pnlPct.toFixed(1)}%</td>
-                      </tr>
+                    {regionGroups.map((rg) => (
+                      <Fragment key={rg.region}>
+                        <tr className="stock-region-row">
+                          <td colSpan={6} className="fw-bold">
+                            <i className="ri-map-pin-line me-2 text-muted" />{rg.region}
+                            <span className="text-muted small ms-2">{rg.count} account{rg.count === 1 ? '' : 's'}</span>
+                          </td>
+                        </tr>
+                        {rg.brokers.map((g) => (
+                          <Fragment key={g.slug}>
+                            <tr className="table-light">
+                              <td colSpan={5} className="fw-semibold ps-4">
+                                <Link to={`/investments/${g.slug}`} className="text-reset">
+                                  <i className={g.icon + ' me-2 text-muted'} />{g.name}
+                                </Link>
+                                <span className="badge bg-light text-body border ms-2">{g.currency}</span>
+                              </td>
+                              <td className="text-end">
+                                <button className="btn btn-sm btn-ghost-secondary p-1" title={`Add account under ${g.name}`} onClick={() => setAddFor(g)}>
+                                  <i className="ri-add-line" />
+                                </button>
+                              </td>
+                            </tr>
+                            {g.accounts.map((a) => (
+                              <tr key={a.id}>
+                                <td className="ps-5 fw-medium">{a.holder || <span className="text-muted fst-italic">Primary</span>}</td>
+                                <td className="text-end">{money(a.invested, a.currency)}</td>
+                                <td className="text-end">{money(a.value, a.currency)}</td>
+                                <td className={'text-end fw-semibold ' + pnlClass(a.pnl)}>{money(a.pnl, a.currency)}</td>
+                                <td className={'text-end ' + pnlClass(a.pnl)}>{a.pnlPct.toFixed(1)}%</td>
+                                <td className="text-end text-nowrap">
+                                  <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit account" onClick={() => setEditTarget(a)}>
+                                    <i className="ri-pencil-line" />
+                                  </button>
+                                  <button className="btn btn-sm btn-ghost-danger p-1" title="Remove account" onClick={() => setDeleteTarget(a)}>
+                                    <i className="ri-delete-bin-line" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </Fragment>
+                        ))}
+                      </Fragment>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="fw-semibold border-top">
-                      <td colSpan={2}>Total (INR)</td>
+                      <td>Total (INR)</td>
                       <td className="text-end">{money(invested, 'INR')}</td>
                       <td className="text-end">{money(value, 'INR')}</td>
                       <td className={'text-end ' + pnlClass(pnl)}>{money(pnl, 'INR')}</td>
                       <td className={'text-end ' + pnlClass(pnl)}>{pnlPct.toFixed(1)}%</td>
+                      <td />
                     </tr>
                   </tfoot>
                 </table>
@@ -182,6 +319,51 @@ export default function StockPnL({ region }) {
           </div>
         </div>
       )}
+
+      <Modal
+        open={Boolean(addFor)}
+        size="lg"
+        title={<>
+          <i className="ri-add-line me-2 text-primary" />
+          {addFor && addFor !== 'new' ? `Add account — ${addFor.name}` : 'Add stock account'}
+        </>}
+        onClose={() => setAddFor(null)}
+      >
+        {addFor && (
+          <AccountForm
+            broker={addFor === 'new' ? null : addFor}
+            onSave={saveAccount}
+            onCancel={() => setAddFor(null)}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(editTarget)}
+        size="lg"
+        title={<><i className="ri-pencil-line me-2 text-primary" />Edit account</>}
+        onClose={() => setEditTarget(null)}
+      >
+        {editTarget && (
+          <AccountForm
+            key={editTarget.id}
+            initial={editTarget}
+            onSave={saveEdit}
+            onCancel={() => setEditTarget(null)}
+          />
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Remove this account?"
+        message={deleteTarget && (
+          <>“{deleteTarget.StockmarketAccountName}{deleteTarget.holder ? ` · ${deleteTarget.holder}` : ''}” will be removed. Its holdings are not deleted automatically.</>
+        )}
+        confirmLabel="Remove"
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

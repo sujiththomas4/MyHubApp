@@ -3,7 +3,7 @@ import { stockMarketAccounts as staticAccounts, stockMarketHoldings as staticHol
 
 /** Data access for stock-market accounts + holdings (Supabase or localStorage). */
 const rowToAccount = (r) => ({
-  id: r.id, slug: r.slug, StockmarketAccountName: r.account_name,
+  id: r.id, slug: r.slug, StockmarketAccountName: r.account_name, holder: r.holder || '',
   region: r.region, currency: r.currency, icon: r.icon,
 })
 const rowToHolding = (r) => ({
@@ -23,6 +23,19 @@ export function useStockHoldings() {
   const { data } = useCollection('stock_holdings', staticHoldings, { map: rowToHolding })
   return data
 }
+
+const accToRow = (a) => ({
+  id: a.id, slug: a.slug, account_name: a.StockmarketAccountName, holder: a.holder || '',
+  region: a.region, currency: a.currency, icon: a.icon,
+})
+
+// Account CRUD — a broker can hold several accounts, one per holder.
+export const addStockAccount = (a) =>
+  insertRow('stock_accounts', accToRow(a))
+export const editStockAccount = (id, patch) =>
+  updateRow('stock_accounts', id, patch)
+export const removeStockAccount = (id) =>
+  deleteRow('stock_accounts', id)
 
 export const addHolding = (h) =>
   insertRow('stock_holdings', holdingToRow(h))

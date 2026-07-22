@@ -1,4 +1,4 @@
-import { useCollection, insertRow, updateRow, deleteRow } from '@/lib/api'
+import { useCollection, insertRow, updateRow, deleteRow, upsertRow } from '@/lib/api'
 import { brokerModules } from '@/data/AppData'
 
 /**
@@ -8,10 +8,10 @@ import { brokerModules } from '@/data/AppData'
 export const brokerModuleMeta = brokerModules.map((m) => ({ id: m.id, title: m.title, basePath: m.basePath }))
 
 const staticAccounts = brokerModules.flatMap((m) =>
-  m.accounts.map((a) => ({ id: a.id, module: m.id, slug: a.slug, broker: a.broker, icon: a.icon, currency: a.currency })))
+  m.accounts.map((a) => ({ id: a.id, module: m.id, slug: a.slug, broker: a.broker, holder: a.holder || '', icon: a.icon, currency: a.currency })))
 const staticTrades = brokerModules.flatMap((m) => m.trades)
 
-const rowToAccount = (r) => ({ id: r.id, module: r.module, slug: r.slug, broker: r.broker, icon: r.icon, currency: r.currency })
+const rowToAccount = (r) => ({ id: r.id, module: r.module, slug: r.slug, broker: r.broker, holder: r.holder || '', icon: r.icon, currency: r.currency })
 const rowToTrade = (r) => ({
   id: r.id, accountId: r.account_id, date: r.date, orders: r.orders,
   grossPnl: Number(r.gross_pnl), brokerage: Number(r.brokerage), govtCharges: Number(r.govt_charges),
@@ -29,6 +29,14 @@ export function useBrokerTrades() {
   const { data } = useCollection('broker_trades', staticTrades, { map: rowToTrade })
   return data
 }
+
+/* Create or update a broker account (id). Used to spin up a per-holder account
+   the first time a trade is booked against a new holder for a broker+module. */
+export const upsertAccount = (a) =>
+  upsertRow('broker_accounts', {
+    id: a.id, module: a.module, slug: a.slug, broker: a.broker,
+    holder: a.holder || '', icon: a.icon, currency: a.currency,
+  })
 
 export const addTrade = (t) =>
   insertRow('broker_trades', tradeToRow(t))

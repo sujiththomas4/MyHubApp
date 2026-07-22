@@ -3,15 +3,15 @@ import ReactApexChart from 'react-apexcharts'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   savingsStats, stockSum,
-  brokers, brokerStats,
-  balanceAfter, tenureMonths,
+  brokerStats,
+  balanceAfter,
   money,
 } from '@/data/AppData'
 import { useSavings } from '@/data/savingsRepo'
 import { useStockAccounts, useStockHoldings } from '@/data/stockRepo'
 import { useBrokerAccounts, useBrokerTrades } from '@/data/brokerRepo'
 import { usePlantationEntries } from '@/data/plantationRepo'
-import { useLoans, useInstallments } from '@/data/loansRepo'
+import { useLoans, useInstallments, usePrepayments } from '@/data/loansRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useFx } from '@/context/FxContext'
 import { useCapital } from '@/context/CapitalContext'
@@ -35,7 +35,7 @@ function PrivacyToggle() {
 }
 
 // A summary card that links through to its section.
-function SummaryCard({ label, value, sub, subClass, icon, tone, to }) {
+function SummaryCard({ label, value, sub, subClass, icon, tone, to, valueClass }) {
   return (
     <div className="col-xl-4 col-md-6">
       <div className="card stat-card h-100 mb-0">
@@ -44,7 +44,9 @@ function SummaryCard({ label, value, sub, subClass, icon, tone, to }) {
             <div className="flex-grow-1"><span className="stat-label">{label}</span></div>
             <div className={`stat-icon bg-${tone}-subtle text-${tone}`}><i className={icon} /></div>
           </div>
-          <h4 className={'stat-value mt-3 mb-0 text-' + tone}><Secret>{value}</Secret></h4>
+          {/* valueClass overrides the value colour (e.g. red on a negative);
+              the icon keeps `tone` so the card's identity stays consistent. */}
+          <h4 className={'stat-value mt-3 mb-0 ' + (valueClass || 'text-' + tone)}><Secret>{value}</Secret></h4>
           {sub && <span className={'small ' + (subClass || 'text-muted')}><Secret>{sub}</Secret></span>}
           <div className="mt-2">
             <Link to={to} className="stat-link">View <i className="ri-arrow-right-line" /></Link>
@@ -59,7 +61,7 @@ function DashboardInner() {
   const colors = useChartColors()
   const navigate = useNavigate()
   const { toINR } = useFx()
-  const { getCapital } = useCapital()
+  const { accounts: capitalAccounts } = useCapital()
   const [chartType, setChartType] = useState('area') // 'area' | 'bar'
   const { savings } = useSavings()
   const stockMarketAccounts = useStockAccounts()
@@ -69,6 +71,7 @@ function DashboardInner() {
   const plantationEntries = usePlantationEntries()
   const loans = useLoans()
   const installments = useInstallments()
+  const prepayments = usePrepayments()
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening'
@@ -86,17 +89,21 @@ function DashboardInner() {
 
   // Business income (broker net P&L + plantation profit) + business value
   const brokerNet = brokerAccounts.reduce((s, a) => s + brokerStats(brokerTrades, a, 0).netPnl, 0)
-  const brokerCapital = brokers.reduce((s, b) => s + getCapital(b.slug), 0)
+  // Sum every capital account (broker + holder), not once per broker.
+  const brokerCapital = capitalAccounts.reduce((s, a) => s + a.capital, 0)
   const plIncome = plantationEntries.filter((e) => e.type === 'income').reduce((s, e) => s + e.amount, 0)
   const plExpense = plantationEntries.filter((e) => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
   const plantationNet = plIncome - plExpense
   const businessIncome = brokerNet + plantationNet
   const businessValue = brokerCapital + brokerNet
 
-  // Loans outstanding (INR) — from live installment paid counts.
+  // Loans outstanding (INR) — live paid counts, minus lump-sum prepayments so
+  // it matches the Loans list and the loan detail page.
   const loansOutstanding = loans.reduce((s, l) => {
     const paid = installments.filter((i) => i.loanId === l.id && i.status === 'paid').length
-    return s + toINR(balanceAfter(l, paid), l.currency)
+    const prepaid = prepayments.filter((p) => p.loanId === l.id).reduce((a, p) => a + p.amount, 0)
+    const bal = Math.max(0, balanceAfter(l, paid) - prepaid)
+    return s + toINR(bal, l.currency)
   }, 0)
 
   // Net worth
@@ -144,11 +151,22 @@ function DashboardInner() {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     cum += incMap.get(key) || 0
     incomeSeries.push([d.getTime(), Math.round(base + cum)])
+    // End of this month — anything dated on or before it counts by now.
+    const monthEnd = addMonths(d, 1).getTime()
     const loanTotal = loans.reduce((s, l) => {
-      const st = new Date(l.startDate + 'T00:00:00')
-      const k = (d.getFullYear() - st.getFullYear()) * 12 + (d.getMonth() - st.getMonth())
-      const bal = k >= 0 && k < tenureMonths(l) ? balanceAfter(l, k) : 0
-      return s + toINR(bal, l.currency)
+      if (new Date(l.startDate + 'T00:00:00').getTime() >= monthEnd) return s
+      // Drive the curve off ACTUAL installment + prepayment dates, not the
+      // calendar-month schedule. This makes the newest point equal the total
+      // outstanding on the Loans page (same paid-count + prepayment basis),
+      // instead of drifting because a loan is ahead of or behind schedule.
+      const paidByThen = installments.filter(
+        (i) => i.loanId === l.id && i.status === 'paid'
+          && new Date(i.date + 'T00:00:00').getTime() < monthEnd
+      ).length
+      const prepaidByThen = prepayments
+        .filter((p) => p.loanId === l.id && new Date(p.date + 'T00:00:00').getTime() < monthEnd)
+        .reduce((a, p) => a + p.amount, 0)
+      return s + toINR(Math.max(0, balanceAfter(l, paidByThen) - prepaidByThen), l.currency)
     }, 0)
     loanSeries.push([d.getTime(), Math.round(loanTotal)])
   }
@@ -225,6 +243,7 @@ function DashboardInner() {
         />
         <SummaryCard
           label="Business income" value={money(businessIncome, 'INR')} subClass={pnlClass(businessIncome)}
+          valueClass={businessIncome < 0 ? 'text-danger' : 'text-success'}
           sub={`Trading ${money(brokerNet, 'INR')} · Plantation ${money(plantationNet, 'INR')}`}
           icon="ri-briefcase-line" tone="success" to="/trading/pnl"
         />

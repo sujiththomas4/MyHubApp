@@ -24,7 +24,10 @@ async function up(table, rows, onConflict = 'id') {
 
 const run = async () => {
   await up('app_settings', [{ key: 'fx.aedInr', value: 26 }], 'key')
-  await up('brokers', A.brokers, 'slug')
+  await up('brokers', A.brokers.map((b) => ({
+    slug: b.slug, holder: b.holder || '', name: b.name,
+    icon: b.icon, currency: b.currency, capital: b.capital,
+  })), 'slug,holder')
 
   await up('loans', A.loans.map((l) => ({
     id: l.id, bank_name: l.bankName, amount: l.amount, currency: l.currency,
@@ -43,7 +46,7 @@ const run = async () => {
   })))
 
   await up('stock_accounts', A.stockMarketAccounts.map((a) => ({
-    id: a.id, slug: a.slug, account_name: a.StockmarketAccountName,
+    id: a.id, slug: a.slug, account_name: a.StockmarketAccountName, holder: a.holder || '',
     region: a.region, currency: a.currency, icon: a.icon,
   })))
   await up('stock_holdings', A.stockMarketHoldings.map((h) => ({
@@ -52,7 +55,7 @@ const run = async () => {
   })))
 
   const brokerAccounts = A.brokerModules.flatMap((m) => m.accounts.map((a) => ({
-    id: a.id, module: m.id, slug: a.slug, broker: a.broker, icon: a.icon, currency: a.currency,
+    id: a.id, module: m.id, slug: a.slug, broker: a.broker, holder: a.holder || '', icon: a.icon, currency: a.currency,
   })))
   const brokerTrades = A.brokerModules.flatMap((m) => m.trades.map((t) => ({
     id: t.id, account_id: t.accountId, date: t.date, orders: t.orders,

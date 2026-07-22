@@ -240,6 +240,33 @@ export const MISTAKES = [
     cost: 'Small wins, then one large loss that erases all of them.',
     rule: 'Small profits are not proof. One bad scalp erases twenty good ones.',
   },
+  {
+    id: 'overtrading',
+    severity: 'high',
+    icon: 'ri-numbers-fill',
+    tags: [
+      { label: 'Overtrading', type: TAG.HABIT },
+      { label: '50+ trades', type: TAG.HABIT },
+    ],
+    title: 'Taking too many trades',
+    detail: 'More than 50 trades in a day — clicking for the sake of clicking, not because a setup appeared.',
+    cost: 'Brokerage and slippage bleed the account even on a flat day. Quantity is not an edge.',
+    rule: 'A few good trades beat fifty average ones. If I’ve crossed 50, I’m done for the day.',
+  },
+  {
+    id: 'exit-early-fear',
+    severity: 'critical',
+    icon: 'ri-door-open-fill',
+    tags: [
+      { label: 'Exited early', type: TAG.HABIT },
+      { label: 'Fear', type: TAG.HABIT },
+      { label: 'Weak indicator', type: TAG.HABIT },
+    ],
+    title: 'Exiting a valid trade out of fear',
+    detail: 'The trade was taken on data and every criterion — then I bailed on a single candle breaking a weak indicator, or just fear.',
+    cost: 'Cutting the winners that pay for the losers. The edge only works if I let it play out.',
+    rule: 'I exit on my SL or my target — not on one candle, not on a weak indicator, not on fear.',
+  },
 ]
 
 /**

@@ -1,6 +1,6 @@
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
-import { brokers, brokerStats, compoundedReturn, money, fmtMonth, fmtDate } from '@/data/AppData'
+import { brokerStats, compoundedReturn, money, fmtMonth, fmtDate } from '@/data/AppData'
 import { useBrokerAccounts, useBrokerTrades, brokerModuleMeta } from '@/data/brokerRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useCapital } from '@/context/CapitalContext'
@@ -17,7 +17,7 @@ const netOf = (t) => t.grossPnl - t.brokerage - t.govtCharges
 
 export default function PnL() {
   const colors = useChartColors()
-  const { getCapital } = useCapital()
+  const { getCapital, accounts: capitalAccounts } = useCapital()
   const allAccounts = useBrokerAccounts()
   const allTrades = useBrokerTrades()
   const metaById = Object.fromEntries(brokerModuleMeta.map((m) => [m.id, m]))
@@ -25,7 +25,7 @@ export default function PnL() {
   // Flatten accounts (with stats) and trades (with net) across all modules.
   const accounts = allAccounts.map((a) => {
     const m = metaById[a.module] || {}
-    const cap = getCapital(a.slug)
+    const cap = getCapital(a.slug, a.holder)
     return { ...a, module: m.title, basePath: m.basePath, capital: cap, ...brokerStats(allTrades, a, cap) }
   })
   const acctById = Object.fromEntries(allAccounts.map((a) => [a.id, a]))
@@ -34,8 +34,8 @@ export default function PnL() {
     return { ...t, module: metaById[acc.module]?.title, slug: acc.slug, net: netOf(t) }
   })
 
-  // Capital is per broker (shared) — deploy total counts each broker ONCE.
-  const capital = brokers.reduce((s, b) => s + getCapital(b.slug), 0)
+  // Deploy total = sum of every capital account (broker + holder).
+  const capital = capitalAccounts.reduce((s, a) => s + a.capital, 0)
   const grossPnl = trades.reduce((s, t) => s + t.grossPnl, 0)
   const charges = trades.reduce((s, t) => s + t.brokerage + t.govtCharges, 0)
   const netPnl = grossPnl - charges
@@ -78,16 +78,18 @@ export default function PnL() {
 
   const accountsSorted = [...accounts].sort((a, b) => b.netPnl - a.netPnl)
 
-  // Per-broker rollup — net across ALL activities on that broker's shared capital.
-  const byBroker = brokers.map((b) => {
-    const accs = accounts.filter((a) => a.slug === b.slug)
-    const cap = getCapital(b.slug)
+  // Per-account rollup — one row per (broker, holder), net across ALL its
+  // activities on that account's capital.
+  const byBroker = capitalAccounts.map((b) => {
+    const accs = accounts.filter((a) => a.slug === b.slug && (a.holder || '') === (b.holder || ''))
+    const cap = b.capital
     const net = accs.reduce((s, a) => s + a.netPnl, 0)
+    const accIds = new Set(accs.map((a) => a.id))
     return {
       ...b, capital: cap, net,
       orders: accs.reduce((s, a) => s + a.orders, 0),
       charges: accs.reduce((s, a) => s + a.charges, 0),
-      returnPct: compoundedReturn(trades.filter((t) => t.slug === b.slug), cap),
+      returnPct: compoundedReturn(trades.filter((t) => accIds.has(t.accountId)), cap),
       value: cap + net,
       activities: accs.length,
     }
@@ -273,8 +275,11 @@ export default function PnL() {
               </thead>
               <tbody>
                 {byBroker.map((b) => (
-                  <tr key={b.slug}>
-                    <td className="fw-medium"><i className={b.icon + ' me-2 text-muted'} />{b.name}</td>
+                  <tr key={b.holder ? `${b.slug}|${b.holder}` : b.slug}>
+                    <td className="fw-medium">
+                      <i className={b.icon + ' me-2 text-muted'} />{b.name}
+                      {b.holder && <span className="text-muted small ms-1">· {b.holder}</span>}
+                    </td>
                     <td className="text-end">{money(b.capital, b.currency)}</td>
                     <td className={'text-end fw-semibold ' + pnlClass(b.net)}>{money(b.net, b.currency)}</td>
                     <td className={'text-end ' + pnlClass(b.net)}>{b.returnPct.toFixed(2)}%</td>
@@ -316,7 +321,10 @@ export default function PnL() {
               <tbody>
                 {accountsSorted.map((a) => (
                   <tr key={a.id}>
-                    <td><Link to={`${a.basePath}/${a.slug}`} className="text-reset fw-medium"><i className={a.icon + ' me-2 text-muted'} />{a.broker}</Link></td>
+                    <td>
+                      <Link to={`${a.basePath}/${a.slug}`} className="text-reset fw-medium"><i className={a.icon + ' me-2 text-muted'} />{a.broker}</Link>
+                      {a.holder && <span className="text-muted small ms-1">· {a.holder}</span>}
+                    </td>
                     <td className="text-muted">{a.module}</td>
                     <td className="text-end">{money(a.capital, a.currency)}</td>
                     <td className={'text-end fw-semibold ' + pnlClass(a.netPnl)}>{money(a.netPnl, a.currency)}</td>

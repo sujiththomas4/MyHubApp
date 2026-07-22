@@ -2612,3 +2612,13 @@
   .profile-mode-btn span { display: none; }
   .profile-mode-btn { padding: 0.35rem 0.6rem; }
 }
+
+
+/* Region section header in the stock P&L "By account" table. */
+.stock-region-row td {
+  background: color-mix(in srgb, var(--bs-primary) 8%, var(--hub-card-bg));
+  border-top: 2px solid color-mix(in srgb, var(--bs-primary) 30%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.8125rem;
+}

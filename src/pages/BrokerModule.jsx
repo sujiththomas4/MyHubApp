@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ReactApexChart from 'react-apexcharts'
 import { brokerStats, compoundedReturn, money, fmtDate, fmtMonth } from '@/data/AppData'
-import { useBrokerAccounts, useBrokerTrades, addTrade as apiAddTrade, editTrade as apiEditTrade, removeTrade as apiRemoveTrade } from '@/data/brokerRepo'
+import { useBrokerAccounts, useBrokerTrades, addTrade as apiAddTrade, editTrade as apiEditTrade, removeTrade as apiRemoveTrade, upsertAccount as apiUpsertAccount } from '@/data/brokerRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useCapital } from '@/context/CapitalContext'
 import Modal from '@/components/ui/Modal'
@@ -76,7 +76,7 @@ export function BrokerOverview({ module }) {
   const accounts = useBrokerAccounts().filter((a) => a.module === module.id)
   const trades = useBrokerTrades()
   const rows = accounts.map((a) => {
-    const capital = getCapital(a.slug)
+    const capital = getCapital(a.slug, a.holder)
     return { ...a, capital, ...brokerStats(trades, a, capital) }
   })
 
@@ -139,6 +139,7 @@ export function BrokerOverview({ module }) {
                           <Link to={`${module.basePath}/${a.slug}`} className="text-reset fw-medium">
                             <i className={a.icon + ' me-2 text-muted'} />{a.broker}
                           </Link>
+                          {a.holder && <span className="text-muted small ms-1">· {a.holder}</span>}
                         </td>
                         <td className="text-end">{money(a.capital, a.currency)}</td>
                         <td className={'text-end fw-semibold ' + pnlClass(a.netPnl)}>{money(a.netPnl, a.currency)}</td>
@@ -180,7 +181,7 @@ export function BrokerOverview({ module }) {
 /* =========================================================================
  * Account detail
  * ========================================================================= */
-function DayForm({ initial, currency, onSave, onCancel }) {
+function DayForm({ initial, currency, holderOptions = [], holder, onHolder, onSave, onCancel }) {
   const [f, setF] = useState({
     date: initial?.date || todayISO(),
     orders: initial?.orders ?? '',
@@ -204,6 +205,16 @@ function DayForm({ initial, currency, onSave, onCancel }) {
   return (
     <>
       <div className="row g-2">
+        {holderOptions.length > 1 && (
+          <div className="col-md-4">
+            <label className="form-label small mb-1">Account holder</label>
+            <select className="form-select form-select-sm" value={holder} onChange={(e) => onHolder(e.target.value)}>
+              {holderOptions.map((h) => (
+                <option key={h || '__primary'} value={h}>{h || 'Primary'}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="col-md-4">
           <label className="form-label small mb-1">Date</label>
           <input type="date" className="form-control form-control-sm" value={f.date} onChange={(e) => set('date', e.target.value)} />
@@ -240,24 +251,53 @@ function DayForm({ initial, currency, onSave, onCancel }) {
 export function BrokerAccount({ module }) {
   const { slug } = useParams()
   const colors = useChartColors()
-  const { getCapital } = useCapital()
+  const { getCapital, accounts: capitalAccounts } = useCapital()
   const allAccounts = useBrokerAccounts()
   const allTrades = useBrokerTrades()
-  const account = useMemo(() => allAccounts.find((a) => a.slug === slug && a.module === module.id), [allAccounts, module, slug])
-  const capital = getCapital(slug)
+
+  // A broker in a module can hold several accounts, one per holder. The page
+  // aggregates them; the entry form picks which holder a trade belongs to.
+  const moduleAccounts = useMemo(
+    () => allAccounts.filter((a) => a.slug === slug && a.module === module.id),
+    [allAccounts, module, slug]
+  )
+  const primary = moduleAccounts.find((a) => !a.holder) || moduleAccounts[0]
+
+  // Holder options = every holder that has capital for this broker, plus any
+  // already on a trading account. '' (primary) always first.
+  const holderOptions = useMemo(() => {
+    const set = new Set([''])
+    capitalAccounts.filter((a) => a.slug === slug).forEach((a) => set.add(a.holder || ''))
+    moduleAccounts.forEach((a) => set.add(a.holder || ''))
+    return [...set].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)))
+  }, [capitalAccounts, moduleAccounts, slug])
+
+  // Capital deployed on this broker = sum across its holders' capital accounts.
+  const capital = capitalAccounts
+    .filter((a) => a.slug === slug)
+    .reduce((s, a) => s + a.capital, 0) || getCapital(slug)
+
+  const accIds = useMemo(() => new Set(moduleAccounts.map((a) => a.id)), [moduleAccounts])
+  const holderById = useMemo(() => {
+    const m = new Map()
+    moduleAccounts.forEach((a) => m.set(a.id, a.holder || ''))
+    return m
+  }, [moduleAccounts])
+  const showHolder = holderOptions.length > 1
 
   const [trades, setTrades] = useState([])
   const [view, setView] = useState('day')
   const [adding, setAdding] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+  const [formHolder, setFormHolder] = useState('')
 
   useEffect(() => {
-    setTrades(account ? allTrades.filter((t) => t.accountId === account.id) : [])
-  }, [allTrades, account])
+    setTrades(allTrades.filter((t) => accIds.has(t.accountId)))
+  }, [allTrades, accIds])
   useEffect(() => { setView('day'); setAdding(false); setEditRow(null); setDeleteRow(null) }, [slug])
 
-  if (!account) {
+  if (!primary) {
     return (
       <>
         <div className="page-title-box"><h4 className="mb-0">Account not found</h4></div>
@@ -269,9 +309,26 @@ export function BrokerAccount({ module }) {
     )
   }
 
+  const account = primary
   const cur = account.currency
-  const addTrade = (t) => { const row = { ...t, accountId: account.id }; setTrades((ts) => [...ts, row]); setAdding(false); apiAddTrade(row).catch(console.error) }
-  const updateTrade = (t) => { const row = { ...t, accountId: account.id }; setTrades((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...row } : x))); setEditRow(null); apiEditTrade(row).catch(console.error) }
+
+  /* The broker_account id for a holder — created on first use so a trade can be
+     booked against a holder that only existed as a capital account until now. */
+  const accountIdForHolder = (holder) => {
+    const h = holder || ''
+    const ex = moduleAccounts.find((a) => (a.holder || '') === h)
+    if (ex) return ex.id
+    const suffix = (h || 'primary').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'primary'
+    const id = `${module.id}-${slug}-${suffix}-${rid()}`
+    apiUpsertAccount({ id, module: module.id, slug, broker: account.broker, holder: h, icon: account.icon, currency: cur }).catch(console.error)
+    return id
+  }
+
+  const openAdd = () => { setFormHolder(''); setAdding(true) }
+  const openEdit = (t) => { setFormHolder(holderById.get(t.accountId) || ''); setEditRow(t) }
+
+  const addTrade = (t) => { const row = { ...t, accountId: accountIdForHolder(formHolder) }; setTrades((ts) => [...ts, row]); setAdding(false); apiAddTrade(row).catch(console.error) }
+  const updateTrade = (t) => { const row = { ...t, accountId: accountIdForHolder(formHolder) }; setTrades((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...row } : x))); setEditRow(null); apiEditTrade(row).catch(console.error) }
   const confirmDelete = () => { const id = deleteRow.id; setTrades((ts) => ts.filter((x) => x.id !== id)); setDeleteRow(null); apiRemoveTrade(id).catch(console.error) }
 
   const grossPnl = trades.reduce((s, t) => s + t.grossPnl, 0)
@@ -322,7 +379,10 @@ export function BrokerAccount({ module }) {
   return (
     <div className="option-buying">
       <div className="page-title-box d-flex align-items-center">
-        <h4 className="flex-grow-1 mb-0"><i className={account.icon + ' me-2 text-muted'} />{account.broker}</h4>
+        <h4 className="flex-grow-1 mb-0">
+          <i className={account.icon + ' me-2 text-muted'} />{account.broker}
+          {account.holder && <span className="text-muted fs-14 ms-2">· {account.holder}</span>}
+        </h4>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item"><a href="/">Hub</a></li>
@@ -370,7 +430,7 @@ export function BrokerAccount({ module }) {
               <button key={v.id} className={'btn ' + (view === v.id ? 'btn-primary' : 'btn-light')} onClick={() => setView(v.id)}>{v.label}</button>
             ))}
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><i className="ri-add-line me-1" />Add entry</button>
+          <button className="btn btn-primary btn-sm" onClick={openAdd}><i className="ri-add-line me-1" />Add entry</button>
         </div>
         <div className="card-body p-0">
           <div className="table-responsive">
@@ -378,6 +438,7 @@ export function BrokerAccount({ module }) {
               <thead className="table-light">
                 <tr>
                   <th>{isDay ? 'Date' : 'Period'}</th>
+                  {isDay && showHolder && <th>Holder</th>}
                   {!isDay && <th className="text-center">Days</th>}
                   <th className="text-center">Orders</th>
                   <th className="text-end">Gross P&amp;L</th>
@@ -390,10 +451,13 @@ export function BrokerAccount({ module }) {
               </thead>
               <tbody>
                 {tableRows.length === 0 ? (
-                  <tr><td colSpan={8} className="text-center text-muted py-4">No entries yet.</td></tr>
+                  <tr><td colSpan={9} className="text-center text-muted py-4">No entries yet.</td></tr>
                 ) : tableRows.map((t) => (
                   <tr key={t.id || t.key}>
                     <td className="fw-medium">{isDay ? fmtDate(t.date) : t.label}</td>
+                    {isDay && showHolder && (
+                      <td className="text-muted small">{holderById.get(t.accountId) || 'Primary'}</td>
+                    )}
                     {!isDay && <td className="text-center">{t.days}</td>}
                     <td className="text-center">{t.orders}</td>
                     <td className={'text-end ' + pnlClass(t.grossPnl)}>{money(t.grossPnl, cur)}</td>
@@ -404,7 +468,7 @@ export function BrokerAccount({ module }) {
                     {isDay && (
                       <td className="text-center">
                         <div className="d-flex gap-1 justify-content-center">
-                          <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => setEditRow(t)}><i className="ri-pencil-line" /></button>
+                          <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => openEdit(t)}><i className="ri-pencil-line" /></button>
                           <button className="btn btn-sm btn-ghost-danger p-1" title="Delete" onClick={() => setDeleteRow(t)}><i className="ri-delete-bin-line" /></button>
                         </div>
                       </td>
@@ -415,6 +479,7 @@ export function BrokerAccount({ module }) {
               <tfoot>
                 <tr className="fw-semibold border-top">
                   <td>Total</td>
+                  {isDay && showHolder && <td />}
                   {!isDay && <td className="text-center">{daily.length}</td>}
                   <td className="text-center">{orders}</td>
                   <td className={'text-end ' + pnlClass(grossPnl)}>{money(grossPnl, cur)}</td>
@@ -442,6 +507,9 @@ export function BrokerAccount({ module }) {
           key={editRow?.id || 'new'}
           initial={editRow}
           currency={cur}
+          holderOptions={holderOptions}
+          holder={formHolder}
+          onHolder={setFormHolder}
           onSave={editRow ? updateTrade : addTrade}
           onCancel={() => { setAdding(false); setEditRow(null) }}
         />
