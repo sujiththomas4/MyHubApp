@@ -62,6 +62,28 @@ export const loans = [
     outstandingAmount: 800000,
     location: 'India',
   },
+  {
+    id: 'loan-ksfe-25k',
+    bankName: 'KSFE Chitty 25k',
+    amount: 1000000,
+    currency: 'INR',
+    startDate: '2026-02-24',
+    endDate: '2029-05-24',
+    emi: 25000, // 0% chitty (40 × 25,000)
+    outstandingAmount: 850000,
+    location: 'India',
+  },
+  {
+    id: 'loan-ksfe-10k',
+    bankName: 'KSFE Chitty 10k',
+    amount: 300000,
+    currency: 'INR',
+    startDate: '2026-02-27',
+    endDate: '2028-07-27',
+    emi: 10000, // 0% chitty (30 × 10,000)
+    outstandingAmount: 240000,
+    location: 'India',
+  },
 ]
 
 // ---- Helpers ---------------------------------------------------------------
@@ -460,6 +482,7 @@ export const savingsCategories = [
   { slug: 'tata-aia', name: 'Tata AIA', icon: 'ri-shield-check-line', currency: 'INR' },
   { slug: 'post-office', name: 'Post office', icon: 'ri-government-line', currency: 'INR' },
   { slug: 'lic', name: 'LIC', icon: 'ri-refund-2-line', currency: 'INR' },
+  { slug: 'nishanth-chitty', name: 'Nishanth Chitty', icon: 'ri-group-line', currency: 'INR' },
 ]
 
 export const savings = [

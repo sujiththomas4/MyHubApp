@@ -531,11 +531,9 @@ export default function BeforeITrade() {
           <p className="bt-vision-close"><i className="ri-key-2-line me-2" />{CREED.vision.close}</p>
         </div>
         <div className="bt-vision-photos">
-          <img className="bt-vision-photo-main" src={tharImg} alt="The Thar on the open road" />
-          <div className="bt-vision-photo-row">
-            <img src={boatImg} alt="Kerala backwaters" />
-            <img src={manaliImg} alt="Manali mountains" />
-          </div>
+          <img src={tharImg} alt="The Thar on the open road" />
+          <img src={boatImg} alt="Kerala backwaters" />
+          <img src={manaliImg} alt="Manali mountains" />
         </div>
       </section>
 

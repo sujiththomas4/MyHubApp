@@ -2699,31 +2699,29 @@
   box-shadow: 0 16px 42px rgba(15, 125, 110, 0.4);
 }
 .bt-vision-text { flex: 1 1 0; min-width: 0; }
-/* Travel collage: the Thar up top, Kerala + Manali beneath — the trip made real. */
+/* Travel row: Thar, Kerala, Manali side by side — the trip made real. */
 .bt-vision-photos {
-  flex: 0 0 320px;
-  max-width: 320px;
+  flex: 1 1 0;
+  min-width: 0;
   align-self: center;
   display: flex;
-  flex-direction: column;
   gap: 0.6rem;
 }
 .bt-vision-photos img {
-  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
+  height: 150px;
   object-fit: cover;
   border-radius: 0.6rem;
   border: 1px solid rgba(255, 255, 255, 0.35);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
   display: block;
 }
-.bt-vision-photo-main { height: 150px; }
-.bt-vision-photo-row { display: flex; gap: 0.6rem; }
-.bt-vision-photo-row img { height: 100px; }
 @media (max-width: 767.98px) {
   .bt-vision { flex-direction: column; }
-  .bt-vision-photos { flex-basis: auto; max-width: 100%; }
-  .bt-vision-photo-main { height: 170px; }
-  .bt-vision-photo-row img { height: 120px; }
+  .bt-vision-photos { align-self: stretch; }
+  .bt-vision-photos img { flex: 1 1 0; width: 0; height: 120px; }
 }
 .bt-vision-kicker {
   display: inline-flex;
@@ -2761,3 +2759,12 @@
   .bt-vision { padding: 1.1rem; }
   .bt-vision-lines p { font-size: 1rem; }
 }
+
+/* Daily Option Selling — grouped saved backtests. */
+.day-row td { background-color: rgba(10, 179, 156, 0.06); }
+.day-row:hover td { background-color: rgba(10, 179, 156, 0.11); }
+
+/* Personal — Daily Routines. */
+.routine-check { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 34px; font-size: 1.05rem; }
+.routine-row:last-child { border-bottom: 0 !important; }
+.routine-row .min-w-0 { min-width: 0; }

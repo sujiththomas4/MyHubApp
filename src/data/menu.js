@@ -30,6 +30,7 @@ export const menu = [
       { id: 'tata-aia', label: 'Tata AIA', to: '/wealth/savings/tata-aia' },
       { id: 'post-office', label: 'Post office', to: '/wealth/savings/post-office' },
       { id: 'lic', label: 'LIC', to: '/wealth/savings/lic' },
+      { id: 'nishanth-chitty', label: 'Nishanth Chitty', to: '/wealth/savings/nishanth-chitty' },
     ],
   },
 
@@ -43,8 +44,15 @@ export const menu = [
       { id: 'loan-south-indian', label: 'South Indian', to: '/loans/south-indian' },
       { id: 'loan-mashreq', label: 'Mashreq', to: '/loans/mashreq' },
       { id: 'loan-kunjumon', label: 'Kunjumon Appappi', to: '/loans/kunjumon-appappi' },
+      { id: 'loan-ksfe-25k', label: 'KSFE Chitty 25k', to: '/loans/ksfe-25k' },
+      { id: 'loan-ksfe-10k', label: 'KSFE Chitty 10k', to: '/loans/ksfe-10k' },
     ],
   },
+
+  { id: 'title-money', label: 'Money', isTitle: true },
+
+  { id: 'monthly-emis', label: 'Monthly EMIs', icon: 'ri-bank-card-line', to: '/money/emis' },
+  { id: 'money-lent', label: 'Money Lent', icon: 'ri-user-shared-line', to: '/money/lent' },
 
   { id: 'title-stock-market', label: 'Stock Market Investments', isTitle: true },
 
@@ -98,6 +106,7 @@ export const menu = [
 
   { id: 'trading-pnl', label: 'P&L', icon: 'ri-line-chart-line', to: '/trading/pnl' },
   { id: 'business-capital', label: 'Capital', icon: 'ri-wallet-3-line', to: '/business/capital' },
+  { id: 'daily-option-selling', label: 'Daily Option Selling', icon: 'ri-star-line', to: '/business/daily-option-selling' },
 
   {
     id: 'intraday-stocks',
@@ -158,6 +167,11 @@ export const menu = [
     ],
   },
 
+  { id: 'title-personal', label: 'Personal', isTitle: true },
+
+  { id: 'daily-routines', label: 'Daily Routines', icon: 'ri-calendar-check-line', to: '/personal/daily-routines' },
+  { id: 'gym-workouts', label: 'GYM Workouts', icon: 'ri-run-line', to: '/personal/gym-workouts' },
+
   { id: 'title-system', label: 'System', isTitle: true },
 
   { id: 'settings', label: 'Settings', icon: 'ri-settings-3-line', to: '/settings' },
@@ -178,7 +192,7 @@ export const PROFILE_MODES = [
 ]
 
 const MODE_SECTIONS = {
-  business: ['title-trading', 'title-business', 'title-system'],
+  business: ['title-trading', 'title-business', 'title-personal', 'title-system'],
 }
 
 /** The nav for a given mode. Unknown modes fall back to the full menu. */

@@ -12,6 +12,11 @@ import { BrokerOverview, BrokerAccount } from '@/pages/BrokerModule'
 import { optionBuyingModule, intradayStocksModule, optionSellingModule } from '@/data/AppData'
 import PnL from '@/pages/PnL'
 import Capital from '@/pages/Capital'
+import DailyOptionSelling from '@/pages/DailyOptionSelling'
+import DailyRoutines from '@/pages/DailyRoutines'
+import GymWorkouts from '@/pages/GymWorkouts'
+import MonthlyEmis from '@/pages/MonthlyEmis'
+import MoneyLent from '@/pages/MoneyLent'
 import PlantationTracker from '@/pages/PlantationTracker'
 import PlantationActivities from '@/pages/PlantationActivities'
 import Savings from '@/pages/Savings'
@@ -58,6 +63,11 @@ export default function App() {
         <Route path="/business/option-selling/:slug" element={<BrokerAccount module={optionSellingModule} />} />
         <Route path="/trading/pnl" element={<PnL />} />
         <Route path="/business/capital" element={<Capital />} />
+        <Route path="/business/daily-option-selling" element={<DailyOptionSelling />} />
+        <Route path="/personal/daily-routines" element={<DailyRoutines />} />
+        <Route path="/personal/gym-workouts" element={<GymWorkouts />} />
+        <Route path="/money/emis" element={<MonthlyEmis />} />
+        <Route path="/money/lent" element={<MoneyLent />} />
         <Route path="/business/plantations" element={<PlantationTracker />} />
         <Route path="/business/plantations/income" element={<PlantationTracker />} />
         <Route path="/business/plantations/expense" element={<PlantationTracker />} />
