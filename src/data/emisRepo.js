@@ -10,17 +10,21 @@ const numOrNull = (v) => (v === '' || v == null ? null : Number(v))
 const rowToEmi = (r) => ({
   id: r.id,
   activity: r.activity || '',
+  kind: r.kind || 'emi',              // 'emi' | 'expense'
   amount: Number(r.amount) || 0,
+  currency: r.currency || 'INR',
   dueDay: r.due_day ?? '',
   source: r.source || '',
-  incomeId: r.income_id || '',        // income source that funds this EMI
+  incomeId: r.income_id || '',        // income source that funds this item
   active: r.active !== false,
   sortOrder: r.sort_order ?? 0,
 })
 const emiToRow = (x) => ({
   id: x.id,
   activity: x.activity,
+  kind: x.kind || 'emi',
   amount: Number(x.amount) || 0,
+  currency: x.currency || 'INR',
   due_day: numOrNull(x.dueDay),
   source: x.source || null,
   income_id: x.incomeId || null,
@@ -44,6 +48,8 @@ const rowToIncome = (r) => ({
   id: r.id,
   name: r.name || '',
   amount: Number(r.amount) || 0,
+  currency: r.currency || 'INR',
+  frequency: r.frequency || 'monthly',   // 'monthly' | 'lumpsum'
   source: r.source || '',
   active: r.active !== false,
   sortOrder: r.sort_order ?? 0,
@@ -52,6 +58,8 @@ const incomeToRow = (x) => ({
   id: x.id,
   name: x.name,
   amount: Number(x.amount) || 0,
+  currency: x.currency || 'INR',
+  frequency: x.frequency || 'monthly',
   source: x.source || null,
   active: x.active !== false,
   sort_order: x.sortOrder ?? 0,

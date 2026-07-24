@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { money, fmtDate } from '@/data/AppData'
+import { useFx } from '@/context/FxContext'
 import { useMoneyLent, addLent, editLent, removeLent } from '@/data/moneyLentRepo'
 
 /**
@@ -15,17 +17,19 @@ const todayISO = () => {
 }
 const outstandingOf = (l) => Math.max(0, l.amount - l.returned)
 
-const blankLent = () => ({ id: null, person: '', amount: '', dateGiven: todayISO(), reason: '', returned: '', returnedDate: '', note: '' })
+const blankLent = () => ({ id: null, person: '', amount: '', currency: 'INR', dateGiven: todayISO(), reason: '', returned: '', returnedDate: '', note: '' })
 
 export default function MoneyLent() {
   const { lent } = useMoneyLent()
+  const { toINR, aedToInr } = useFx()
   const [form, setForm] = useState(blankLent())
   const [err, setErr] = useState(null)
   const editing = Boolean(form.id)
 
-  const totalLent = lent.reduce((s, l) => s + l.amount, 0)
-  const totalReturned = lent.reduce((s, l) => s + l.returned, 0)
-  const outstanding = lent.reduce((s, l) => s + outstandingOf(l), 0)
+  // Totals in INR (AED converted), since records can be in either currency.
+  const totalLent = lent.reduce((s, l) => s + toINR(l.amount, l.currency), 0)
+  const totalReturned = lent.reduce((s, l) => s + toINR(l.returned, l.currency), 0)
+  const outstanding = lent.reduce((s, l) => s + toINR(outstandingOf(l), l.currency), 0)
   const pending = lent.filter((l) => outstandingOf(l) > 0).length
 
   const reset = () => { setForm(blankLent()); setErr(null) }
@@ -54,7 +58,10 @@ export default function MoneyLent() {
   return (
     <div className="option-buying">
       <div className="page-title-box d-flex align-items-center">
-        <h4 className="flex-grow-1 mb-0">Money Lent</h4>
+        <div className="flex-grow-1">
+          <h4 className="mb-0">Money Lent</h4>
+          <small className="text-muted">Totals in INR · <Link to="/settings" className="text-reset">AED→INR {aedToInr}</Link></small>
+        </div>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item"><a href="/">Hub</a></li>
@@ -101,12 +108,20 @@ export default function MoneyLent() {
                   onChange={(e) => setForm((f) => ({ ...f, person: e.target.value }))} />
               </div>
               <div className="row g-2 mb-2">
-                <div className="col-6">
+                <div className="col-5">
                   <label className="form-label small mb-1">Amount</label>
                   <input type="number" className="form-control" placeholder="5000" value={form.amount}
                     onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
                 </div>
-                <div className="col-6">
+                <div className="col-3">
+                  <label className="form-label small mb-1">Curr.</label>
+                  <select className="form-select" value={form.currency}
+                    onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}>
+                    <option value="INR">INR</option>
+                    <option value="AED">AED</option>
+                  </select>
+                </div>
+                <div className="col-4">
                   <label className="form-label small mb-1">Date given</label>
                   <input type="date" className="form-control" value={form.dateGiven}
                     onChange={(e) => setForm((f) => ({ ...f, dateGiven: e.target.value }))} />
@@ -167,9 +182,9 @@ export default function MoneyLent() {
                               <div className="fw-medium">{l.person}</div>
                               {(l.reason || l.note) && <div className="text-muted small">{[l.reason, l.note].filter(Boolean).join(' · ')}</div>}
                             </td>
-                            <td className="text-end">{money(l.amount, 'INR')}</td>
-                            <td className="text-end text-success">{l.returned ? money(l.returned, 'INR') : '—'}</td>
-                            <td className={'text-end fw-semibold ' + (out > 0 ? 'text-danger' : 'text-muted')}>{money(out, 'INR')}</td>
+                            <td className="text-end">{money(l.amount, l.currency)}</td>
+                            <td className="text-end text-success">{l.returned ? money(l.returned, l.currency) : '—'}</td>
+                            <td className={'text-end fw-semibold ' + (out > 0 ? 'text-danger' : 'text-muted')}>{money(out, l.currency)}</td>
                             <td className="text-muted">{l.dateGiven ? fmtDate(l.dateGiven) : '—'}</td>
                             <td>{statusBadge(l)}</td>
                             <td className="text-end text-nowrap">

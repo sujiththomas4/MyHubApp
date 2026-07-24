@@ -51,7 +51,7 @@ export const menu = [
 
   { id: 'title-money', label: 'Money', isTitle: true },
 
-  { id: 'monthly-emis', label: 'Monthly EMIs', icon: 'ri-bank-card-line', to: '/money/emis' },
+  { id: 'monthly-emis', label: 'Monthly EMIs & Expenses', icon: 'ri-bank-card-line', to: '/money/emis' },
   { id: 'money-lent', label: 'Money Lent', icon: 'ri-user-shared-line', to: '/money/lent' },
 
   { id: 'title-stock-market', label: 'Stock Market Investments', isTitle: true },
