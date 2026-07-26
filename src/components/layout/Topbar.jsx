@@ -15,7 +15,9 @@ function useClickOutside(ref, handler) {
 
 export default function Topbar({ onHamburger, onOpenCustomizer }) {
   const { settings, setSetting } = useTheme()
-  const { signOut } = useAuth()
+  const { signOut, userName, isAdmin } = useAuth()
+  const userInitial = (userName || '?').trim().charAt(0).toUpperCase() || '?'
+  const roleLabel = isAdmin ? 'Admin' : 'Plantation Member'
   const [openMenu, setOpenMenu] = useState(null) // 'notif' | 'user' | null
   const notifRef = useRef(null)
   const userRef = useRef(null)
@@ -129,17 +131,16 @@ export default function Topbar({ onHamburger, onOpenCustomizer }) {
             onClick={() => setOpenMenu((m) => (m === 'user' ? null : 'user'))}
           >
             <span className="avatar-xs">
-              <span className="avatar-title bg-primary text-white rounded-circle">S</span>
+              <span className="avatar-title bg-primary text-white rounded-circle">{userInitial}</span>
             </span>
             <span className="d-none d-xl-inline text-start" style={{ lineHeight: 1.1 }}>
-              <span className="d-block fw-medium" style={{ fontSize: '0.8rem' }}>Sujith Thomas</span>
-              <small className="text-muted" style={{ fontSize: '0.65rem' }}>Founder</small>
+              <span className="d-block fw-medium" style={{ fontSize: '0.8rem' }}>{userName}</span>
+              {roleLabel && <small className="text-muted" style={{ fontSize: '0.65rem' }}>{roleLabel}</small>}
             </span>
           </button>
           {openMenu === 'user' && (
             <div className="hub-dropdown-menu" style={{ minWidth: 200 }}>
-              <div className="hub-dropdown-item"><i className="ri-user-line" /> Profile</div>
-              <div className="hub-dropdown-item"><i className="ri-wallet-line" /> Balance: <b className="ms-1">$5,971.67</b></div>
+              <div className="hub-dropdown-item"><i className="ri-user-line" /> {userName}</div>
               <div className="hub-dropdown-item" onClick={onOpenCustomizer}><i className="ri-settings-3-line" /> Settings</div>
               <div className="hub-dropdown-item"><i className="ri-lock-line" /> Lock screen</div>
               <div className="hub-dropdown-item text-danger" onClick={signOut}><i className="ri-logout-box-r-line" /> Logout</div>

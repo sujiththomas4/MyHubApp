@@ -1,6 +1,6 @@
 import ReactApexChart from 'react-apexcharts'
 import { Link } from 'react-router-dom'
-import { money, fmtMonth as fmtDate, trajectory, slugOf, tenureMonths, balanceAfter } from '@/data/AppData'
+import { money, fmtMonth as fmtDate, trajectory, slugOf, tenureMonths, balanceAfter, rateOf, remainingMonths } from '@/data/AppData'
 import { useLoans, useInstallments, usePrepayments } from '@/data/loansRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useFx } from '@/context/FxContext'
@@ -37,8 +37,8 @@ function Tile({ label, value, sub, icon, tone }) {
 
 // --- Per-loan card -----------------------------------------------------------
 function LoanCard({ loan, color }) {
-  const pctPaid = Math.round((loan.installmentsPaid / loan.numberOfInstallments) * 100)
-  const emisLeft = loan.numberOfInstallments - loan.installmentsPaid
+  const pctPaid = loan.numberOfInstallments ? Math.round((loan.installmentsPaid / loan.numberOfInstallments) * 100) : 100
+  const emisLeft = loan.emisLeft
 
   const options = {
     chart: { sparkline: { enabled: true }, fontFamily: 'Poppins, sans-serif' },
@@ -124,11 +124,17 @@ export default function Loans() {
   // lump-sum prepayments — same as the loan detail page. Without the prepayment
   // subtraction this list overstated every balance.
   const rows = loans.map((l) => {
-    const numberOfInstallments = tenureMonths(l)
     const installmentsPaid = installments.filter((i) => i.loanId === l.id && i.status === 'paid').length
     const prepaid = prepayments.filter((p) => p.loanId === l.id).reduce((s, p) => s + p.amount, 0)
     const outstanding = Math.max(0, balanceAfter(l, installmentsPaid) - prepaid)
-    return { ...l, numberOfInstallments, installmentsPaid, prepaid, outstanding }
+    // Lump-sum prepayments shorten the tenure: remaining EMIs come from the
+    // prepaid balance (same as the loan detail page). Without a prepayment the
+    // count is the plain remaining tenure.
+    const emisLeft = prepaid > 0
+      ? (outstanding > 0 ? remainingMonths(outstanding, l.emi, rateOf(l)) : 0)
+      : Math.max(0, tenureMonths(l) - installmentsPaid)
+    const numberOfInstallments = installmentsPaid + emisLeft
+    return { ...l, numberOfInstallments, installmentsPaid, prepaid, outstanding, emisLeft }
   })
 
   // Aggregates
