@@ -146,7 +146,7 @@ export const menu = [
     id: 'plantations',
     label: 'Plantation',
     icon: 'ri-plant-line',
-    to: '/business/plantations',
+    to: '/business/plantations/dashboard',
     children: [
       { id: 'plantation-dashboard', label: 'Dashboard', to: '/business/plantations/dashboard' },
       { id: 'plantation-explorer', label: 'Explorer', to: '/business/plantations/explorer' },

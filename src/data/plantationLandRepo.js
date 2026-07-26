@@ -100,11 +100,11 @@ export const removePole = (id) => deleteRow('plantation_poles', id)
 // ---- Plants -----------------------------------------------------------------
 const rowToPlant = (r) => ({
   id: r.id, poleId: r.pole_id, tag: r.tag || '', code: r.code || '', variety: r.variety || '', plantedDate: r.planted_date || '',
-  status: r.status || 'healthy', note: r.note || '', image: r.image || '', sortOrder: r.sort_order ?? 0,
+  status: r.status || 'healthy', isMother: !!r.is_mother, note: r.note || '', image: r.image || '', sortOrder: r.sort_order ?? 0,
 })
 const plantToRow = (x) => ({
   id: x.id, pole_id: x.poleId, tag: x.tag || null, code: x.code || null, variety: x.variety || null, planted_date: x.plantedDate || null,
-  status: x.status || 'healthy', note: x.note || null, image: x.image || null, sort_order: x.sortOrder ?? 0, updated_at: iso(),
+  status: x.status || 'healthy', is_mother: !!x.isMother, note: x.note || null, image: x.image || null, sort_order: x.sortOrder ?? 0, updated_at: iso(),
 })
 export function usePlants() {
   const { data, loading, error } = useCollection('plantation_plants', [], { orderBy: 'sort_order', ascending: true, map: rowToPlant })
@@ -149,3 +149,25 @@ export function useDefects() {
 export const addDefect = (x) => insertRow('plantation_defects', defectToRow(x))
 export const editDefect = (x) => updateRow('plantation_defects', x.id, defectToRow(x))
 export const removeDefect = (id) => deleteRow('plantation_defects', id)
+
+// ---- Hierarchy helper -------------------------------------------------------
+/**
+ * Descendant nodes below a given node, grouped by level (only levels strictly
+ * below it are populated). Used to cascade an observation down to every child.
+ *   descendantsByLevel('zone', zId, { zones, verticals, poles, plants })
+ *     -> { zone: [], vertical: [...], pole: [...], plant: [...] }
+ */
+export function descendantsByLevel(type, id, { zones = [], verticals = [], poles = [], plants = [] }) {
+  const out = { zone: [], vertical: [], pole: [], plant: [] }
+  let zoneIds
+  if (type === 'land') { out.zone = zones.filter((z) => z.landId === id); zoneIds = new Set(out.zone.map((z) => z.id)) }
+  else if (type === 'zone') zoneIds = new Set([id])
+  let vertIds
+  if (type === 'vertical') vertIds = new Set([id])
+  else if (zoneIds) { out.vertical = verticals.filter((v) => zoneIds.has(v.zoneId)); vertIds = new Set(out.vertical.map((v) => v.id)) }
+  let poleIds
+  if (type === 'pole') poleIds = new Set([id])
+  else if (vertIds) { out.pole = poles.filter((p) => vertIds.has(p.verticalId)); poleIds = new Set(out.pole.map((p) => p.id)) }
+  if (poleIds) out.plant = plants.filter((pl) => poleIds.has(pl.poleId))
+  return out
+}

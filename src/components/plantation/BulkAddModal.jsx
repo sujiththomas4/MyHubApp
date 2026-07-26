@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Field from '@/components/plantation/Field'
 import { ENTITY } from '@/data/plantationForms'
+import { useLookups, valuesFor } from '@/data/lookupsRepo'
 
 /**
  * BulkAddModal — create many siblings at once (zones / rows / poles / plants).
@@ -17,6 +18,7 @@ const MAX = 500
 export default function BulkAddModal({ open, type, parentRef = '', defaultStart = 1, onClose, onCreate }) {
   const cfg = type ? ENTITY[type] : null
   const bulk = cfg?.bulk
+  const { lookups } = useLookups()
 
   const [count, setCount] = useState(5)
   const [namePrefix, setNamePrefix] = useState('')
@@ -42,7 +44,14 @@ export default function BulkAddModal({ open, type, parentRef = '', defaultStart 
   if (!cfg) return null
 
   const setSharedField = (k, v) => setShared((s) => ({ ...s, [k]: v }))
-  const sharedFields = (bulk?.shared || []).map((k) => cfg.fields.find((f) => f.key === k)).filter(Boolean)
+  const sharedFields = (bulk?.shared || []).map((k) => {
+    const base = cfg.fields.find((f) => f.key === k)
+    if (!base) return null
+    const listName = bulk?.lookups?.[k]
+    // A lookup-backed field becomes a searchable dropdown of its master-data values.
+    if (listName) return { ...base, type: 'search', allowCustom: true, options: valuesFor(lookups, listName), placeholder: `Search ${base.label.toLowerCase()}…` }
+    return base
+  }).filter(Boolean)
 
   const n = Math.max(0, Math.min(MAX, Math.floor(Number(count) || 0)))
   const s0 = Math.max(0, Math.floor(Number(start) || 0))

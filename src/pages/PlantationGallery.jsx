@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { useLands, useZones, useZoneItems, useVerticals, usePoles, usePlants, useDefects } from '@/data/plantationLandRepo'
+import { useLands, useZones, useZoneItems, useVerticals, usePoles, usePlants } from '@/data/plantationLandRepo'
+import { useUpdates } from '@/data/plantationUpdatesRepo'
 import PropertyBar from '@/components/plantation/PropertyBar'
 
 /**
  * PlantationGallery.jsx — every photo across the plantation, filterable by source.
- * Read-only: images are added on their own entity screens.
+ * Read-only: images are added on their own entity screens (and the timeline).
  */
-const TAGS = ['All', 'Land', 'Item', 'Pole', 'Plant', 'Defect']
+const TAGS = ['All', 'Land', 'Item', 'Pole', 'Plant', 'Update']
 
 export default function PlantationGallery() {
   const { lands } = useLands()
@@ -15,7 +16,7 @@ export default function PlantationGallery() {
   const { verticals } = useVerticals()
   const { poles } = usePoles()
   const { plants } = usePlants()
-  const { defects } = useDefects()
+  const { updates } = useUpdates()
   const [tag, setTag] = useState('All')
   const [property, setProperty] = useState('')
 
@@ -29,7 +30,7 @@ export default function PlantationGallery() {
     ...items.filter((x) => x.image).map((x) => ({ url: x.image, label: x.name, tag: 'Item', landId: zoneLand[x.zoneId] })),
     ...poles.filter((x) => x.image).map((x) => ({ url: x.image, label: x.label || 'Pole', tag: 'Pole', landId: poleLand[x.id] })),
     ...plants.filter((x) => x.image).map((x) => ({ url: x.image, label: x.tag || x.variety || 'Plant', tag: 'Plant', landId: poleLand[x.poleId] })),
-    ...defects.filter((x) => x.image).map((x) => ({ url: x.image, label: x.title, tag: 'Defect', landId: x.landId })),
+    ...updates.filter((x) => x.image).map((x) => ({ url: x.image, label: x.title || x.detail || 'Update', tag: 'Update', landId: x.landId })),
   ]
   const scoped = property ? all.filter((g) => g.landId === property) : all
   const shown = tag === 'All' ? scoped : scoped.filter((g) => g.tag === tag)

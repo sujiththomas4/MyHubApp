@@ -5,6 +5,7 @@ import {
   addPole, editPole, removePole,
   addPlant, editPlant, removePlant,
 } from '@/data/plantationLandRepo'
+import { VARIETY_LIST } from '@/data/lookupsRepo'
 import landImg from '@/assets/land.webp'
 import zoneImg from '@/assets/zone.jpg'
 import rowsImg from '@/assets/rows.webp'
@@ -106,7 +107,7 @@ export const ENTITY = {
     childType: null, parentField: 'poleId', idPrefix: 'plant',
     add: addPlant, edit: editPlant, remove: removePlant,
     name: (n) => n.tag || n.variety || 'Plant',
-    bulk: { nameKey: 'tag', namePrefix: 'Plant ', codePrefix: 'BP', shared: ['variety', 'status', 'plantedDate'] },
+    bulk: { nameKey: 'tag', namePrefix: 'Plant ', codePrefix: 'BP', shared: ['variety', 'status', 'plantedDate'], lookups: { variety: VARIETY_LIST } },
     blank: () => ({ tag: '', code: '', variety: '', plantedDate: '', status: 'healthy', note: '', image: '' }),
     fields: [
       { key: 'tag', label: 'Plant tag', type: 'text', placeholder: 'TAG-001', required: true, colClass: 'col-md-8' },

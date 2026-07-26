@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { fmtDate } from '@/data/AppData'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import {
-  useLands, useZones, useZoneItems, useVerticals, usePoles, usePlants, useCare, useDefects,
+  useLands, useZones, useZoneItems, useVerticals, usePoles, usePlants, useCare,
 } from '@/data/plantationLandRepo'
+import { useUpdates } from '@/data/plantationUpdatesRepo'
 import landImg from '@/assets/land.webp'
 import zoneImg from '@/assets/zone.jpg'
 import rowsImg from '@/assets/rows.webp'
@@ -78,7 +79,7 @@ export default function PlantationDashboard() {
   const { poles } = usePoles()
   const { plants } = usePlants()
   const { care } = useCare()
-  const { defects } = useDefects()
+  const { updates } = useUpdates()
 
   // Lookups for defect/care subjects.
   const poleById = Object.fromEntries(poles.map((p) => [p.id, p]))
@@ -93,7 +94,7 @@ export default function PlantationDashboard() {
   })
 
   const owned = lands.filter((l) => l.ownership !== 'leased').length
-  const openDefects = defects.filter((d) => d.status !== 'resolved')
+  const openDefects = updates.filter((d) => d.type === 'defect' && !d.parentId && d.status !== 'resolved')
   const pendingCare = care.filter((c) => !c.done)
 
   // Charts
@@ -108,13 +109,14 @@ export default function PlantationDashboard() {
     ...items.filter((x) => x.image).map((x) => ({ url: x.image, label: x.name, tag: 'Item' })),
     ...poles.filter((x) => x.image).map((x) => ({ url: x.image, label: x.label || 'Pole', tag: 'Pole' })),
     ...plants.filter((x) => x.image).map((x) => ({ url: x.image, label: x.tag || x.variety || 'Plant', tag: 'Plant' })),
-    ...defects.filter((x) => x.image).map((x) => ({ url: x.image, label: x.title, tag: 'Defect' })),
+    ...updates.filter((x) => x.image).map((x) => ({ url: x.image, label: x.title || 'Update', tag: 'Update' })),
   ].slice(0, 18)
 
+  const SUBJ = { land: 'Property', zone: 'Zone', vertical: 'Row', pole: 'Pole', plant: 'Plant' }
   const defectSubject = (d) =>
-    d.plantId && plantById[d.plantId] ? `Plant ${plantById[d.plantId].tag || plantById[d.plantId].variety || ''}`.trim()
-      : d.poleId && poleById[d.poleId] ? `Pole ${poleById[d.poleId].label || ''}`.trim()
-        : '—'
+    d.entityType === 'plant' && plantById[d.entityId] ? `Plant ${plantById[d.entityId].tag || plantById[d.entityId].variety || ''}`.trim()
+      : d.entityType === 'pole' && poleById[d.entityId] ? `Pole ${poleById[d.entityId].label || ''}`.trim()
+        : SUBJ[d.entityType] || '—'
 
   return (
     <div className="option-buying">
@@ -209,11 +211,11 @@ export default function PlantationDashboard() {
                         <tr key={d.id}>
                           <td style={{ width: 44 }}>{d.image && <img src={d.image} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6 }} />}</td>
                           <td>
-                            <div className="fw-medium">{d.title}</div>
-                            {d.remedy && <div className="text-muted small">Remedy: {d.remedy}</div>}
+                            <div className="fw-medium">{d.title || 'Defect'}</div>
+                            {d.detail && <div className="text-muted small text-truncate" style={{ maxWidth: 280 }}>{d.detail}</div>}
                           </td>
                           <td className="text-muted">{defectSubject(d)}</td>
-                          <td className="text-muted">{d.identifiedDate ? fmtDate(d.identifiedDate) : '—'}</td>
+                          <td className="text-muted">{d.date ? fmtDate(d.date) : '—'}</td>
                           <td><span className={'badge ' + (DEFECT_BADGE[d.status] || DEFECT_BADGE.open)}>{d.status}</span></td>
                         </tr>
                       ))}

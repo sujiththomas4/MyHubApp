@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { money, fmtDate } from '@/data/AppData'
 import CrudCard from '@/components/plantation/CrudCard'
 import { usePepperBookings, addBooking, editBooking, removeBooking } from '@/data/pepperBookingRepo'
-import { useLookups, valuesFor } from '@/data/lookupsRepo'
+import { useLookups, valuesFor, VARIETY_LIST } from '@/data/lookupsRepo'
 import { useProfiles, personName } from '@/data/profilesRepo'
 import { useLands, landLabel } from '@/data/plantationLandRepo'
 import PropertyBar from '@/components/plantation/PropertyBar'
@@ -15,7 +15,6 @@ import PropertyBar from '@/components/plantation/PropertyBar'
  */
 const rid = () => Math.random().toString(36).slice(2, 8)
 const todayISO = () => new Date().toISOString().slice(0, 10)
-const VARIETY_LIST = 'Pepper Variety'
 const CROP_LIST = 'Crop'
 const STATUS = [
   { value: 'booked', label: 'Booked' },

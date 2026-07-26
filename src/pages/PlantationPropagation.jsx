@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fmtDate } from '@/data/AppData'
 import CrudCard from '@/components/plantation/CrudCard'
 import { usePropagation, addPropagation, editPropagation, removePropagation } from '@/data/propagationRepo'
 import { useProfiles, personName } from '@/data/profilesRepo'
-import { usePlants, usePoles, useVerticals, useZones, useLands, landLabel } from '@/data/plantationLandRepo'
-import PropertyBar from '@/components/plantation/PropertyBar'
+import { usePlants, usePoles, useVerticals, useZones, useLands, landLabel, editPlant } from '@/data/plantationLandRepo'
+import HierarchyFilter, { MultiSelect } from '@/components/plantation/HierarchyFilter'
+import { computeVisible, emptyHierarchyFilter } from '@/components/plantation/hierarchyScope'
+import Modal from '@/components/ui/Modal'
 
 /**
  * PlantationPropagation.jsx — "Plant Factory": in-house plant development
@@ -58,8 +60,9 @@ function usePlantOptions() {
     return z?.landId || ''
   }
   return {
-    plants,
+    plants, poles, verticals, zones,
     options: plants.map((p) => ({ value: p.id, label: label(p) })),
+    motherOptions: plants.filter((p) => p.isMother).map((p) => ({ value: p.id, label: label(p) })),
     labelById: Object.fromEntries(plants.map((p) => [p.id, label(p)])),
     landOfPlant,
   }
@@ -67,8 +70,29 @@ function usePlantOptions() {
 
 export default function PlantationPropagation() {
   const [tab, setTab] = useState('thippali')
-  const [property, setProperty] = useState('')
+  const [filter, setFilter] = useState(emptyHierarchyFilter)
+  const [motherSel, setMotherSel] = useState(new Set())
   const active = TABS.find((t) => t.id === tab)
+
+  const { lands } = useLands()
+  const { plants, poles, verticals, zones, motherOptions } = usePlantOptions()
+  const data = { lands, zones, verticals, poles, plants }
+  const { keep } = computeVisible(filter, data)
+
+  const landActive = filter.land.size > 0
+  const deeperActive = filter.zone.size || filter.vertical.size || filter.pole.size || filter.plant.size
+  const motherActive = motherSel.size > 0
+
+  // A batch is scoped by its property and by its mother plant's position/identity.
+  const matchBatch = (b) => {
+    if (landActive && !keep.land.has(b.landId)) return false
+    if (deeperActive && !(b.parentPlantId && keep.plant.has(b.parentPlantId))) return false
+    if (motherActive && !motherSel.has(b.parentPlantId)) return false
+    return true
+  }
+  const plantVisible = (id) => keep.plant.has(id)
+  // Mother-plant dropdown options, limited to mothers within the current scope.
+  const scopedMotherOptions = motherOptions.filter((o) => keep.plant.has(o.value))
 
   return (
     <div className="option-buying">
@@ -92,12 +116,17 @@ export default function PlantationPropagation() {
         ))}
       </div>
 
-      <PropertyBar value={property} onChange={setProperty} />
+      {lands.length > 0 && (
+        <div className="card mb-3"><div className="card-body py-2 d-flex align-items-center flex-wrap gap-2">
+          <HierarchyFilter data={data} value={filter} onChange={setFilter} />
+          <MultiSelect icon="ri-plant-line" label="Mother plant" options={scopedMotherOptions} selected={motherSel} onChange={setMotherSel} />
+        </div></div>
+      )}
 
-      {active.method && <BatchTracker lockType={active.method} property={property} />}
-      {tab === 'mothers' && <MotherPlants property={property} />}
-      {tab === 'inventory' && <NurseryInventory property={property} />}
-      {tab === 'reports' && <Reports property={property} />}
+      {active.method && <BatchTracker lockType={active.method} matchBatch={matchBatch} />}
+      {tab === 'mothers' && <MotherPlants plantVisible={plantVisible} motherSel={motherSel} data={data} />}
+      {tab === 'inventory' && <NurseryInventory matchBatch={matchBatch} />}
+      {tab === 'reports' && <Reports matchBatch={matchBatch} />}
       {tab === 'planning' && (
         <div className="card mb-0"><div className="card-body text-center text-muted py-5">
           <i className="ri-calendar-schedule-line fs-1 d-block mb-2" />
@@ -110,11 +139,11 @@ export default function PlantationPropagation() {
 }
 
 // ---- Batch tracker (one propagation method) --------------------------------
-function BatchTracker({ lockType, property }) {
+function BatchTracker({ lockType, matchBatch }) {
   const { batches } = usePropagation()
   const { profiles } = useProfiles()
   const { lands } = useLands()
-  const { options: plantOpts, labelById: plantLabelById } = usePlantOptions()
+  const { motherOptions, labelById: plantLabelById } = usePlantOptions()
   const people = [...new Set(profiles.map(personName).filter(Boolean))]
   const landOpts = [{ value: '', label: '— select —' }, ...lands.map((l) => ({ value: l.id, label: landLabel(l) }))]
   const landName = (id) => landLabel(lands.find((l) => l.id === id))
@@ -123,7 +152,7 @@ function BatchTracker({ lockType, property }) {
   const setF = (k, v) => setFilters((f) => ({ ...f, [k]: v }))
   const anyFilter = filters.q || filters.status
 
-  const mine = batches.filter((b) => b.type === lockType && (!property || b.landId === property))
+  const mine = batches.filter((b) => b.type === lockType && matchBatch(b))
   const activeB = mine.filter((b) => b.status !== 'failed')
   const inProgress = mine.filter((b) => b.status === 'in_progress').length
   const created = activeB.reduce((s, b) => s + b.quantity, 0)
@@ -141,7 +170,7 @@ function BatchTracker({ lockType, property }) {
 
   const fields = [
     { key: 'landId', label: 'Property', type: 'select', options: landOpts, colClass: 'col-md-6' },
-    { key: 'parentPlantId', label: 'Parent plant (zone / row)', type: 'search', options: plantOpts, placeholder: 'Search plants…', colClass: 'col-md-6' },
+    { key: 'parentPlantId', label: 'Mother plant', type: 'search', options: motherOptions, placeholder: motherOptions.length ? 'Search mother plants…' : 'No mother plants — add them in the Mother Plants tab', colClass: 'col-md-6' },
     { key: 'label', label: 'Batch name / code', type: 'text', colClass: 'col-md-6' },
     { key: 'location', label: 'Location', type: 'text', placeholder: 'Zone / shed', colClass: 'col-md-4' },
     { key: 'startDate', label: 'Start date', type: 'date', colClass: 'col-md-4' },
@@ -223,50 +252,131 @@ function BatchTracker({ lockType, property }) {
   )
 }
 
-// ---- Mother Plants ---------------------------------------------------------
-function MotherPlants({ property }) {
-  const { plants, labelById, landOfPlant } = usePlantOptions()
+// ---- Mother Plants (explicitly designated) ---------------------------------
+function MotherPlants({ plantVisible, motherSel, data }) {
+  const { plants, labelById } = usePlantOptions()
   const { batches } = usePropagation()
+  const [adding, setAdding] = useState(false)
+
   const childrenOf = (plantId) => batches.filter((b) => b.parentPlantId === plantId).reduce((s, b) => s + b.quantity, 0)
-  const shown = property ? plants.filter((p) => landOfPlant(p) === property) : plants
-  const rows = shown
-    .map((p) => ({ id: p.id, label: labelById[p.id], variety: p.variety || '', tag: p.tag || '', children: childrenOf(p.id) }))
+  const inScope = (p) => plantVisible(p.id) && (!motherSel.size || motherSel.has(p.id))
+  const mothers = plants.filter((p) => p.isMother && inScope(p))
+  const rows = mothers
+    .map((p) => ({ id: p.id, plant: p, label: labelById[p.id], variety: p.variety || '', children: childrenOf(p.id) }))
     .sort((a, b) => b.children - a.children)
 
+  const existingMotherIds = new Set(plants.filter((p) => p.isMother).map((p) => p.id))
+  const undesignate = (p) => editPlant({ ...p, isMother: false }).catch(console.error)
+  const designateMany = async (ids) => {
+    for (const id of ids) {
+      const p = plants.find((x) => x.id === id)
+      // eslint-disable-next-line no-await-in-loop
+      if (p) await editPlant({ ...p, isMother: true })
+    }
+  }
+
   return (
-    <div className="card mb-0">
-      <div className="card-header d-flex align-items-center">
-        <h5 className="card-title mb-0 flex-grow-1">Mother plants</h5>
-        <span className="text-muted small">from Explorer · children created from each</span>
+    <>
+      <div className="card mb-0">
+        <div className="card-header d-flex align-items-center">
+          <h5 className="card-title mb-0 flex-grow-1">Mother plants <span className="text-muted fs-13 fw-normal">({rows.length})</span></h5>
+          <span className="text-muted small me-3 d-none d-md-inline">designate plants to use as parents for batches</span>
+          <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><i className="ri-add-line me-1" />Designate mother plants</button>
+        </div>
+        <div className="card-body p-0">
+          {rows.length === 0 ? (
+            <p className="text-muted text-center py-4 mb-0">No mother plants designated. Add some to use as parents when creating batches.</p>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light"><tr><th>Plant</th><th>Variety</th><th className="text-center">Children created</th><th className="text-end">Actions</th></tr></thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id}>
+                      <td className="fw-medium"><i className="ri-plant-line text-success me-1" />{r.label}</td>
+                      <td className="text-muted">{r.variety || '—'}</td>
+                      <td className="text-center">{r.children ? <span className="badge bg-success-subtle text-success">{r.children}</span> : '—'}</td>
+                      <td className="text-end"><button className="btn btn-sm btn-ghost-danger px-2" title="Remove from mother plants" onClick={() => undesignate(r.plant)}><i className="ri-close-circle-line me-1" />Remove</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="card-body p-0">
-        {rows.length === 0 ? (
-          <p className="text-muted text-center py-4 mb-0">No plants yet. Add plants in the Explorer to use them as mothers.</p>
-        ) : (
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light"><tr><th>Plant</th><th>Variety</th><th className="text-center">Children created</th></tr></thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td className="fw-medium">{r.label}</td>
-                    <td className="text-muted">{r.variety || '—'}</td>
-                    <td className="text-center">{r.children ? <span className="badge bg-success-subtle text-success">{r.children}</span> : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+
+      <DesignateMothersModal
+        open={adding} data={data} labelById={labelById} existingMotherIds={existingMotherIds}
+        onClose={() => setAdding(false)} onConfirm={designateMany}
+      />
+    </>
+  )
+}
+
+// ---- Designate mother plants (filterable multi-select) ----------------------
+function DesignateMothersModal({ open, data, labelById, existingMotherIds, onClose, onConfirm }) {
+  const [filter, setFilter] = useState(emptyHierarchyFilter)
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState(new Set())
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { if (open) { setFilter(emptyHierarchyFilter()); setQ(''); setSel(new Set()) } }, [open])
+
+  const { keep } = computeVisible(filter, data)
+  const candidates = (data.plants || [])
+    .filter((p) => !existingMotherIds.has(p.id) && keep.plant.has(p.id))
+    .filter((p) => !q || (labelById[p.id] || '').toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => (labelById[a.id] || '').localeCompare(labelById[b.id] || ''))
+
+  const allSelected = candidates.length > 0 && candidates.every((p) => sel.has(p.id))
+  const toggle = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAll = () => setSel((s) => {
+    const n = new Set(s)
+    if (allSelected) candidates.forEach((p) => n.delete(p.id))
+    else candidates.forEach((p) => n.add(p.id))
+    return n
+  })
+
+  const confirm = async () => {
+    setSaving(true)
+    try { await onConfirm([...sel]); onClose() }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Modal open={open} size="lg" title={<><i className="ri-plant-line me-2 text-success" />Designate mother plants</>} onClose={onClose}>
+      <HierarchyFilter data={data} value={filter} onChange={setFilter} hide={['plant']} />
+      <div className="d-flex align-items-center gap-2 mt-3 mb-2">
+        <input className="form-control form-control-sm" placeholder="Search plants…" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 260 }} />
+        <span className="flex-grow-1" />
+        <span className="text-muted small">{sel.size} selected</span>
+        <button className="btn btn-sm btn-light" onClick={toggleAll} disabled={candidates.length === 0}>
+          <i className={'me-1 ' + (allSelected ? 'ri-checkbox-indeterminate-line' : 'ri-checkbox-multiple-line')} />{allSelected ? 'Unselect all' : `Select all (${candidates.length})`}
+        </button>
       </div>
-    </div>
+      <div className="border rounded" style={{ maxHeight: 320, overflowY: 'auto' }}>
+        {candidates.length === 0 ? (
+          <p className="text-muted text-center py-4 mb-0">No plants to add here. Adjust the filter, or all matching plants are already mothers.</p>
+        ) : candidates.map((p) => (
+          <button type="button" key={p.id} className={'ss-item' + (sel.has(p.id) ? ' active' : '')} onClick={() => toggle(p.id)}>
+            <i className={'me-2 ' + (sel.has(p.id) ? 'ri-checkbox-line text-primary' : 'ri-checkbox-blank-line')} />{labelById[p.id]}
+          </button>
+        ))}
+      </div>
+      <p className="text-muted small mt-2 mb-0">Only designated mother plants appear in the batch parent-plant picker.</p>
+      <div className="d-flex justify-content-end gap-2 mt-3">
+        <button className="btn btn-light" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={confirm} disabled={sel.size === 0 || saving}><i className="ri-check-line me-1" />{saving ? 'Adding…' : `Add ${sel.size || ''} as mother${sel.size === 1 ? '' : 's'}`}</button>
+      </div>
+    </Modal>
   )
 }
 
 // ---- Nursery Inventory (ready stock by method) -----------------------------
-function NurseryInventory({ property }) {
+function NurseryInventory({ matchBatch }) {
   const { batches: all } = usePropagation()
-  const batches = property ? all.filter((b) => b.landId === property) : all
+  const batches = all.filter(matchBatch)
   const m = new Map()
   batches.filter((b) => b.status === 'ready').forEach((b) => {
     const k = b.type || '—'
@@ -299,9 +409,9 @@ function NurseryInventory({ property }) {
 }
 
 // ---- Reports (by type + by status) -----------------------------------------
-function Reports({ property }) {
+function Reports({ matchBatch }) {
   const { batches: all } = usePropagation()
-  const batches = property ? all.filter((b) => b.landId === property) : all
+  const batches = all.filter(matchBatch)
   const byType = new Map()
   batches.forEach((b) => {
     const k = b.type || '—'

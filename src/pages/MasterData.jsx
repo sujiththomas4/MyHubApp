@@ -43,7 +43,7 @@ export default function MasterData() {
 
       <div className="alert alert-info d-flex align-items-center">
         <i className="ri-information-line me-2 fs-5" />
-        <span>Values here populate app dropdowns. The <strong>Expense Category</strong> list feeds the Plantation → Expenses category picker.</span>
+        <span>Values here populate app dropdowns — e.g. <strong>Expense Category</strong> feeds the Expenses picker, and <strong>Update Type</strong> feeds the plantation timeline type dropdown (keep <code>defect</code>, <code>dead</code>, <code>recovered</code> for their special behaviour).</span>
       </div>
 
       <CrudCard

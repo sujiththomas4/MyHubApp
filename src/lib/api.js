@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase, isSupabaseConfigured } from './supabase'
 
 /**
@@ -80,30 +80,37 @@ export function useCollection(table, unusedFallback = [], { orderBy = 'id', asce
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [error, setError] = useState(null)
+  const aliveRef = useRef(true)
+  const mapRef = useRef(map)
+  mapRef.current = map
+
+  // Refetch on demand — call after a write so the UI updates immediately even if
+  // the realtime event is slow or the table isn't in the realtime publication.
+  const reload = useCallback(() => {
+    if (!isSupabaseConfigured) return Promise.resolve()
+    return listRows(table, { orderBy, ascending })
+      .then((rows) => { if (aliveRef.current) { setData(mapRef.current ? rows.map(mapRef.current) : rows); setLoading(false); setError(null) } })
+      .catch((e) => { if (aliveRef.current) { setError(e); setLoading(false) } })
+  }, [table, orderBy, ascending])
 
   useEffect(() => {
+    aliveRef.current = true
     if (!isSupabaseConfigured) {
       setError(new Error('Not connected to the database.'))
       setLoading(false)
       return
     }
 
-    let alive = true
-    const load = () => listRows(table, { orderBy, ascending })
-      .then((rows) => { if (alive) { setData(map ? rows.map(map) : rows); setLoading(false) } })
-      .catch((e) => { if (alive) { setError(e); setLoading(false) } })
-
-    load()
+    reload()
     const channel = supabase
       .channel(`rt:${table}:${channelSeq++}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table }, reload)
       .subscribe()
 
-    return () => { alive = false; supabase.removeChannel(channel) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [table, orderBy, ascending])
+    return () => { aliveRef.current = false; supabase.removeChannel(channel) }
+  }, [table, reload])
 
-  return { data, loading, error }
+  return { data, loading, error, reload }
 }
 
 // ---- Image storage ----------------------------------------------------------
