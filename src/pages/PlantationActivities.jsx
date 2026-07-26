@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fmtDate } from '@/data/AppData'
 import { usePlantationActivities, addActivity as apiAdd, editActivity as apiEdit, removeActivity as apiRemove } from '@/data/plantationRepo'
+import { useLands, landLabel } from '@/data/plantationLandRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import PropertyBar from '@/components/plantation/PropertyBar'
 
 /**
  * PlantationActivities.jsx
@@ -15,13 +17,14 @@ const rid = () => Math.random().toString(36).slice(2, 8)
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const isOverdue = (a) => a.status === 'planned' && a.dueDate < todayISO()
 
-function ActivityForm({ initial, onSave, onCancel }) {
+function ActivityForm({ initial, onSave, onCancel, landOpts }) {
   const [f, setF] = useState({
     date: initial?.date || todayISO(),
     dueDate: initial?.dueDate || todayISO(),
     activity: initial?.activity || '',
     status: initial?.status || 'planned',
     note: initial?.note || '',
+    landId: initial?.landId || '',
   })
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
   const save = () => onSave({
@@ -31,11 +34,18 @@ function ActivityForm({ initial, onSave, onCancel }) {
     activity: f.activity.trim() || 'Activity',
     status: f.status,
     note: f.note.trim(),
+    landId: f.landId,
   })
 
   return (
     <>
       <div className="row g-2">
+        <div className="col-md-12">
+          <label className="form-label small mb-1">Property</label>
+          <select className="form-select form-select-sm" value={f.landId} onChange={(e) => set('landId', e.target.value)}>
+            {landOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
         <div className="col-md-6">
           <label className="form-label small mb-1">Activity</label>
           <input className="form-control form-control-sm" placeholder="e.g. Fertilizer application" value={f.activity} onChange={(e) => set('activity', e.target.value)} autoFocus />
@@ -70,16 +80,22 @@ function ActivityForm({ initial, onSave, onCancel }) {
 
 export default function PlantationActivities() {
   const live = usePlantationActivities()
+  const { lands } = useLands()
   const [items, setItems] = useState([])
+  const [property, setProperty] = useState('')
   const [adding, setAdding] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
 
   useEffect(() => { setItems(live) }, [live])
 
-  const rows = [...items].sort((a, b) => b.dueDate.localeCompare(a.dueDate))
-  const done = items.filter((a) => a.status === 'done').length
-  const overdue = items.filter(isOverdue).length
+  const landOpts = [{ value: '', label: '— select —' }, ...lands.map((l) => ({ value: l.id, label: landLabel(l) }))]
+  const landName = (id) => landLabel(lands.find((l) => l.id === id))
+
+  const scoped = property ? items.filter((a) => a.landId === property) : items
+  const rows = [...scoped].sort((a, b) => b.dueDate.localeCompare(a.dueDate))
+  const done = scoped.filter((a) => a.status === 'done').length
+  const overdue = scoped.filter(isOverdue).length
 
   const addItem = (a) => { setItems((xs) => [...xs, a]); setAdding(false); apiAdd(a).catch(console.error) }
   const updateItem = (a) => { setItems((xs) => xs.map((x) => (x.id === a.id ? a : x))); setEditRow(null); apiEdit(a).catch(console.error) }
@@ -99,10 +115,12 @@ export default function PlantationActivities() {
         </nav>
       </div>
 
+      <PropertyBar value={property} onChange={setProperty} />
+
       <div className="card">
         <div className="card-header d-flex align-items-center flex-wrap gap-2">
           <h5 className="card-title mb-0 flex-grow-1">Activity log</h5>
-          <span className="text-muted small">{done}/{items.length} done{overdue > 0 && <span className="text-danger"> · {overdue} overdue</span>}</span>
+          <span className="text-muted small">{done}/{scoped.length} done{overdue > 0 && <span className="text-danger"> · {overdue} overdue</span>}</span>
           <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><i className="ri-add-line me-1" />Add activity</button>
         </div>
         <div className="card-body p-0">
@@ -111,6 +129,7 @@ export default function PlantationActivities() {
               <thead className="table-light">
                 <tr>
                   <th>Activity</th>
+                  <th>Property</th>
                   <th>Date</th>
                   <th>Due date</th>
                   <th className="text-center">Status</th>
@@ -120,10 +139,11 @@ export default function PlantationActivities() {
               </thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center text-muted py-4">No activities yet.</td></tr>
+                  <tr><td colSpan={7} className="text-center text-muted py-4">No activities yet.</td></tr>
                 ) : rows.map((a) => (
                   <tr key={a.id}>
                     <td className="fw-medium">{a.activity}</td>
+                    <td className="text-muted">{landName(a.landId) || '—'}</td>
                     <td>{fmtDate(a.date)}</td>
                     <td className={isOverdue(a) ? 'text-danger' : ''}>
                       {fmtDate(a.dueDate)}{isOverdue(a) && <i className="ri-alarm-warning-line ms-1" title="Overdue" />}
@@ -162,6 +182,7 @@ export default function PlantationActivities() {
         <ActivityForm
           key={editRow?.id || 'new'}
           initial={editRow}
+          landOpts={landOpts}
           onSave={editRow ? updateItem : addItem}
           onCancel={() => { setAdding(false); setEditRow(null) }}
         />

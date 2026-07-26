@@ -2768,3 +2768,39 @@
 .routine-check { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 34px; font-size: 1.05rem; }
 .routine-row:last-child { border-bottom: 0 !important; }
 .routine-row .min-w-0 { min-width: 0; }
+
+/* Plantation Explorer — hierarchy tree. */
+.tree-row { display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; border-bottom: 1px solid var(--bs-border-color); }
+.tree-row:last-child { border-bottom: 0; }
+.tree-row:hover { background: rgba(10, 179, 156, 0.06); }
+.tree-chevron { border: 0; background: transparent; width: 22px; padding: 0; color: var(--bs-secondary-color); display: inline-flex; align-items: center; justify-content: center; }
+
+/* SearchSelect dropdown items. */
+.ss-item { display: flex; align-items: center; width: 100%; text-align: left; padding: 0.45rem 0.9rem; border: 0; background: transparent; color: var(--bs-body-color); font-size: 0.875rem; line-height: 1.4; }
+.ss-item:hover { background: rgba(10, 179, 156, 0.10); }
+.ss-item.active { background: rgba(10, 179, 156, 0.15); color: var(--bs-primary); font-weight: 500; }
+
+/* Plant Factory — tab strip. */
+.pf-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pf-tab {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.5rem 0.95rem; border: 1px solid var(--bs-border-color);
+  border-radius: 0.6rem; background: var(--bs-body-bg); color: var(--bs-body-color);
+  font-size: 0.875rem; font-weight: 500; line-height: 1; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pf-tab i { font-size: 1.05rem; opacity: 0.85; }
+.pf-tab:hover { border-color: var(--bs-primary); color: var(--bs-primary); }
+.pf-tab.active {
+  background: var(--bs-primary); border-color: var(--bs-primary); color: #fff;
+  box-shadow: 0 4px 12px rgba(10, 179, 156, 0.35);
+}
+.pf-tab.active i { opacity: 1; }
+
+/* Plantation — composed reference code (e.g. CHRY-ZA-R1-P1-BP1). */
+.ref-code {
+  font-family: var(--bs-font-monospace, monospace);
+  font-size: 0.72rem; letter-spacing: 0.02em;
+  color: var(--bs-primary); background: rgba(10, 179, 156, 0.10);
+  padding: 0.08rem 0.4rem; border-radius: 0.3rem; white-space: nowrap;
+}

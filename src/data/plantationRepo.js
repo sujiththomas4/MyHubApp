@@ -11,10 +11,10 @@ const entryToRow = (e) => ({
   amount: e.amount, status: e.status, note: e.note,
 })
 const rowToActivity = (r) => ({
-  id: r.id, date: r.date, dueDate: r.due_date, activity: r.activity, status: r.status, note: r.note || '',
+  id: r.id, date: r.date, dueDate: r.due_date, activity: r.activity, status: r.status, landId: r.land_id || '', note: r.note || '',
 })
 const activityToRow = (a) => ({
-  id: a.id, date: a.date, due_date: a.dueDate, activity: a.activity, status: a.status, note: a.note,
+  id: a.id, date: a.date, due_date: a.dueDate, activity: a.activity, status: a.status, land_id: a.landId || null, note: a.note,
 })
 
 export function usePlantationEntries() {

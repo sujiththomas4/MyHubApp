@@ -148,8 +148,14 @@ export const menu = [
     icon: 'ri-plant-line',
     to: '/business/plantations',
     children: [
-      { id: 'plantation-income', label: 'Income', to: '/business/plantations/income' },
-      { id: 'plantation-expense', label: 'Expense', to: '/business/plantations/expense' },
+      { id: 'plantation-dashboard', label: 'Dashboard', to: '/business/plantations/dashboard' },
+      { id: 'plantation-explorer', label: 'Explorer', to: '/business/plantations/explorer' },
+      { id: 'plantation-defects', label: 'Defects', to: '/business/plantations/defects' },
+      { id: 'plantation-capital', label: 'Capital', to: '/business/plantations/capital' },
+      { id: 'plantation-expenses', label: 'Expenses', to: '/business/plantations/expenses' },
+      { id: 'plantation-gallery', label: 'Gallery', to: '/business/plantations/gallery' },
+      { id: 'plantation-pepper-booked', label: 'Plants Booked', to: '/business/plantations/pepper-booked' },
+      { id: 'plantation-propagation', label: 'Plant Factory', to: '/business/plantations/propagation' },
       { id: 'plantation-activities', label: 'Activities', to: '/business/plantations/activities' },
     ],
   },
@@ -174,6 +180,8 @@ export const menu = [
 
   { id: 'title-system', label: 'System', isTitle: true },
 
+  { id: 'users-roles', label: 'Users & Roles', icon: 'ri-shield-user-line', to: '/admin/users' },
+  { id: 'master-data', label: 'Master Data', icon: 'ri-list-check-2', to: '/admin/master-data' },
   { id: 'settings', label: 'Settings', icon: 'ri-settings-3-line', to: '/settings' },
 ]
 
@@ -211,4 +219,17 @@ export function menuForMode(mode) {
     if (keeping) out.push(node)
   }
   return out
+}
+
+/**
+ * The nav for a given role. Admins get the full mode-filtered menu; plantation
+ * members get only the Plantation group's items (flattened under a title).
+ */
+export function menuForRole(role, mode) {
+  if (role === 'admin') return menuForMode(mode)
+  const plantation = menu.find((n) => n.id === 'plantations')
+  return [
+    { id: 'title-plantation', label: 'Plantation', isTitle: true },
+    ...(plantation?.children || []),
+  ]
 }

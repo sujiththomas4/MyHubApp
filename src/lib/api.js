@@ -69,6 +69,12 @@ export async function upsertRow(table, row, onConflict = 'id') {
  * Kept in the signature so existing call sites don't all have to change, but
  * nothing is ever served from it: the database is the only source of truth.
  */
+// Monotonic id so every hook instance gets its own realtime channel topic.
+// Two components subscribing to the same table (e.g. a page + PropertyBar both
+// reading plantation_lands) must NOT share a topic name — Supabase rejects the
+// duplicate `subscribe()` and the page fails to render.
+let channelSeq = 0
+
 // eslint-disable-next-line no-unused-vars
 export function useCollection(table, unusedFallback = [], { orderBy = 'id', ascending = true, map } = {}) {
   const [data, setData] = useState([])
@@ -89,7 +95,7 @@ export function useCollection(table, unusedFallback = [], { orderBy = 'id', asce
 
     load()
     const channel = supabase
-      .channel(`rt:${table}`)
+      .channel(`rt:${table}:${channelSeq++}`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, load)
       .subscribe()
 

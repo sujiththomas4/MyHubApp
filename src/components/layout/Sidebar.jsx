@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react' // useMemo used in VerticalMenu
 import { NavLink, useLocation } from 'react-router-dom'
 import SimpleBar from 'simplebar-react'
-import { menuForMode } from '@/data/menu'
+import { menuForRole } from '@/data/menu'
 import { useTheme } from '@/context/ThemeContext'
+import { useAuth } from '@/context/AuthContext'
 
 /* Find the id-path of ancestors that contain the active route, so those
    submenus start expanded. */
@@ -79,9 +80,9 @@ function MenuNode({ node, level, openIds, toggle }) {
 function VerticalMenu() {
   const { pathname } = useLocation()
   const { settings } = useTheme()
-  // Business mode hides the wealth/investment sections so they don't pull focus
-  // during market hours. See menuForMode() in data/menu.js.
-  const items = useMemo(() => menuForMode(settings.profileMode), [settings.profileMode])
+  const { role } = useAuth()
+  // Admins get the mode-filtered menu; plantation members get Plantation only.
+  const items = useMemo(() => menuForRole(role, settings.profileMode), [role, settings.profileMode])
   const initialOpen = useMemo(() => findActiveTrail(items, pathname) || ['loans'], [items, pathname])
   const [openIds, setOpenIds] = useState(initialOpen)
 
@@ -100,7 +101,8 @@ function VerticalMenu() {
 /* Two-column: a slim icon rail + a panel showing the selected group's children. */
 function TwoColumn() {
   const { settings } = useTheme()
-  const groups = menuForMode(settings.profileMode).filter((m) => !m.isTitle)
+  const { role } = useAuth()
+  const groups = menuForRole(role, settings.profileMode).filter((m) => !m.isTitle)
   const [activeId, setActiveId] = useState(groups[0]?.id)
   const active = groups.find((g) => g.id === activeId)
 
