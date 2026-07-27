@@ -32,6 +32,10 @@ import PlantationCapital from '@/pages/PlantationCapital'
 import PlantationExpenses from '@/pages/PlantationExpenses'
 import PlantationPepperBooked from '@/pages/PlantationPepperBooked'
 import PlantationPropagation from '@/pages/PlantationPropagation'
+import PlantationPlannedCrops from '@/pages/PlantationPlannedCrops'
+import PlantationPlannedCropDetail from '@/pages/PlantationPlannedCropDetail'
+import PlantationFertilizers from '@/pages/PlantationFertilizers'
+import PlantationFertilizerDetail from '@/pages/PlantationFertilizerDetail'
 import MasterData from '@/pages/MasterData'
 import Savings from '@/pages/Savings'
 import SavingsCategory from '@/pages/SavingsCategory'
@@ -60,6 +64,10 @@ export default function App() {
         <Route path="/business/plantations" element={<PlantationTracker />} />
         <Route path="/business/plantations/pepper-booked" element={<PlantationPepperBooked />} />
         <Route path="/business/plantations/propagation" element={<PlantationPropagation />} />
+        <Route path="/business/plantations/planned-crops" element={<PlantationPlannedCrops />} />
+        <Route path="/business/plantations/planned-crops/:cropId" element={<PlantationPlannedCropDetail />} />
+        <Route path="/business/plantations/health-center" element={<PlantationFertilizers />} />
+        <Route path="/business/plantations/health-center/:fertId" element={<PlantationFertilizerDetail />} />
         <Route path="/business/plantations/activities" element={<PlantationActivities />} />
         <Route path="/business/plantations/dashboard" element={<PlantationDashboard />} />
         <Route path="/business/plantations/explorer" element={<PlantationExplorer />} />

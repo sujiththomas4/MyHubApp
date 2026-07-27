@@ -6,14 +6,22 @@ import EntityModal from '@/components/plantation/EntityModal'
 import BulkAddModal from '@/components/plantation/BulkAddModal'
 import NodeTimeline from '@/components/plantation/NodeTimeline'
 import HierarchyFilter from '@/components/plantation/HierarchyFilter'
+import CrudCard from '@/components/plantation/CrudCard'
 import { computeVisible, emptyHierarchyFilter } from '@/components/plantation/hierarchyScope'
 import { ENTITY, POLE_TYPE_LABEL, PLANT_STATUS_BADGE } from '@/data/plantationForms'
 import {
   useLands, useZones, useVerticals, usePoles, usePlants,
   useZoneItems, useCare, editPlant, descendantsByLevel,
   removeZoneItem, removeCare,
+  usePlotFeatures, addPlotFeature, editPlotFeature, removePlotFeature, PLOT_FEATURE_KINDS,
 } from '@/data/plantationLandRepo'
 import { useUpdates, removeUpdate } from '@/data/plantationUpdatesRepo'
+
+const rid2 = () => Math.random().toString(36).slice(2, 8)
+const FEATURE_ICON = Object.fromEntries(PLOT_FEATURE_KINDS.map((k) => [k.value, k.icon]))
+const FEATURE_LABEL = Object.fromEntries(PLOT_FEATURE_KINDS.map((k) => [k.value, k.label]))
+const PLANT_TONE = { healthy: 'success', defect: 'warning', dead: 'danger' }
+const MAX_PLANT_DOTS = 6
 
 /**
  * PlantationExplorer.jsx — the whole hierarchy in one screen, viewable four ways
@@ -32,6 +40,7 @@ const LEVELS = [
 ]
 const VIEWS = [
   { id: 'tree', label: 'Tree', icon: 'ri-node-tree' },
+  { id: 'plot', label: 'Plot', icon: 'ri-layout-masonry-line' },
   { id: 'cards', label: 'Cards', icon: 'ri-layout-grid-line' },
   { id: 'table', label: 'Table', icon: 'ri-table-line' },
   { id: 'board', label: 'Board', icon: 'ri-layout-column-line' },
@@ -125,6 +134,7 @@ export default function PlantationExplorer() {
   const { items } = useZoneItems()
   const { care } = useCare()
   const { updates } = useUpdates()
+  const { features } = usePlotFeatures()
   const byType = { land: lands, zone: zones, vertical: verticals, pole: poles, plant: plants }
 
   // Count of top-level updates per node, for the timeline button badge.
@@ -267,6 +277,100 @@ export default function PlantationExplorer() {
     return [a.land?.code, a.zone?.code, a.vertical?.code, a.pole?.code, node.code].filter(Boolean).join('-')
   }
   const rowsOf = (type) => byType[type].filter((n) => keep[type].has(n.id)).sort((a, b) => a.sortOrder - b.sortOrder)
+
+  // ---- Plot view helpers ----------------------------------------------------
+  const childrenOf = (type, parentId) => {
+    const ct = ENTITY[type].childType
+    if (!ct) return []
+    return byType[ct].filter((c) => c[ENTITY[ct].parentField] === parentId && keep[ct].has(c.id)).sort((a, b) => a.sortOrder - b.sortOrder)
+  }
+  const plantsOnPole = (poleId) => plants.filter((p) => p.poleId === poleId && keep.plant.has(p.id))
+  const poleTone = (ps) => {
+    if (ps.length === 0) return 'secondary'
+    if (ps.some((p) => (p.status || 'healthy') === 'dead')) return 'danger'
+    if (ps.some((p) => (p.status || 'healthy') === 'defect')) return 'warning'
+    return 'success'
+  }
+
+  // ---- Plot structures (features) management --------------------------------
+  const featLandName = (id) => (lands.find((l) => l.id === id) || {}).name || '—'
+  const featureFields = [
+    { key: 'landId', label: 'Property', type: 'select', options: [{ value: '', label: '— select —' }, ...lands.map((l) => ({ value: l.id, label: l.name }))], required: true, colClass: 'col-md-6' },
+    { key: 'kind', label: 'Type', type: 'select', options: PLOT_FEATURE_KINDS.map((k) => ({ value: k.value, label: k.label })), colClass: 'col-md-6' },
+    { key: 'label', label: 'Label', type: 'text', placeholder: 'e.g. Main Gate' },
+    { key: 'x', label: 'X', type: 'number', colClass: 'col-3' },
+    { key: 'y', label: 'Y', type: 'number', colClass: 'col-3' },
+    { key: 'w', label: 'Width', type: 'number', colClass: 'col-3' },
+    { key: 'h', label: 'Height', type: 'number', colClass: 'col-3' },
+  ]
+  const featureBlank = () => ({ landId: lands[0]?.id || '', kind: 'gate', label: '', x: '', y: '', w: '', h: '' })
+  const featureSave = async (f) => { if (f.id) await editPlotFeature(f); else await addPlotFeature({ ...f, id: 'ft-' + rid2(), sortOrder: features.length }) }
+  const featureColumns = [
+    { header: 'Structure', cell: (f) => <span className="fw-medium"><i className={(FEATURE_ICON[f.kind] || FEATURE_ICON.other) + ' me-1'} />{f.label || FEATURE_LABEL[f.kind]}</span> },
+    { header: 'Type', className: 'text-muted', cell: (f) => FEATURE_LABEL[f.kind] || f.kind },
+    { header: 'Property', className: 'text-muted', cell: (f) => featLandName(f.landId) },
+    { header: 'Box (x,y,w,h)', className: 'text-muted', cell: (f) => `${f.x || 0}, ${f.y || 0}, ${f.w || 0}, ${f.h || 0}` },
+  ]
+
+  // ---- Plot arrange (drag / resize zones & structures) ----------------------
+  const [arrange, setArrange] = useState(false)
+  const [live, setLive] = useState(null)   // { id, x, y, w, h } while dragging
+  const unplacedZones = zones.filter((z) => !(Number(z.layoutW) > 0 && Number(z.layoutH) > 0))
+
+  // Auto-generate a starting layout for zones that aren't positioned yet, so the
+  // Plot shows boxes to fine-tune. Non-destructive — placed zones are left alone.
+  const draftLayout = async () => {
+    for (const land of lands) {
+      const zs = zones.filter((z) => z.landId === land.id)
+      const todo = zs.filter((z) => !(Number(z.layoutW) > 0 && Number(z.layoutH) > 0)).sort((a, b) => a.sortOrder - b.sortOrder)
+      if (!todo.length) continue
+      const startY = zs.filter((z) => Number(z.layoutH) > 0).reduce((m, z) => Math.max(m, (Number(z.layoutY) || 0) + (Number(z.layoutH) || 0)), 0)
+      const cols = todo.length <= 1 ? 1 : (todo.length <= 4 ? 2 : 3)
+      const cellW = 100 / cols
+      const cellH = 26
+      const gap = 2
+      for (let i = 0; i < todo.length; i++) {
+        const col = i % cols
+        const row = Math.floor(i / cols)
+        // eslint-disable-next-line no-await-in-loop
+        await ENTITY.zone.edit({
+          ...todo[i],
+          layoutX: Math.round(col * cellW + gap / 2),
+          layoutY: Math.round(startY + row * cellH + gap / 2),
+          layoutW: Math.round(cellW - gap),
+          layoutH: Math.round(cellH - gap),
+        })
+      }
+    }
+  }
+  const startBoxDrag = (e, kind, item, mode, ctx) => {
+    if (!arrange) return
+    const plan = e.currentTarget.closest('.plot-plan')
+    if (!plan) return
+    e.preventDefault(); e.stopPropagation()
+    const rect = plan.getBoundingClientRect()
+    const sx = e.clientX, sy = e.clientY
+    const su = { x: item.x, y: item.y, w: item.w, h: item.h }
+    const onMove = (ev) => {
+      const dux = (ev.clientX - sx) / rect.width * ctx.totalW
+      const duy = (ev.clientY - sy) / rect.height * ctx.totalH
+      if (mode === 'resize') setLive({ id: item.id, x: su.x, y: su.y, w: Math.max(2, Math.round(su.w + dux)), h: Math.max(2, Math.round(su.h + duy)) })
+      else setLive({ id: item.id, x: Math.max(0, Math.round(su.x + dux)), y: Math.max(0, Math.round(su.y + duy)), w: su.w, h: su.h })
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setLive((cur) => {
+        if (cur && cur.id === item.id) {
+          if (kind === 'zone') ENTITY.zone.edit({ ...item.raw, layoutX: cur.x, layoutY: cur.y, layoutW: cur.w, layoutH: cur.h }).catch(console.error)
+          else editPlotFeature({ ...item.raw, x: cur.x, y: cur.y, w: cur.w, h: cur.h }).catch(console.error)
+        }
+        return null
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
 
   const openTimeline = (type, node) => {
     const a = ancestors(type, node)
@@ -451,6 +555,129 @@ export default function PlantationExplorer() {
             })}
           </div>
         </div></div>
+      ) : view === 'plot' ? (
+        <>
+          <div className="card">
+            <div className="card-body">
+              <div className="d-flex align-items-center flex-wrap gap-3 mb-3 small text-muted">
+                <span className="fw-medium text-body">Legend:</span>
+                <span><span className="plot-swatch bg-success" /> healthy</span>
+                <span><span className="plot-swatch bg-warning" /> has defect</span>
+                <span><span className="plot-swatch bg-danger" /> has dead</span>
+                <span><span className="plot-swatch bg-secondary" /> empty pole</span>
+                <span className="ms-auto d-flex align-items-center gap-2">
+                  {arrange && <span className="text-primary">Drag to move · corner to resize</span>}
+                  {unplacedZones.length > 0 && (
+                    <button className="btn btn-sm btn-soft-primary" onClick={draftLayout} title="Auto-place zones that aren't positioned yet">
+                      <i className="ri-magic-line me-1" />Draft layout ({unplacedZones.length})
+                    </button>
+                  )}
+                  <button className={'btn btn-sm ' + (arrange ? 'btn-primary' : 'btn-light')} onClick={() => { setArrange((a) => !a); setLive(null) }}>
+                    <i className="ri-drag-move-2-line me-1" />{arrange ? 'Done' : 'Arrange'}
+                  </button>
+                </span>
+              </div>
+              {rowsOf('land').length === 0 ? (
+                <p className="text-muted text-center py-4 mb-0">No nodes match the filter.</p>
+              ) : rowsOf('land').map((land) => {
+                const zones = childrenOf('land', land.id)
+                const placed = zones
+                  .filter((z) => Number(z.layoutW) > 0 && Number(z.layoutH) > 0)
+                  .map((z) => ({ zone: z, x: Number(z.layoutX) || 0, y: Number(z.layoutY) || 0, w: Number(z.layoutW), h: Number(z.layoutH) }))
+                const unplaced = zones.filter((z) => !(Number(z.layoutW) > 0 && Number(z.layoutH) > 0))
+                const feats = features
+                  .filter((f) => f.landId === land.id && Number(f.w) > 0 && Number(f.h) > 0)
+                  .map((f) => ({ feature: f, x: Number(f.x) || 0, y: Number(f.y) || 0, w: Number(f.w), h: Number(f.h) }))
+                const boxes = [...placed, ...feats]
+                const minX = boxes.length ? Math.min(...boxes.map((b) => b.x)) : 0
+                const minY = boxes.length ? Math.min(...boxes.map((b) => b.y)) : 0
+                const maxX = boxes.length ? Math.max(...boxes.map((b) => b.x + b.w)) : 1
+                const maxY = boxes.length ? Math.max(...boxes.map((b) => b.y + b.h)) : 1
+                const totalW = (maxX - minX) || 1
+                const totalH = (maxY - minY) || 1
+                const box = (b) => ({ position: 'absolute', left: `${(b.x - minX) / totalW * 100}%`, top: `${(b.y - minY) / totalH * 100}%`, width: `${b.w / totalW * 100}%`, height: `${b.h / totalH * 100}%` })
+                return (
+                  <div key={land.id} className="mb-4">
+                    <h6 className="mb-2"><img src={ENTITY.land.img} alt="" style={{ width: 20, height: 20, objectFit: 'cover', borderRadius: 4 }} className="me-2" />{land.name}{land.code && <span className="ref-code ms-2">{land.code}</span>}</h6>
+                    {boxes.length === 0 ? (
+                      <p className="text-muted small ms-2">No positioned zones yet. Set each zone&apos;s Width &amp; Height (and X / Y) to draw the plot.</p>
+                    ) : (
+                      <div className="plot-plan" style={{ position: 'relative', width: '100%', paddingTop: `${totalH / totalW * 100}%` }}>
+                        {feats.map(({ feature, x, y, w, h }) => {
+                          const eff = (live && live.id === feature.id) ? live : { x, y, w, h }
+                          const item = { id: feature.id, raw: feature, x, y, w, h }
+                          return (
+                            <div key={feature.id} className={'plot-feature' + (arrange ? ' plot-arrange' : '')} style={box(eff)} title={feature.label || FEATURE_LABEL[feature.kind]}
+                              onPointerDown={arrange ? (e) => startBoxDrag(e, 'feature', item, 'move', { totalW, totalH }) : undefined}>
+                            <i className={FEATURE_ICON[feature.kind] || FEATURE_ICON.other} /> <span className="text-truncate">{feature.label || FEATURE_LABEL[feature.kind]}</span>
+                            {arrange && <span className="plot-resize" onPointerDown={(e) => startBoxDrag(e, 'feature', item, 'resize', { totalW, totalH })} />}
+                            </div>
+                          )
+                        })}
+                        {placed.map(({ zone, x, y, w, h }) => {
+                          const verticals = childrenOf('zone', zone.id)
+                          const poleCount = verticals.reduce((s, v) => s + childrenOf('vertical', v.id).length, 0)
+                          const plantCount = verticals.reduce((s, v) => s + childrenOf('vertical', v.id).reduce((t, po) => t + plantsOnPole(po.id).length, 0), 0)
+                          const zEff = (live && live.id === zone.id) ? live : { x, y, w, h }
+                          const zItem = { id: zone.id, raw: zone, x, y, w, h }
+                          return (
+                            <div key={zone.id} className={'plot-zone' + (arrange ? ' plot-arrange' : '')} style={{ ...box(zEff), minWidth: 0, overflow: 'hidden', margin: 0 }}
+                              onPointerDown={arrange ? (e) => startBoxDrag(e, 'zone', zItem, 'move', { totalW, totalH }) : undefined}>
+                              <div className="plot-zone-inner" style={{ pointerEvents: arrange ? 'none' : 'auto', overflow: 'auto', height: '100%' }}>
+                              <div className="plot-zone-head">
+                                <span className="fw-medium text-truncate flex-grow-1">{zone.name}</span>
+                                {zone.code && <span className="ref-code ms-1">{zone.code}</span>}
+                              </div>
+                              <div className="text-muted mb-2" style={{ fontSize: '.68rem' }}>{verticals.length} rows · {poleCount} poles · {plantCount} plants</div>
+                              {verticals.length === 0 && (
+                                <div className="text-muted small fst-italic d-flex align-items-center gap-1">
+                                  <i className="ri-add-circle-line" />No rows yet — add rows, poles &amp; plants (Tree view) to draw them here.
+                                </div>
+                              )}
+                              {verticals.map((v) => {
+                                const poles = childrenOf('vertical', v.id)
+                                if (poles.length === 0) return null
+                                return (
+                                  <div key={v.id} className="plot-row2">
+                                    <span className="plot-rowlabel" title={v.name}>{v.code || v.name}</span>
+                                    <div className="plot-row-track">
+                                      {poles.map((po) => {
+                                        const ps = plantsOnPole(po.id)
+                                        return (
+                                          <Link key={po.id} to={DETAIL.pole.href(po.id)} className="plot-pole-col" title={`Pole ${po.label || ''} · ${ps.length} plant${ps.length === 1 ? '' : 's'}`}>
+                                            <span className="plot-plant-stack">
+                                              {ps.slice(0, MAX_PLANT_DOTS).map((pl) => <span key={pl.id} className={`plot-plant bg-${PLANT_TONE[pl.status || 'healthy'] || 'success'}`} />)}
+                                              {ps.length > MAX_PLANT_DOTS && <span className="plot-plant-more">+{ps.length - MAX_PLANT_DOTS}</span>}
+                                            </span>
+                                            <span className={`plot-pole-dot bg-${poleTone(ps)}`}>{ps.length || ''}</span>
+                                            <span className="plot-pole-cap">{po.label || po.code || ''}</span>
+                                          </Link>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                              </div>
+                              {arrange && <span className="plot-resize" onPointerDown={(e) => startBoxDrag(e, 'zone', zItem, 'resize', { totalW, totalH })} />}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {unplaced.length > 0 && <div className="text-muted small mt-2"><i className="ri-information-line me-1" />Not positioned: {unplaced.map((z) => z.name).join(', ')} — set Width &amp; Height in the zone to place it.</div>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <CrudCard
+            title="Plot structures (gate, shed, tank…)" addLabel="Add structure" modalTitle="structure" modalSize="lg"
+            emptyText="No structures yet. Add a gate, shed, water tank or path to place on the plot."
+            rows={features} columns={featureColumns} fields={featureFields} makeBlank={featureBlank} onSave={featureSave} onDelete={removePlotFeature}
+          />
+        </>
       ) : (
         // Cards / Table — one section per level, stacked
         LEVELS.map((l, idx) => (

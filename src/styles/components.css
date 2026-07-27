@@ -2805,6 +2805,62 @@
   padding: 0.08rem 0.4rem; border-radius: 0.3rem; white-space: nowrap;
 }
 
+/* Plantation — Explorer "Plot" map view. */
+.plot-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.plot-grid { display: grid; gap: 10px; align-items: stretch; }
+/* Scaled plan: a proportional canvas with absolutely-placed zones/structures. */
+.plot-plan { border: 1px dashed var(--bs-border-color); border-radius: 8px; }
+.plot-arrange { cursor: move; user-select: none; touch-action: none; }
+.plot-arrange:hover { outline: 2px solid var(--bs-primary); outline-offset: -1px; }
+.plot-resize {
+  position: absolute; right: 0; bottom: 0; width: 15px; height: 15px;
+  cursor: nwse-resize; background: var(--bs-primary); opacity: .75;
+  border-radius: 4px 0 6px 0; touch-action: none;
+}
+.plot-feature {
+  border: 2px dashed var(--bs-secondary); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; gap: .25rem;
+  font-size: .72rem; font-weight: 600; color: var(--bs-secondary-color);
+  background: var(--bs-tertiary-bg, rgba(0,0,0,0.03)); overflow: hidden; padding: 2px 4px;
+}
+.plot-zone {
+  border: 2px solid var(--bs-border-color); border-radius: 10px; padding: 10px;
+  min-width: 180px; background: var(--bs-tertiary-bg, rgba(0,0,0,0.02));
+  display: flex; flex-direction: column;
+}
+.plot-zone-head { display: flex; align-items: center; gap: .25rem; margin-bottom: .5rem; padding-bottom: .4rem; border-bottom: 1px dashed var(--bs-border-color); }
+.plot-rowline { display: flex; align-items: flex-start; gap: .5rem; padding: .25rem 0; }
+.plot-rowlabel {
+  flex: 0 0 30px; font-size: .68rem; font-weight: 600; color: var(--bs-secondary-color);
+  text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Auto-arranged row → poles → plants inside a zone (count-driven). */
+.plot-row2 { display: flex; align-items: flex-end; gap: .4rem; padding: .3rem 0; border-top: 1px dashed var(--bs-border-color); }
+.plot-row2:first-of-type { border-top: 0; }
+.plot-row-track {
+  display: flex; align-items: flex-end; gap: 8px; flex: 1;
+  overflow-x: auto; padding-bottom: 2px;
+}
+.plot-pole-col { display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; min-width: 16px; }
+.plot-pole-col:hover .plot-pole-dot { outline: 2px solid var(--bs-primary); }
+.plot-plant-stack { display: flex; flex-direction: column-reverse; align-items: center; gap: 1px; }
+.plot-plant { width: 6px; height: 6px; border-radius: 50%; }
+.plot-plant-more { font-size: .5rem; line-height: 1; color: var(--bs-secondary-color); }
+.plot-pole-dot {
+  width: 15px; height: 15px; border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: .55rem; font-weight: 700; color: #fff;
+}
+.plot-pole-cap { font-size: .5rem; color: var(--bs-secondary-color); max-width: 26px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plot-pole {
+  width: 40px; height: 40px; border-radius: 8px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-decoration: none; line-height: 1;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.plot-pole:hover { outline: 2px solid var(--bs-primary); }
+.plot-pole-count { font-size: .95rem; font-weight: 700; }
+.plot-pole-label { font-size: .55rem; opacity: .8; max-width: 36px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Plantation — node updates timeline. */
 .tl { position: relative; }
 .tl-item { position: relative; display: flex; gap: .75rem; padding-bottom: 1rem; }

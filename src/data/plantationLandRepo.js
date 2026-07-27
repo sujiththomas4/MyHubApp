@@ -39,10 +39,12 @@ export const removeLand = (id) => deleteRow('plantation_lands', id)
 const rowToZone = (r) => ({
   id: r.id, landId: r.land_id, name: r.name || '', code: r.code || '', area: r.area ?? '', areaUnit: r.area_unit || 'cent',
   hasVerticals: !!r.has_verticals, note: r.note || '', sortOrder: r.sort_order ?? 0,
+  layoutX: r.layout_x ?? '', layoutY: r.layout_y ?? '', layoutW: r.layout_w ?? '', layoutH: r.layout_h ?? '',
 })
 const zoneToRow = (x) => ({
   id: x.id, land_id: x.landId, name: x.name, code: x.code || null, area: num(x.area), area_unit: x.areaUnit || 'cent',
-  has_verticals: !!x.hasVerticals, note: x.note || null, sort_order: x.sortOrder ?? 0, updated_at: iso(),
+  has_verticals: !!x.hasVerticals, note: x.note || null, sort_order: x.sortOrder ?? 0,
+  layout_x: num(x.layoutX), layout_y: num(x.layoutY), layout_w: num(x.layoutW), layout_h: num(x.layoutH), updated_at: iso(),
 })
 export function useZones() {
   const { data, loading, error } = useCollection('plantation_zones', [], { orderBy: 'sort_order', ascending: true, map: rowToZone })
@@ -149,6 +151,30 @@ export function useDefects() {
 export const addDefect = (x) => insertRow('plantation_defects', defectToRow(x))
 export const editDefect = (x) => updateRow('plantation_defects', x.id, defectToRow(x))
 export const removeDefect = (id) => deleteRow('plantation_defects', id)
+
+// ---- Plot features (gate / shed / tank / path…) -----------------------------
+const rowToFeature = (r) => ({
+  id: r.id, landId: r.land_id, label: r.label || '', kind: r.kind || 'other',
+  x: r.x ?? '', y: r.y ?? '', w: r.w ?? '', h: r.h ?? '', sortOrder: r.sort_order ?? 0,
+})
+const featureToRow = (x) => ({
+  id: x.id, land_id: x.landId, label: x.label || null, kind: x.kind || 'other',
+  x: num(x.x), y: num(x.y), w: num(x.w), h: num(x.h), sort_order: x.sortOrder ?? 0, updated_at: iso(),
+})
+export function usePlotFeatures() {
+  const { data, loading, error } = useCollection('plantation_plot_features', [], { orderBy: 'sort_order', ascending: true, map: rowToFeature })
+  return { features: data, loading, error }
+}
+export const addPlotFeature = (x) => insertRow('plantation_plot_features', featureToRow(x))
+export const editPlotFeature = (x) => updateRow('plantation_plot_features', x.id, featureToRow(x))
+export const removePlotFeature = (id) => deleteRow('plantation_plot_features', id)
+export const PLOT_FEATURE_KINDS = [
+  { value: 'gate', label: 'Gate', icon: 'ri-door-open-line' },
+  { value: 'shed', label: 'Shed / house', icon: 'ri-home-4-line' },
+  { value: 'tank', label: 'Water tank / well', icon: 'ri-drop-line' },
+  { value: 'path', label: 'Path / road', icon: 'ri-signpost-line' },
+  { value: 'other', label: 'Other', icon: 'ri-map-pin-line' },
+]
 
 // ---- Hierarchy helper -------------------------------------------------------
 /**
