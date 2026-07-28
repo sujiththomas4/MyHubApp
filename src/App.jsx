@@ -36,6 +36,8 @@ import PlantationPlannedCrops from '@/pages/PlantationPlannedCrops'
 import PlantationPlannedCropDetail from '@/pages/PlantationPlannedCropDetail'
 import PlantationFertilizers from '@/pages/PlantationFertilizers'
 import PlantationFertilizerDetail from '@/pages/PlantationFertilizerDetail'
+import PlantationProcedures from '@/pages/PlantationProcedures'
+import PlantationProcedureDetail from '@/pages/PlantationProcedureDetail'
 import MasterData from '@/pages/MasterData'
 import Savings from '@/pages/Savings'
 import SavingsCategory from '@/pages/SavingsCategory'
@@ -68,6 +70,8 @@ export default function App() {
         <Route path="/business/plantations/planned-crops/:cropId" element={<PlantationPlannedCropDetail />} />
         <Route path="/business/plantations/health-center" element={<PlantationFertilizers />} />
         <Route path="/business/plantations/health-center/:fertId" element={<PlantationFertilizerDetail />} />
+        <Route path="/business/plantations/records" element={<PlantationProcedures />} />
+        <Route path="/business/plantations/records/:procId" element={<PlantationProcedureDetail />} />
         <Route path="/business/plantations/activities" element={<PlantationActivities />} />
         <Route path="/business/plantations/dashboard" element={<PlantationDashboard />} />
         <Route path="/business/plantations/explorer" element={<PlantationExplorer />} />
