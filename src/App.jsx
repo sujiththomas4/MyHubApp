@@ -18,6 +18,7 @@ import DailyRoutines from '@/pages/DailyRoutines'
 import GymWorkouts from '@/pages/GymWorkouts'
 import MonthlyEmis from '@/pages/MonthlyEmis'
 import MoneyLent from '@/pages/MoneyLent'
+import IncomePlanner from '@/pages/IncomePlanner'
 import PlantationTracker from '@/pages/PlantationTracker'
 import PlantationActivities from '@/pages/PlantationActivities'
 import PlantationDashboard from '@/pages/PlantationDashboard'
@@ -117,6 +118,7 @@ export default function App() {
           <Route path="/personal/gym-workouts" element={<GymWorkouts />} />
           <Route path="/money/emis" element={<MonthlyEmis />} />
           <Route path="/money/lent" element={<MoneyLent />} />
+          <Route path="/money/income-planner" element={<IncomePlanner />} />
         </>}
 
         {/* Anything else: admins get the stub, members are sent to Plantation */}

@@ -53,6 +53,7 @@ export const menu = [
 
   { id: 'monthly-emis', label: 'Monthly EMIs & Expenses', icon: 'ri-bank-card-line', to: '/money/emis' },
   { id: 'money-lent', label: 'Money Lent', icon: 'ri-user-shared-line', to: '/money/lent' },
+  { id: 'income-planner', label: 'Income Planner', icon: 'ri-funds-line', to: '/money/income-planner' },
 
   { id: 'title-stock-market', label: 'Stock Market Investments', isTitle: true },
 
@@ -152,7 +153,7 @@ export const menu = [
       { id: 'plantation-explorer', label: 'Explorer', to: '/business/plantations/explorer' },
       { id: 'plantation-planned-crops', label: 'Planned Crops', to: '/business/plantations/planned-crops' },
       { id: 'plantation-fertilizers', label: 'Health Center', to: '/business/plantations/health-center' },
-      { id: 'plantation-records', label: 'Records', to: '/business/plantations/records' },
+      { id: 'plantation-records', label: 'Setup & Procedures', to: '/business/plantations/records' },
       { id: 'plantation-defects', label: 'Defects', to: '/business/plantations/defects' },
       { id: 'plantation-capital', label: 'Capital', to: '/business/plantations/capital' },
       { id: 'plantation-expenses', label: 'Expenses', to: '/business/plantations/expenses' },
