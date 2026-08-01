@@ -10,11 +10,14 @@ import plantImg from '@/assets/plant.jpg'
 
 const rid = () => Math.random().toString(36).slice(2, 8)
 const STATUS = [
+  { value: 'na', label: 'N/A (not planted)' },
   { value: 'healthy', label: 'Healthy' },
   { value: 'defect', label: 'Defect' },
   { value: 'dead', label: 'Dead' },
 ]
-const STATUS_BADGE = { healthy: 'bg-success-subtle text-success', defect: 'bg-warning-subtle text-dark', dead: 'bg-danger-subtle text-danger' }
+const STATUS_BADGE = { na: 'bg-light text-muted', healthy: 'bg-success-subtle text-success', defect: 'bg-warning-subtle text-dark', dead: 'bg-danger-subtle text-danger' }
+const STAGE = [{ value: 'planned', label: 'Planned' }, { value: 'planted', label: 'Planted' }]
+const STAGE_BADGE = { planned: 'bg-secondary-subtle text-secondary', planted: 'bg-success-subtle text-success' }
 const CARE_TYPES = [{ value: 'watering', label: 'Watering' }, { value: 'fertilizer', label: 'Fertilizer' }]
 
 export default function PlantationPlants() {
@@ -36,12 +39,13 @@ export default function PlantationPlants() {
   const fields = [
     { key: 'tag', label: 'Plant tag', type: 'text', placeholder: 'TAG-001', required: true },
     { key: 'variety', label: 'Variety', type: 'text', placeholder: 'e.g. Panniyur-1 pepper' },
-    { key: 'plantedDate', label: 'Planted on', type: 'date', colClass: 'col-6' },
-    { key: 'status', label: 'Status', type: 'select', options: STATUS, colClass: 'col-6' },
+    { key: 'stage', label: 'Stage', type: 'select', options: STAGE, colClass: 'col-md-4' },
+    { key: 'plantedDate', label: 'Planted on', type: 'date', colClass: 'col-md-4' },
+    { key: 'status', label: 'Status', type: 'select', options: STATUS, colClass: 'col-md-4' },
     { key: 'note', label: 'Note', type: 'textarea' },
     { key: 'image', label: 'Photo', type: 'image', folder: 'plantation/plants' },
   ]
-  const makeBlank = () => ({ poleId, tag: '', variety: '', plantedDate: '', status: 'healthy', note: '', image: '' })
+  const makeBlank = () => ({ poleId, tag: '', variety: '', stage: 'planned', plantedDate: '', status: 'na', note: '', image: '' })
   const onSave = async (f) => { if (f.id) await editPlant(f); else await addPlant({ ...f, id: 'plant-' + rid(), poleId, sortOrder: myPlants.length }) }
 
   const columns = [
@@ -55,6 +59,7 @@ export default function PlantationPlants() {
       ),
     },
     { header: 'Variety', className: 'text-muted', cell: (p) => p.variety || '—' },
+    { header: 'Stage', cell: (p) => <span className={'badge ' + (STAGE_BADGE[p.stage] || STAGE_BADGE.planted)}>{(STAGE.find((s) => s.value === p.stage) || {}).label || 'Planted'}</span> },
     { header: 'Planted', className: 'text-muted', cell: (p) => (p.plantedDate ? fmtDate(p.plantedDate) : '—') },
     { header: 'Status', cell: (p) => <span className={'badge ' + (STATUS_BADGE[p.status] || STATUS_BADGE.healthy)}>{p.status || 'healthy'}</span> },
   ]

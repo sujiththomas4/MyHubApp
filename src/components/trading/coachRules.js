@@ -13,9 +13,9 @@
  * coach never suggests trading against it. Every other read (5 min, 15 min,
  * VIX, premium) is a CONFLUENCE vote:
  *
- *   · votes agree with OI          → full size   ("Look for Buy only")
+ *   · votes agree with OI          → full size   ("Buy CE only" / "Buy PE only")
  *   · votes disagree with OI       → same direction, cut size
- *                                    ("Look for Buy — low quantity")
+ *                                    ("Buy CE — low quantity")
  *   · OI too weak / sideways       → don't trade at all
  *
  * ── Adding a SIGNAL ──────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export const SIGNALS = [
     id: 'oiSide',
     label: 'OI dominating side',
     options: ['Put', 'Call'],
-    hint: 'Put dominating ⇒ put writing ⇒ bullish. Call ⇒ bearish. Trades are taken only with this side.',
+    hint: 'Put dominating ⇒ bullish ⇒ Buy CE. Call dominating ⇒ bearish ⇒ Buy PE. Trades are taken only with this side.',
   },
   {
     id: 'oiPct',
@@ -114,10 +114,18 @@ export const SIGNALS = [
     hint: 'VIX rising ⇒ market may fall (bearish). Falling ⇒ bullish.',
   },
   {
-    id: 'premium',
-    label: 'Premium vs indicators',
-    options: ['Above all indicators', 'Sideways', 'Below all indicators'],
-    hint: 'Above ⇒ bullish, Below ⇒ bearish. Against the OI side ⇒ cut size.',
+    id: 'cePremium',
+    label: 'CE premium vs indicators',
+    options: ['Above', 'Below', 'Sideways'],
+    colClass: 'col-6',
+    hint: 'CE above indicators ⇒ favours Buy CE.',
+  },
+  {
+    id: 'pePremium',
+    label: 'PE premium vs indicators',
+    options: ['Above', 'Below', 'Sideways'],
+    colClass: 'col-6',
+    hint: 'PE above indicators ⇒ favours Buy PE.',
   },
   {
     id: 'mood',
@@ -136,7 +144,18 @@ const DIRECTION_OF = {
   bias5: { Bullish: 'Bullish', Bearish: 'Bearish' },
   bias15: { Bullish: 'Bullish', Bearish: 'Bearish' },
   vix: { Falling: 'Bullish', Rising: 'Bearish' }, // VIX up ⇒ market down
-  premium: { 'Above all indicators': 'Bullish', 'Below all indicators': 'Bearish' },
+  // CE premium above indicators ⇒ Buy CE (bullish); PE premium above ⇒ Buy PE (bearish).
+  cePremium: { Above: 'Bullish', Below: 'Bearish' },
+  pePremium: { Above: 'Bearish', Below: 'Bullish' },
+}
+
+/**
+ * Reads that only apply to one OI direction. When Buy CE is preferred (bullish)
+ * only the CE premium is considered — the PE premium is ignored — and vice versa.
+ */
+const ONLY_WHEN = {
+  cePremium: 'Bullish',
+  pePremium: 'Bearish',
 }
 
 const labelOf = (id) => SIGNALS.find((s) => s.id === id)?.label || id
@@ -166,6 +185,7 @@ export function confluence(signals = {}, oiBias = null) {
   const opposing = []
   if (oiBias) {
     for (const [id, map] of Object.entries(DIRECTION_OF)) {
+      if (ONLY_WHEN[id] && ONLY_WHEN[id] !== oiBias) continue // opposite-side premium is ignored
       const dir = map[signals[id]]
       if (!dir) continue
       ;(dir === oiBias ? supporting : opposing).push(labelOf(id))
@@ -176,14 +196,14 @@ export function confluence(signals = {}, oiBias = null) {
 
 /* Detail line for the low-quantity calls — spells out every reason size is
    being cut, so the message is never just "trust me". */
-const lowQtyDetail = (dir) => (s) => {
+const lowQtyDetail = (action) => (s) => {
   const reasons = []
   if (s.opposing.length) {
     reasons.push(`${s.opposing.join(', ')} ${s.opposing.length > 1 ? 'disagree' : 'disagrees'}`)
   }
   if (s.mood === MOOD.NEUTRAL) reasons.push('your mood is only neutral')
   const why = reasons.length ? ` — ${reasons.join(', and ')}` : ''
-  return `OI is ${dir}${why}. Trade the OI side with low quantity, and observe before committing.`
+  return `OI favours ${action}${why}. Take it with low quantity, and observe before committing.`
 }
 
 // --- The messages ------------------------------------------------------------
@@ -226,8 +246,8 @@ export const RULES = [
   // A neutral mood forces low quantity even when every read agrees.
   {
     id: 'oi-buy-low',
-    message: 'Look for Buy — low quantity',
-    detail: lowQtyDetail('bullish'),
+    message: 'Buy CE — low quantity',
+    detail: lowQtyDetail('Buy CE'),
     tone: 'warning',
     priority: 62,
     when: (s) =>
@@ -236,8 +256,8 @@ export const RULES = [
   },
   {
     id: 'oi-sell-low',
-    message: 'Look for Sell — low quantity',
-    detail: lowQtyDetail('bearish'),
+    message: 'Buy PE — low quantity',
+    detail: lowQtyDetail('Buy PE'),
     tone: 'warning',
     priority: 62,
     when: (s) =>
@@ -246,8 +266,8 @@ export const RULES = [
   },
   {
     id: 'oi-buy',
-    message: 'Look for Buy only',
-    detail: `Put side dominating ${OI_STRONG}%+ and nothing disagrees. Wait for your entry.`,
+    message: 'Buy CE only',
+    detail: `Put side dominating ${OI_STRONG}%+ (bullish) and nothing disagrees. Wait for your entry to Buy CE.`,
     tone: 'success',
     priority: 60,
     when: (s) =>
@@ -256,8 +276,8 @@ export const RULES = [
   },
   {
     id: 'oi-sell',
-    message: 'Look for Sell',
-    detail: `Call side dominating ${OI_STRONG}%+ and nothing disagrees. Wait for your entry.`,
+    message: 'Buy PE only',
+    detail: `Call side dominating ${OI_STRONG}%+ (bearish) and nothing disagrees. Wait for your entry to Buy PE.`,
     tone: 'sell',
     priority: 60,
     when: (s) =>
@@ -270,7 +290,7 @@ export const RULES = [
     detail: 'Trades are taken only with the OI side — set the dominating side and %.',
     tone: 'info',
     priority: 40,
-    when: (s) => !s.oiBias && Boolean(s.bias5 || s.bias15 || s.vix || s.premium),
+    when: (s) => !s.oiBias && Boolean(s.bias5 || s.bias15 || s.vix || s.cePremium || s.pePremium),
   },
 ]
 

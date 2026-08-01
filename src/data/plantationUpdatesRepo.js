@@ -55,6 +55,7 @@ export const UPDATE_TYPE = {
   defect: { label: 'Defect', icon: 'ri-bug-line', tone: 'danger' },
   dead: { label: 'Dead', icon: 'ri-skull-2-line', tone: 'dark' },
   recovered: { label: 'Recovered', icon: 'ri-heart-pulse-line', tone: 'success' },
+  replanted: { label: 'Replanted', icon: 'ri-seedling-line', tone: 'success' },
   remedy: { label: 'Remedy', icon: 'ri-medicine-bottle-line', tone: 'warning' },
   result: { label: 'Result', icon: 'ri-flask-line', tone: 'success' },
 }

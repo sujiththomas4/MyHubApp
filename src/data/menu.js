@@ -13,6 +13,9 @@
  * route in App.jsx) until a real screen is built for it.
  */
 export const menu = [
+  { id: 'title-challenge', label: 'Trading Challenge', isTitle: true },
+  { id: 'challenge-10', label: '10 Clean Trades', icon: 'ri-focus-3-line', to: '/trading-challenge/10-clean' },
+
   { id: 'title-wealth', label: 'Overall Wealth', isTitle: true },
 
   { id: 'dashboard', label: 'Dashboard', icon: 'ri-dashboard-2-line', to: '/' },

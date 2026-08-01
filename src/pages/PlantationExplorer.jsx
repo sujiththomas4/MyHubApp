@@ -1,27 +1,111 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ReactApexChart from 'react-apexcharts'
 import { fmtDate } from '@/data/AppData'
+import { useChartColors } from '@/components/dashboard/useChartColors'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import EntityModal from '@/components/plantation/EntityModal'
 import BulkAddModal from '@/components/plantation/BulkAddModal'
+import AddPlantModal from '@/components/plantation/AddPlantModal'
 import NodeTimeline from '@/components/plantation/NodeTimeline'
+import Modal from '@/components/ui/Modal'
 import HierarchyFilter from '@/components/plantation/HierarchyFilter'
 import CrudCard from '@/components/plantation/CrudCard'
 import { computeVisible, emptyHierarchyFilter } from '@/components/plantation/hierarchyScope'
-import { ENTITY, POLE_TYPE_LABEL, PLANT_STATUS_BADGE } from '@/data/plantationForms'
+import { ENTITY, POLE_TYPE_LABEL, PLANT_STATUS_BADGE, PLANT_STATUS_LABEL, PLANT_STAGE_BADGE, PLANT_STAGE_LABEL } from '@/data/plantationForms'
 import {
   useLands, useZones, useVerticals, usePoles, usePlants,
   useZoneItems, useCare, editPlant, descendantsByLevel,
   removeZoneItem, removeCare,
   usePlotFeatures, addPlotFeature, editPlotFeature, removePlotFeature, PLOT_FEATURE_KINDS,
 } from '@/data/plantationLandRepo'
-import { useUpdates, removeUpdate } from '@/data/plantationUpdatesRepo'
+import { useUpdates, removeUpdate, UPDATE_TYPE } from '@/data/plantationUpdatesRepo'
+import { useLookups, valuesFor } from '@/data/lookupsRepo'
 
 const rid2 = () => Math.random().toString(36).slice(2, 8)
 const FEATURE_ICON = Object.fromEntries(PLOT_FEATURE_KINDS.map((k) => [k.value, k.icon]))
 const FEATURE_LABEL = Object.fromEntries(PLOT_FEATURE_KINDS.map((k) => [k.value, k.label]))
 const PLANT_TONE = { healthy: 'success', defect: 'warning', dead: 'danger' }
-const MAX_PLANT_DOTS = 6
+const uniqv = (a) => [...new Set(a.filter(Boolean))]
+
+// Popup to locate poles that already hold PLANNED plants matching crop/type/variety.
+function PlantLocateModal({ open, plants, onApply, onClose }) {
+  const [crop, setCrop] = useState('')
+  const [ptype, setPtype] = useState('')
+  const [variety, setVariety] = useState('')
+  const [count, setCount] = useState('')
+  useEffect(() => { if (open) { setCrop(''); setPtype(''); setVariety(''); setCount('') } }, [open])
+  const planned = plants.filter((p) => p.stage === 'planned')
+  const crops = uniqv(planned.map((p) => p.crop))
+  const types = uniqv(planned.filter((p) => !crop || p.crop === crop).map((p) => p.plantType))
+  const varieties = uniqv(planned.filter((p) => (!crop || p.crop === crop) && (!ptype || p.plantType === ptype)).map((p) => p.variety))
+  return (
+    <Modal open={open} title={<><i className="ri-search-eye-line me-2 text-primary" />Find poles to plant</>} onClose={onClose}>
+      <p className="text-muted small">Pick what you are about to plant — poles that already have matching <strong>planned</strong> plants get a ★ on the map.</p>
+      <div className="row g-2">
+        <div className="col-6">
+          <label className="form-label small mb-1">Crop</label>
+          <select className="form-select form-select-sm" value={crop} onChange={(e) => { setCrop(e.target.value); setPtype(''); setVariety('') }}>
+            <option value="">— select —</option>
+            {crops.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="col-6">
+          <label className="form-label small mb-1">Type</label>
+          <select className="form-select form-select-sm" value={ptype} onChange={(e) => { setPtype(e.target.value); setVariety('') }}>
+            <option value="">— any —</option>
+            {types.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="col-6">
+          <label className="form-label small mb-1">Variety</label>
+          <select className="form-select form-select-sm" value={variety} onChange={(e) => setVariety(e.target.value)}>
+            <option value="">— any —</option>
+            {varieties.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <div className="col-6">
+          <label className="form-label small mb-1">Number of plants (optional)</label>
+          <input type="number" min={1} className="form-control form-control-sm" placeholder="all matching" value={count} onChange={(e) => setCount(e.target.value)} />
+        </div>
+      </div>
+      {crops.length === 0 && <div className="text-muted small mt-2">No planned plants yet.</div>}
+      <div className="d-flex justify-content-end gap-2 mt-3">
+        <button className="btn btn-light" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={() => onApply({ crop, ptype, variety, count: Math.floor(Number(count) || 0) })} disabled={!crop}><i className="ri-star-line me-1" />Show on map</button>
+      </div>
+    </Modal>
+  )
+}
+const PALETTE = ['#0ab39c', '#f7b84b', '#f06548', '#6c757d', '#4b93ff', '#6c5ffc', '#e83e8c', '#ffab00']
+const BOARD_COLS = [
+  { key: 'planned', label: 'Planned', tone: 'secondary', match: (p) => p.stage === 'planned' },
+  { key: 'healthy', label: 'Healthy', tone: 'success', match: (p) => p.stage !== 'planned' && (p.status || 'healthy') === 'healthy' },
+  { key: 'defect', label: 'Defect', tone: 'warning', match: (p) => p.stage !== 'planned' && p.status === 'defect' },
+  { key: 'dead', label: 'Dead', tone: 'danger', match: (p) => p.stage !== 'planned' && p.status === 'dead' },
+]
+
+function Donut({ title, labels, series, colors, chartColors }) {
+  const has = series.some((v) => v > 0)
+  const options = {
+    chart: { fontFamily: 'Poppins, sans-serif' },
+    labels, colors,
+    legend: { position: 'bottom', labels: { colors: chartColors.text } },
+    dataLabels: { enabled: false }, stroke: { width: 0 }, tooltip: { theme: 'light' },
+    plotOptions: { pie: { donut: { size: '64%' } } },
+  }
+  return (
+    <div className="col-md-4">
+      <div className="card h-100 mb-0">
+        <div className="card-header py-2"><h6 className="card-title mb-0">{title}</h6></div>
+        <div className="card-body d-flex align-items-center justify-content-center">
+          {has ? <ReactApexChart key={chartColors.primary + title} options={options} series={series} type="donut" height={230} width="100%" /> : <p className="text-muted py-4 mb-0">No data yet.</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+const MAX_PLANT_DOTS = 9
 
 /**
  * PlantationExplorer.jsx — the whole hierarchy in one screen, viewable four ways
@@ -41,14 +125,7 @@ const LEVELS = [
 const VIEWS = [
   { id: 'tree', label: 'Tree', icon: 'ri-node-tree' },
   { id: 'plot', label: 'Plot', icon: 'ri-layout-masonry-line' },
-  { id: 'cards', label: 'Cards', icon: 'ri-layout-grid-line' },
-  { id: 'table', label: 'Table', icon: 'ri-table-line' },
   { id: 'board', label: 'Board', icon: 'ri-layout-column-line' },
-]
-const STATUSES = [
-  { key: 'healthy', label: 'Healthy', tone: 'success' },
-  { key: 'defect', label: 'Defect', tone: 'warning' },
-  { key: 'dead', label: 'Dead', tone: 'danger' },
 ]
 const area = (n) => (n.area !== '' && n.area != null ? `${n.area} ${n.areaUnit}` : '—')
 const nameOf = (n) => (n ? n.name || n.label : '')
@@ -68,6 +145,7 @@ const TABLE_COLS = {
   pole: [['Type', (n) => (n.poleType ? POLE_TYPE_LABEL[n.poleType] || n.poleType : '—')], ['Row', (n, a) => nameOf(a.vertical) || '—'], ['Zone', (n, a) => nameOf(a.zone) || '—'], ['Land', (n, a) => nameOf(a.land) || '—']],
   plant: [
     ['Variety', (n) => n.variety || '—'],
+    ['Stage', (n) => <span className={'badge ' + (PLANT_STAGE_BADGE[n.stage] || PLANT_STAGE_BADGE.planted)}>{PLANT_STAGE_LABEL[n.stage] || 'Planted'}</span>],
     ['Status', (n) => <span className={'badge ' + (PLANT_STATUS_BADGE[n.status] || PLANT_STATUS_BADGE.healthy)}>{n.status || 'healthy'}</span>],
     ['Pole', (n, a) => nameOf(a.pole) || '—'], ['Row', (n, a) => nameOf(a.vertical) || '—'],
     ['Zone', (n, a) => nameOf(a.zone) || '—'], ['Land', (n, a) => nameOf(a.land) || '—'],
@@ -94,6 +172,7 @@ function TreeNode({ type, node, depth, byType, keep, expanded, toggle, onAdd, on
         <img src={node.image || cfg.img} alt="" title={cfg.singular} style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6 }} />
         <span className="fw-medium">{cfg.name(node)}</span>
         {nodeRef && <span className="ref-code ms-2">{nodeRef}</span>}
+        {type === 'plant' && node.stage === 'planned' && <span className="badge ms-2 bg-secondary-subtle text-secondary">Planned</span>}
         {type === 'plant' && <span className={'badge ms-2 ' + (PLANT_STATUS_BADGE[node.status] || PLANT_STATUS_BADGE.healthy)}>{node.status || 'healthy'}</span>}
         <span className="text-muted small ms-2">
           {type === 'land' && (node.ownership === 'leased' ? '· Leased' : '· Owned')}
@@ -105,7 +184,7 @@ function TreeNode({ type, node, depth, byType, keep, expanded, toggle, onAdd, on
         <span className="flex-grow-1" />
         <div className="text-nowrap">
           {childType && <button className="btn btn-sm btn-soft-primary px-2 me-1" onClick={() => onAdd(childType, node.id)} title={`Add ${ENTITY[childType].singular}`}><i className="ri-add-line" /> {ENTITY[childType].singular}</button>}
-          {childType && ENTITY[childType].bulk && <button className="btn btn-sm btn-soft-secondary px-2 me-1" onClick={() => onBulk(childType, node.id, nodeRef)} title={`Bulk add ${ENTITY[childType].singular}s`}><i className="ri-stack-line" /></button>}
+          {childType && ENTITY[childType].bulk && childType !== 'plant' && <button className="btn btn-sm btn-soft-secondary px-2 me-1" onClick={() => onBulk(childType, node.id, nodeRef)} title={`Bulk add ${ENTITY[childType].singular}s`}><i className="ri-stack-line" /></button>}
           <button className="btn btn-sm btn-ghost-info px-2" onClick={() => onTimeline(type, node)} title="Timeline / updates">
             <i className="ri-time-line" />{updCount(type, node.id) > 0 && <span className="badge bg-info-subtle text-info ms-1">{updCount(type, node.id)}</span>}
           </button>
@@ -135,6 +214,19 @@ export default function PlantationExplorer() {
   const { care } = useCare()
   const { updates } = useUpdates()
   const { features } = usePlotFeatures()
+  const { lookups } = useLookups()
+  const chartColors = useChartColors()
+
+  // Turn any field backed by a master-data list (declared in the entity's
+  // bulk.lookups) into a searchable dropdown for the single add/edit form too.
+  const modalFields = (type) => {
+    const cfg = ENTITY[type]
+    const lists = cfg.bulk?.lookups
+    if (!lists) return cfg.fields
+    return cfg.fields.map((f) => (lists[f.key]
+      ? { ...f, type: 'search', allowCustom: true, options: valuesFor(lookups, lists[f.key]), placeholder: `Search ${f.label.toLowerCase()}…` }
+      : f))
+  }
   const byType = { land: lands, zone: zones, vertical: verticals, pole: poles, plant: plants }
 
   // Count of top-level updates per node, for the timeline button badge.
@@ -153,8 +245,20 @@ export default function PlantationExplorer() {
   const [filter, setFilter] = useState(emptyHierarchyFilter)
   const { keep } = computeVisible(filter, { lands, zones, verticals, poles, plants })
   const [expanded, setExpanded] = useState(new Set())
+  // On first load: expand the properties (one level) + the first zone; rest collapsed.
+  const didInitExpand = useRef(false)
+  useEffect(() => {
+    if (didInitExpand.current || !lands.length || !zones.length) return
+    didInitExpand.current = true
+    const firstLand = [...lands].sort((a, b) => a.sortOrder - b.sortOrder)[0]
+    const firstZone = zones.filter((z) => z.landId === firstLand.id).sort((a, b) => a.sortOrder - b.sortOrder)[0]
+    const init = new Set(lands.map((l) => l.id))
+    if (firstZone) init.add(firstZone.id)
+    setExpanded(init)
+  }, [lands, zones])
   const [modal, setModal] = useState(null)
   const [bulk, setBulk] = useState(null)
+  const [plantAdd, setPlantAdd] = useState(null)  // { poleId, poleRef, multiple } — inventory-aware add plant
   const [timeline, setTimeline] = useState(null)
   const [confirm, setConfirm] = useState(null)
 
@@ -162,7 +266,11 @@ export default function PlantationExplorer() {
   const expandAll = () => setExpanded(new Set([...lands, ...zones, ...verticals, ...poles].map((n) => n.id)))
   const collapseAll = () => setExpanded(new Set())
 
-  const openAdd = (type, parentId) => setModal({ type, parentId, initial: ENTITY[type].blank() })
+  const openAdd = (type, parentId) => {
+    // Plants go through the inventory-aware modal (crop/type/variety from bookings).
+    if (type === 'plant') { setPlantAdd({ poleId: parentId, poleRef: refOf('pole', byId.pole[parentId] || {}) }); return }
+    setModal({ type, parentId, initial: ENTITY[type].blank() })
+  }
   const openEdit = (type, node) => setModal({ type, parentId: ENTITY[type].parentField ? node[ENTITY[type].parentField] : null, initial: { ...node } })
   const close = () => setModal(null)
 
@@ -175,6 +283,7 @@ export default function PlantationExplorer() {
   }
 
   const openBulk = (type, parentId, parentRef) => {
+    if (type === 'plant') { setPlantAdd({ poleId: parentId, poleRef: parentRef }); return }
     const cfg = ENTITY[type]
     const sibs = byType[type].filter((x) => x[cfg.parentField] === parentId)
     setBulk({ type, parentId, parentRef, start: sibs.length + 1 })
@@ -278,6 +387,14 @@ export default function PlantationExplorer() {
   }
   const rowsOf = (type) => byType[type].filter((n) => keep[type].has(n.id)).sort((a, b) => a.sortOrder - b.sortOrder)
 
+  // "Replanted" on a pole may change its support type (same pole, updated in place).
+  const poleTypeOptions = Object.entries(POLE_TYPE_LABEL).map(([value, label]) => ({ value, label }))
+  const replantPoleType = (newType) => {
+    if (timeline?.entityType === 'pole' && timeline.node) {
+      ENTITY.pole.edit({ ...timeline.node, poleType: newType }).catch(console.error)
+    }
+  }
+
   // ---- Plot view helpers ----------------------------------------------------
   const childrenOf = (type, parentId) => {
     const ct = ENTITY[type].childType
@@ -287,10 +404,20 @@ export default function PlantationExplorer() {
   const plantsOnPole = (poleId) => plants.filter((p) => p.poleId === poleId && keep.plant.has(p.id))
   const poleTone = (ps) => {
     if (ps.length === 0) return 'secondary'
-    if (ps.some((p) => (p.status || 'healthy') === 'dead')) return 'danger'
-    if (ps.some((p) => (p.status || 'healthy') === 'defect')) return 'warning'
-    return 'success'
+    if (ps.some((p) => p.status === 'dead')) return 'danger'
+    if (ps.some((p) => p.status === 'defect')) return 'warning'
+    if (ps.some((p) => (p.status || 'healthy') === 'healthy')) return 'success'
+    return 'secondary' // all planned / N/A
   }
+  // A pole is "dead" if its latest life update (dead/replanted/recovered) is dead.
+  const poleIsDead = (poleId) => {
+    const life = updates.filter((u) => u.entityType === 'pole' && u.entityId === poleId && !u.parentId && ['dead', 'replanted', 'recovered'].includes(u.type))
+    if (!life.length) return false
+    const latest = [...life].sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.createdAt || '').localeCompare(b.createdAt || '')).pop()
+    return latest.type === 'dead'
+  }
+  // Border colour: red if the pole itself is dead, else green when it has healthy plants.
+  const poleBorderTone = (po, ps) => (poleIsDead(po.id) ? 'danger' : poleTone(ps))
 
   // ---- Plot structures (features) management --------------------------------
   const featLandName = (id) => (lands.find((l) => l.id === id) || {}).name || '—'
@@ -315,6 +442,24 @@ export default function PlantationExplorer() {
   // ---- Plot arrange (drag / resize zones & structures) ----------------------
   const [arrange, setArrange] = useState(false)
   const [live, setLive] = useState(null)   // { id, x, y, w, h } while dragging
+  const [tip, setTip] = useState(null)     // { poleId, top, left } for the plot pole tooltip
+  const [polePanel, setPolePanel] = useState(null)  // pole object — plot-tab side panel
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [plantSearch, setPlantSearch] = useState(null)  // { crop, ptype, variety, count } — locate planned poles (not stored)
+
+  const searchMatches = plantSearch
+    ? plants.filter((p) => p.stage === 'planned' && p.crop === plantSearch.crop && (!plantSearch.ptype || p.plantType === plantSearch.ptype) && (!plantSearch.variety || p.variety === plantSearch.variety))
+    : []
+  const starredPoles = (() => {
+    if (!plantSearch) return new Set()
+    const byPole = {}
+    searchMatches.forEach((p) => { byPole[p.poleId] = (byPole[p.poleId] || 0) + 1 })
+    const ids = Object.keys(byPole)
+    if (!plantSearch.count) return new Set(ids)
+    let acc = 0; const set = new Set()
+    for (const pid of ids) { if (acc >= plantSearch.count) break; set.add(pid); acc += byPole[pid] }
+    return set
+  })()
   const unplacedZones = zones.filter((z) => !(Number(z.layoutW) > 0 && Number(z.layoutH) > 0))
 
   // Auto-generate a starting layout for zones that aren't positioned yet, so the
@@ -388,7 +533,7 @@ export default function PlantationExplorer() {
   const RowActions = ({ type, node }) => (
     <>
       {ENTITY[type].childType && <button className="btn btn-sm btn-soft-primary px-2 me-1" onClick={() => openAdd(ENTITY[type].childType, node.id)} title={`Add ${ENTITY[ENTITY[type].childType].singular}`}><i className="ri-add-line" /></button>}
-      {ENTITY[type].childType && ENTITY[ENTITY[type].childType].bulk && <button className="btn btn-sm btn-soft-secondary px-2 me-1" onClick={() => openBulk(ENTITY[type].childType, node.id, refOf(type, node))} title={`Bulk add ${ENTITY[ENTITY[type].childType].singular}s`}><i className="ri-stack-line" /></button>}
+      {ENTITY[type].childType && ENTITY[ENTITY[type].childType].bulk && ENTITY[type].childType !== 'plant' && <button className="btn btn-sm btn-soft-secondary px-2 me-1" onClick={() => openBulk(ENTITY[type].childType, node.id, refOf(type, node))} title={`Bulk add ${ENTITY[ENTITY[type].childType].singular}s`}><i className="ri-stack-line" /></button>}
       <button className="btn btn-sm btn-ghost-info px-2 position-relative" onClick={() => openTimeline(type, node)} title="Timeline / updates">
         <i className="ri-time-line" />
         {updByEntity[type + ':' + node.id] > 0 && <span className="badge bg-info-subtle text-info ms-1">{updByEntity[type + ':' + node.id]}</span>}
@@ -414,6 +559,7 @@ export default function PlantationExplorer() {
                 <img src={n.image || c.img} alt="" style={{ width: '100%', height: 110, objectFit: 'cover' }} />
                 <div className="p-2 flex-grow-1">
                   <div className="fw-medium text-truncate">{c.name(n)}
+                    {type === 'plant' && n.stage === 'planned' && <span className="badge ms-1 bg-secondary-subtle text-secondary">Planned</span>}
                     {type === 'plant' && <span className={'badge ms-1 ' + (PLANT_STATUS_BADGE[n.status] || PLANT_STATUS_BADGE.healthy)}>{n.status || 'healthy'}</span>}
                   </div>
                   {refOf(type, n) && <div className="ref-code d-inline-block mt-1">{refOf(type, n)}</div>}
@@ -522,40 +668,73 @@ export default function PlantationExplorer() {
               expanded={expanded} toggle={toggle} onAdd={openAdd} onBulk={openBulk} onTimeline={openTimeline} onEdit={openEdit} onDelete={askDelete} updCount={(t, id) => updByEntity[t + ':' + id] || 0} />
           ))}
         </div></div>
-      ) : view === 'board' ? (
-        <div className="card mb-0"><div className="card-body">
-          <div className="row g-3">
-            {STATUSES.map((s) => {
-              const items = plants.filter((p) => (p.status || 'healthy') === s.key && keep.plant.has(p.id))
-              return (
-                <div className="col-md-4" key={s.key}>
-                  <div className="card mb-0 h-100">
-                    <div className="card-header"><h6 className={`mb-0 text-${s.tone}`}>{s.label} <span className="text-muted fw-normal">({items.length})</span></h6></div>
-                    <div className="card-body p-2 d-flex flex-column gap-2">
-                      {items.length === 0 ? <p className="text-muted small text-center mb-0 py-2">None</p> : items.map((p) => {
-                        const a = ancestors('plant', p)
-                        return (
-                          <div className="border rounded p-2" key={p.id}>
-                            <div className="d-flex align-items-center gap-2">
-                              <img src={p.image || ENTITY.plant.img} alt="" style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 5 }} />
-                              <span className="fw-medium flex-grow-1">{p.tag || p.variety || 'Plant'}</span>
-                              <button className="btn btn-sm btn-ghost-info px-2" onClick={() => openTimeline('plant', p)} title="Timeline / updates"><i className="ri-time-line" />{updByEntity['plant:' + p.id] > 0 && <span className="badge bg-info-subtle text-info ms-1">{updByEntity['plant:' + p.id]}</span>}</button>
-                              <button className="btn btn-sm btn-ghost-secondary px-2" onClick={() => openEdit('plant', p)} title="Edit"><i className="ri-pencil-line" /></button>
-                              <button className="btn btn-sm btn-ghost-danger px-2" onClick={() => askDelete('plant', p)} title="Delete"><i className="ri-delete-bin-line" /></button>
-                            </div>
-                            {p.variety && <div className="small">{p.variety}</div>}
-                            <div className="text-muted small text-truncate">{ancestorLine(a)}</div>
-                          </div>
-                        )
-                      })}
+      ) : view === 'board' ? (() => {
+        const bp = plants.filter((p) => keep.plant.has(p.id))
+        const cnt = (fn) => bp.filter(fn).length
+        const plannedN = cnt((p) => p.stage === 'planned')
+        const plantedN = cnt((p) => p.stage !== 'planned')
+        const healthyN = cnt((p) => p.stage !== 'planned' && (p.status || 'healthy') === 'healthy')
+        const defectN = cnt((p) => p.stage !== 'planned' && p.status === 'defect')
+        const deadN = cnt((p) => p.stage !== 'planned' && p.status === 'dead')
+        const varietyGroups = Object.entries(bp.reduce((m, p) => { const v = p.variety || 'Unspecified'; m[v] = (m[v] || 0) + 1; return m }, {})).sort((a, b) => b[1] - a[1])
+        const BTile = ({ label, value, tone, icon }) => (
+          <div className="col-md-2 col-4"><div className="card stat-card h-100 mb-0"><div className="card-body py-3">
+            <div className="d-flex align-items-center"><span className="stat-label flex-grow-1">{label}</span><div className={`stat-icon bg-${tone}-subtle text-${tone}`}><i className={icon} /></div></div>
+            <h4 className={'stat-value mt-2 mb-0 text-' + tone}>{value}</h4>
+          </div></div></div>
+        )
+        return (
+          <>
+            <div className="row g-3 mb-3">
+              <BTile label="Plants" value={bp.length} tone="primary" icon="ri-seedling-line" />
+              <BTile label="Planted" value={plantedN} tone="success" icon="ri-plant-line" />
+              <BTile label="Planned" value={plannedN} tone="secondary" icon="ri-calendar-todo-line" />
+              <BTile label="Healthy" value={healthyN} tone="success" icon="ri-heart-pulse-line" />
+              <BTile label="Defect" value={defectN} tone="warning" icon="ri-bug-line" />
+              <BTile label="Dead" value={deadN} tone="danger" icon="ri-skull-2-line" />
+            </div>
+
+            <div className="row g-3 mb-3">
+              <Donut title="Planned vs Planted" chartColors={chartColors} labels={['Planted', 'Planned']} series={[plantedN, plannedN]} colors={['#0ab39c', '#6c757d']} />
+              <Donut title="By status (planted)" chartColors={chartColors} labels={['Healthy', 'Defect', 'Dead']} series={[healthyN, defectN, deadN]} colors={['#0ab39c', '#f7b84b', '#f06548']} />
+              <Donut title="By variety" chartColors={chartColors} labels={varietyGroups.map((g) => g[0])} series={varietyGroups.map((g) => g[1])} colors={varietyGroups.map((_, i) => PALETTE[i % PALETTE.length])} />
+            </div>
+
+            <div className="card mb-0"><div className="card-body">
+              <div className="row g-3">
+                {BOARD_COLS.map((s) => {
+                  const items = bp.filter(s.match)
+                  return (
+                    <div className="col-md-3" key={s.key}>
+                      <div className="card mb-0 h-100">
+                        <div className="card-header py-2"><h6 className={`mb-0 text-${s.tone}`}>{s.label} <span className="text-muted fw-normal">({items.length})</span></h6></div>
+                        <div className="card-body p-2 d-flex flex-column gap-2" style={{ maxHeight: 460, overflowY: 'auto' }}>
+                          {items.length === 0 ? <p className="text-muted small text-center mb-0 py-2">None</p> : items.map((p) => {
+                            const a = ancestors('plant', p)
+                            return (
+                              <div className="border rounded p-2" key={p.id}>
+                                <div className="d-flex align-items-center gap-2">
+                                  <img src={p.image || ENTITY.plant.img} alt="" style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 5 }} />
+                                  <span className="fw-medium flex-grow-1 text-truncate">{p.tag || p.variety || 'Plant'}</span>
+                                  <button className="btn btn-sm btn-ghost-info px-2" onClick={() => openTimeline('plant', p)} title="Timeline / updates"><i className="ri-time-line" />{updByEntity['plant:' + p.id] > 0 && <span className="badge bg-info-subtle text-info ms-1">{updByEntity['plant:' + p.id]}</span>}</button>
+                                  <button className="btn btn-sm btn-ghost-secondary px-2" onClick={() => openEdit('plant', p)} title="Edit"><i className="ri-pencil-line" /></button>
+                                  <button className="btn btn-sm btn-ghost-danger px-2" onClick={() => askDelete('plant', p)} title="Delete"><i className="ri-delete-bin-line" /></button>
+                                </div>
+                                {p.variety && <div className="small">{p.variety}</div>}
+                                <div className="text-muted small text-truncate">{ancestorLine(a)}{refOf('plant', p) ? ` · ${refOf('plant', p)}` : ''}</div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div></div>
-      ) : view === 'plot' ? (
+                  )
+                })}
+              </div>
+            </div></div>
+          </>
+        )
+      })() : view === 'plot' ? (
         <>
           <div className="card">
             <div className="card-body">
@@ -567,6 +746,10 @@ export default function PlantationExplorer() {
                 <span><span className="plot-swatch bg-secondary" /> empty pole</span>
                 <span className="ms-auto d-flex align-items-center gap-2">
                   {arrange && <span className="text-primary">Drag to move · corner to resize</span>}
+                  <button className={'btn btn-sm ' + (plantSearch ? 'btn-warning' : 'btn-soft-warning')} onClick={() => setSearchOpen(true)} title="Find poles that already have planned plants">
+                    <i className="ri-search-eye-line me-1" />Find to plant
+                  </button>
+                  {plantSearch && <button className="btn btn-sm btn-ghost-danger" onClick={() => setPlantSearch(null)}><i className="ri-close-line me-1" />Clear ★</button>}
                   {unplacedZones.length > 0 && (
                     <button className="btn btn-sm btn-soft-primary" onClick={draftLayout} title="Auto-place zones that aren't positioned yet">
                       <i className="ri-magic-line me-1" />Draft layout ({unplacedZones.length})
@@ -577,6 +760,13 @@ export default function PlantationExplorer() {
                   </button>
                 </span>
               </div>
+              {plantSearch && (
+                <div className="alert alert-warning py-2 small mb-3 d-flex align-items-center">
+                  <i className="ri-star-fill text-warning me-2" />
+                  <span className="flex-grow-1">{searchMatches.length} planned {plantSearch.crop}{plantSearch.variety ? ` · ${plantSearch.variety}` : ''} plant{searchMatches.length === 1 ? '' : 's'} across <strong>{starredPoles.size}</strong> pole{starredPoles.size === 1 ? '' : 's'} — starred below{plantSearch.count ? ` (enough for ${plantSearch.count})` : ''}.</span>
+                  <button className="btn btn-sm btn-ghost-danger" onClick={() => setPlantSearch(null)}>Clear</button>
+                </div>
+              )}
               {rowsOf('land').length === 0 ? (
                 <p className="text-muted text-center py-4 mb-0">No nodes match the filter.</p>
               ) : rowsOf('land').map((land) => {
@@ -617,6 +807,7 @@ export default function PlantationExplorer() {
                         {placed.map(({ zone, x, y, w, h }) => {
                           const verticals = childrenOf('zone', zone.id)
                           const poleCount = verticals.reduce((s, v) => s + childrenOf('vertical', v.id).length, 0)
+                          const deadPoleCount = verticals.reduce((s, v) => s + childrenOf('vertical', v.id).filter((po) => poleIsDead(po.id)).length, 0)
                           const plantCount = verticals.reduce((s, v) => s + childrenOf('vertical', v.id).reduce((t, po) => t + plantsOnPole(po.id).length, 0), 0)
                           const zEff = (live && live.id === zone.id) ? live : { x, y, w, h }
                           const zItem = { id: zone.id, raw: zone, x, y, w, h }
@@ -628,7 +819,7 @@ export default function PlantationExplorer() {
                                 <span className="fw-medium text-truncate flex-grow-1">{zone.name}</span>
                                 {zone.code && <span className="ref-code ms-1">{zone.code}</span>}
                               </div>
-                              <div className="text-muted mb-2" style={{ fontSize: '.68rem' }}>{verticals.length} rows · {poleCount} poles · {plantCount} plants</div>
+                              <div className="text-muted mb-2" style={{ fontSize: '.68rem' }}>{verticals.length} rows · {poleCount} poles · {plantCount} plants{deadPoleCount > 0 && <span className="text-danger fw-semibold"> · {deadPoleCount} dead poles</span>}</div>
                               {verticals.length === 0 && (
                                 <div className="text-muted small fst-italic d-flex align-items-center gap-1">
                                   <i className="ri-add-circle-line" />No rows yet — add rows, poles &amp; plants (Tree view) to draw them here.
@@ -644,14 +835,25 @@ export default function PlantationExplorer() {
                                       {poles.map((po) => {
                                         const ps = plantsOnPole(po.id)
                                         return (
-                                          <Link key={po.id} to={DETAIL.pole.href(po.id)} className="plot-pole-col" title={`Pole ${po.label || ''} · ${ps.length} plant${ps.length === 1 ? '' : 's'}`}>
-                                            <span className="plot-plant-stack">
-                                              {ps.slice(0, MAX_PLANT_DOTS).map((pl) => <span key={pl.id} className={`plot-plant bg-${PLANT_TONE[pl.status || 'healthy'] || 'success'}`} />)}
-                                              {ps.length > MAX_PLANT_DOTS && <span className="plot-plant-more">+{ps.length - MAX_PLANT_DOTS}</span>}
+                                          <button
+                                            type="button"
+                                            key={po.id}
+                                            className="plot-pole-col"
+                                            onClick={() => { setTip(null); setPolePanel(po) }}
+                                            onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ poleId: po.id, top: r.bottom + 6, left: r.left }) }}
+                                            onMouseLeave={() => setTip(null)}
+                                          >
+                                            <span className="plot-pole-star">{starredPoles.has(po.id) ? <i className="ri-star-fill" /> : null}</span>
+                                            <span className={`plot-pole-box border-${poleBorderTone(po, ps)}`}>
+                                              {ps.length === 0 ? (
+                                                <span className="plot-pole-empty">·</span>
+                                              ) : <>
+                                                {ps.slice(0, MAX_PLANT_DOTS).map((pl) => <span key={pl.id} className={`plot-plant2 bg-${PLANT_TONE[pl.status] || 'secondary'}`} />)}
+                                                {ps.length > MAX_PLANT_DOTS && <span className="plot-plant-more2">+{ps.length - MAX_PLANT_DOTS}</span>}
+                                              </>}
                                             </span>
-                                            <span className={`plot-pole-dot bg-${poleTone(ps)}`}>{ps.length || ''}</span>
-                                            <span className="plot-pole-cap">{po.label || po.code || ''}</span>
-                                          </Link>
+                                            <span className="plot-pole-cap">{po.code || po.label || ''}</span>
+                                          </button>
                                         )
                                       })}
                                     </div>
@@ -677,6 +879,36 @@ export default function PlantationExplorer() {
             emptyText="No structures yet. Add a gate, shed, water tank or path to place on the plot."
             rows={features} columns={featureColumns} fields={featureFields} makeBlank={featureBlank} onSave={featureSave} onDelete={removePlotFeature}
           />
+
+          {tip && (() => {
+            const po = poles.find((p) => p.id === tip.poleId)
+            if (!po) return null
+            const ps = plantsOnPole(po.id)
+            const cnt = (st) => ps.filter((p) => p.status === st).length
+            const na = ps.filter((p) => !['healthy', 'defect', 'dead'].includes(p.status)).length
+            const planned = ps.filter((p) => p.stage === 'planned').length
+            const varieties = Object.entries(ps.reduce((m, p) => { const v = p.variety || 'Unspecified'; m[v] = (m[v] || 0) + 1; return m }, {}))
+            const defectN = updates.filter((u) => u.type === 'defect' && !u.parentId && u.status !== 'resolved'
+              && ((u.entityType === 'pole' && u.entityId === po.id) || (u.entityType === 'plant' && ps.some((p) => p.id === u.entityId)))).length
+            const ref = refOf('pole', po)
+            return (
+              <div className="plot-tip" style={{ top: tip.top, left: tip.left }}>
+                <div className="plot-tip-head"><i className="ri-signal-tower-line me-1" />{po.label || 'Pole'}{ref && <span className="ref-code ms-2">{ref}</span>}</div>
+                <div className="text-muted mb-2" style={{ fontSize: '.7rem' }}>{POLE_TYPE_LABEL[po.poleType] || 'Pole'}</div>
+                <div className="plot-tip-row"><i className="ri-seedling-line text-success" /> <strong>{ps.length}</strong> plants{planned ? <span className="text-muted"> · {planned} planned</span> : ''}</div>
+                <div className="plot-tip-row d-flex flex-wrap gap-2">
+                  <span><span className="tipdot bg-success" />{cnt('healthy')} healthy</span>
+                  <span><span className="tipdot bg-warning" />{cnt('defect')} defect</span>
+                  <span><span className="tipdot bg-danger" />{cnt('dead')} dead</span>
+                  {na > 0 && <span><span className="tipdot bg-secondary" />{na} n/a</span>}
+                </div>
+                <div className="plot-tip-row"><i className="ri-bug-line text-danger" /> <strong>{defectN}</strong> open defects</div>
+                {varieties.length > 0 && (
+                  <div className="plot-tip-row"><i className="ri-flask-line text-primary" /> {varieties.map(([v, n]) => `${v} (${n})`).join(', ')}</div>
+                )}
+              </div>
+            )
+          })()}
         </>
       ) : (
         // Cards / Table — one section per level, stacked
@@ -696,12 +928,89 @@ export default function PlantationExplorer() {
         ))
       )}
 
+      {/* Plot-tab pole popup: plants + their observations, without leaving the plot. */}
+      <Modal
+        open={Boolean(polePanel)}
+        size="lg"
+        title={polePanel ? <><i className="ri-signal-tower-line me-2 text-primary" />Pole {polePanel.label || ''}{refOf('pole', polePanel) ? <span className="ref-code ms-2">{refOf('pole', polePanel)}</span> : null}</> : ''}
+        onClose={() => setPolePanel(null)}
+      >
+        {polePanel && (() => {
+          const po = polePanel
+          const ps = plants.filter((p) => p.poleId === po.id && keep.plant.has(p.id)).sort((a, b) => a.sortOrder - b.sortOrder)
+          const ref = refOf('pole', po)
+          const obsOf = (type, id) => updates.filter((u) => u.entityType === type && u.entityId === id && !u.parentId).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+          const ObsList = ({ items }) => (
+            items.length === 0 ? <div className="text-muted small fst-italic">No observations yet.</div> : (
+              <div className="d-flex flex-column gap-1">
+                {items.slice(0, 5).map((u) => {
+                  const t = UPDATE_TYPE[u.type] || UPDATE_TYPE.regular
+                  return (
+                    <div key={u.id} className="small d-flex align-items-start gap-1">
+                      <span className={`badge bg-${t.tone}-subtle text-${t.tone}`}><i className={t.icon + ' me-1'} />{t.label}</span>
+                      <span className="text-muted">{u.date ? fmtDate(u.date) : ''}</span>
+                      <span className="flex-grow-1">{u.title || u.detail}</span>
+                    </div>
+                  )
+                })}
+                {items.length > 5 && <div className="text-muted small">+{items.length - 5} more…</div>}
+              </div>
+            )
+          )
+          return (
+            <>
+              <div className="d-flex align-items-center flex-wrap gap-2 mb-3">
+                <span className="text-muted small flex-grow-1">{POLE_TYPE_LABEL[po.poleType] || 'Pole'} · {ps.length} plant{ps.length === 1 ? '' : 's'}</span>
+                <button className="btn btn-sm btn-primary" onClick={() => openAdd('plant', po.id)}><i className="ri-add-line me-1" />Add plants</button>
+                <button className="btn btn-sm btn-soft-info" onClick={() => openTimeline('pole', po)}><i className="ri-time-line me-1" />Pole observations{updByEntity['pole:' + po.id] ? ` (${updByEntity['pole:' + po.id]})` : ''}</button>
+              </div>
+
+              {ps.length === 0 ? (
+                <p className="text-muted text-center py-3 mb-0">No plants on this pole yet. Add one above.</p>
+              ) : ps.map((p) => (
+                <div className="border rounded p-2 mb-2" key={p.id}>
+                  <div className="d-flex align-items-center gap-2">
+                    <img src={p.image || ENTITY.plant.img} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
+                    <div className="flex-grow-1 min-w-0">
+                      <div className="fw-medium text-truncate">{p.tag || p.variety || 'Plant'}{p.code && <span className="ref-code ms-2">{[ref, p.code].filter(Boolean).join('-')}</span>}</div>
+                      <div className="small">
+                        <span className={'badge me-1 ' + (PLANT_STAGE_BADGE[p.stage] || PLANT_STAGE_BADGE.planted)}>{PLANT_STAGE_LABEL[p.stage] || 'Planted'}</span>
+                        <span className={'badge me-1 ' + (PLANT_STATUS_BADGE[p.status] || PLANT_STATUS_BADGE.healthy)}>{PLANT_STATUS_LABEL[p.status] || p.status}</span>
+                        {p.variety && <span className="text-muted">{p.variety}</span>}
+                        {p.plantedDate && <span className="text-muted"> · planted {fmtDate(p.plantedDate)}</span>}
+                      </div>
+                    </div>
+                    <button className="btn btn-sm btn-soft-info px-2" title="Add / view observations" onClick={() => openTimeline('plant', p)}><i className="ri-time-line me-1" />Observations{updByEntity['plant:' + p.id] ? ` (${updByEntity['plant:' + p.id]})` : ''}</button>
+                    <button className="btn btn-sm btn-ghost-secondary px-2" title="Edit plant" onClick={() => openEdit('plant', p)}><i className="ri-pencil-line" /></button>
+                    <button className="btn btn-sm btn-ghost-danger px-2" title="Delete plant" onClick={() => askDelete('plant', p)}><i className="ri-delete-bin-line" /></button>
+                  </div>
+                  {p.note && <div className="text-muted small mt-1">{p.note}</div>}
+                  <div className="mt-2 ps-1 border-start"><div className="ps-2"><ObsList items={obsOf('plant', p.id)} /></div></div>
+                </div>
+              ))}
+            </>
+          )
+        })()}
+      </Modal>
+
       <EntityModal
         open={Boolean(modal)}
         title={modal ? (modal.initial.id ? 'Edit ' : 'New ') + ENTITY[modal.type].singular : ''}
-        fields={modal ? ENTITY[modal.type].fields : []}
+        fields={modal ? modalFields(modal.type) : []}
         initial={modal ? modal.initial : {}}
         onSave={save} onClose={close}
+      />
+      <PlantLocateModal
+        open={searchOpen}
+        plants={plants}
+        onApply={(s) => { setPlantSearch(s); setSearchOpen(false) }}
+        onClose={() => setSearchOpen(false)}
+      />
+      <AddPlantModal
+        open={Boolean(plantAdd)}
+        poleId={plantAdd?.poleId}
+        poleRef={plantAdd?.poleRef}
+        onClose={() => setPlantAdd(null)}
       />
       <BulkAddModal
         open={Boolean(bulk)}
@@ -719,6 +1028,8 @@ export default function PlantationExplorer() {
         landId={timeline?.landId}
         plantedDate={timeline?.plantedDate}
         descendants={timeline?.descendants}
+        poleTypeOptions={timeline?.entityType === 'pole' ? poleTypeOptions : undefined}
+        onReplantType={replantPoleType}
         onSyncStatus={timeline?.entityType === 'plant' ? ((status) => editPlant({ ...timeline.node, status }).catch(console.error)) : undefined}
         onClose={() => setTimeline(null)}
       />

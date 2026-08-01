@@ -5,7 +5,7 @@ import {
   addPole, editPole, removePole,
   addPlant, editPlant, removePlant,
 } from '@/data/plantationLandRepo'
-import { VARIETY_LIST } from '@/data/lookupsRepo'
+import { VARIETY_LIST, CROP_LIST } from '@/data/lookupsRepo'
 import landImg from '@/assets/land.webp'
 import zoneImg from '@/assets/zone.jpg'
 import rowsImg from '@/assets/rows.webp'
@@ -24,19 +24,28 @@ const ZONE_UNITS = ['cent', 'acre', 'sqft', 'hectare'].map((u) => ({ value: u, l
 const POLE_TYPES = [
   { value: '', label: '— select —' },
   { value: 'payyani', label: 'Payyani (live tree)' },
+  { value: 'konna', label: 'Konna' },
   { value: 'pvc', label: 'PVC' },
   { value: 'concrete', label: 'Concrete' },
   { value: 'plant', label: 'Plant itself' },
   { value: 'other', label: 'Other' },
 ]
 const PLANT_STATUS = [
+  { value: 'na', label: 'N/A (not planted)' },
   { value: 'healthy', label: 'Healthy' },
   { value: 'defect', label: 'Defect' },
   { value: 'dead', label: 'Dead' },
 ]
+export const PLANT_STATUS_LABEL = Object.fromEntries(PLANT_STATUS.map((s) => [s.value, s.label]))
+const PLANT_STAGE = [
+  { value: 'planned', label: 'Planned' },
+  { value: 'planted', label: 'Planted' },
+]
+export const PLANT_STAGE_BADGE = { planned: 'bg-secondary-subtle text-secondary', planted: 'bg-success-subtle text-success' }
+export const PLANT_STAGE_LABEL = Object.fromEntries(PLANT_STAGE.map((s) => [s.value, s.label]))
 
 export const POLE_TYPE_LABEL = Object.fromEntries(POLE_TYPES.filter((t) => t.value).map((t) => [t.value, t.label]))
-export const PLANT_STATUS_BADGE = { healthy: 'bg-success-subtle text-success', defect: 'bg-warning-subtle text-dark', dead: 'bg-danger-subtle text-danger' }
+export const PLANT_STATUS_BADGE = { na: 'bg-light text-muted', healthy: 'bg-success-subtle text-success', defect: 'bg-warning-subtle text-dark', dead: 'bg-danger-subtle text-danger' }
 
 export const ENTITY = {
   land: {
@@ -111,14 +120,17 @@ export const ENTITY = {
     childType: null, parentField: 'poleId', idPrefix: 'plant',
     add: addPlant, edit: editPlant, remove: removePlant,
     name: (n) => n.tag || n.variety || 'Plant',
-    bulk: { nameKey: 'tag', namePrefix: 'Plant ', codePrefix: 'BP', shared: ['variety', 'status', 'plantedDate'], lookups: { variety: VARIETY_LIST } },
-    blank: () => ({ tag: '', code: '', variety: '', plantedDate: '', status: 'healthy', note: '', image: '' }),
+    bulk: { nameKey: 'tag', namePrefix: 'Plant ', codePrefix: 'BP', shared: ['stage', 'variety', 'status', 'plantedDate'], lookups: { variety: VARIETY_LIST, crop: CROP_LIST } },
+    blank: () => ({ tag: '', code: '', crop: '', plantType: '', variety: '', stage: 'planned', plantedDate: '', status: 'na', note: '', image: '' }),
     fields: [
       { key: 'tag', label: 'Plant tag', type: 'text', placeholder: 'TAG-001', required: true, colClass: 'col-md-8' },
       { key: 'code', label: 'Code', type: 'text', placeholder: 'BP1', colClass: 'col-md-4' },
-      { key: 'variety', label: 'Variety', type: 'text', placeholder: 'e.g. Panniyur-1 pepper' },
-      { key: 'plantedDate', label: 'Planted on', type: 'date', colClass: 'col-6' },
-      { key: 'status', label: 'Status', type: 'select', options: PLANT_STATUS, colClass: 'col-6' },
+      { key: 'crop', label: 'Crop', type: 'text', placeholder: 'Pepper / Payyani…', colClass: 'col-md-4' },
+      { key: 'plantType', label: 'Type', type: 'select', options: [{ value: '', label: '—' }, { value: 'Grafted', label: 'Grafted' }, { value: 'Normal', label: 'Normal' }], colClass: 'col-md-4' },
+      { key: 'variety', label: 'Variety', type: 'text', placeholder: 'e.g. Panniyur-1 pepper', colClass: 'col-md-4' },
+      { key: 'stage', label: 'Stage', type: 'select', options: PLANT_STAGE, colClass: 'col-md-4' },
+      { key: 'plantedDate', label: 'Planted on', type: 'date', colClass: 'col-md-4' },
+      { key: 'status', label: 'Status', type: 'select', options: PLANT_STATUS, colClass: 'col-md-4' },
       { key: 'note', label: 'Note', type: 'textarea' },
       { key: 'image', label: 'Photo', type: 'image', folder: 'plantation/plants' },
     ],

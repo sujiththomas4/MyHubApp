@@ -153,6 +153,7 @@ export default function PlantationPepperBooked() {
       { key: 'variety', label: 'Variety', type: 'search', options: varieties, allowCustom: true, placeholder: 'Search varieties…', colClass: 'col-md-4' },
     ] : []),
     { key: 'quantity', label: 'Plants', type: 'number', required: true, colClass: 'col-md-4' },
+    { key: 'defective', label: 'Defective (unusable)', type: 'number', colClass: 'col-md-4' },
     { key: 'rate', label: 'Price / plant (₹)', type: 'number', colClass: 'col-md-4' },
     { key: 'deliveryCharge', label: 'Delivery charge (₹)', type: 'number', colClass: 'col-md-4' },
     { key: 'advance', label: 'Advance (₹)', type: 'number', colClass: 'col-md-4' },
@@ -164,7 +165,7 @@ export default function PlantationPepperBooked() {
     { key: 'actions', label: 'Action to be done', type: 'textarea' },
     { key: 'note', label: 'Note', type: 'textarea' },
   ]
-  const makeBlank = () => ({ crop, landId: '', nursery: '', phone: '', address: '', variety: '', plantType: isPepper ? 'Grafted' : 'Normal', growthForm: '', quantity: '', rate: '', deliveryCharge: '', advance: '', bookingDate: todayISO(), deliveryDate: '', assigned: '', status: 'booked', actions: '', note: '' })
+  const makeBlank = () => ({ crop, landId: '', nursery: '', phone: '', address: '', variety: '', plantType: isPepper ? 'Grafted' : 'Normal', growthForm: '', quantity: '', defective: '', rate: '', deliveryCharge: '', advance: '', bookingDate: todayISO(), deliveryDate: '', assigned: '', status: 'booked', actions: '', note: '' })
   const onSave = async (f) => { if (f.id) await editBooking(f); else await addBooking({ ...f, id: 'pb-' + rid(), crop }) }
 
   const columns = [
@@ -189,7 +190,7 @@ export default function PlantationPepperBooked() {
         </>
       ),
     }] : []),
-    { header: 'Plants', className: 'text-center', cell: (b) => b.quantity || '—' },
+    { header: 'Plants', className: 'text-center', cell: (b) => (<><span>{b.quantity || '—'}</span>{b.defective > 0 && <div className="text-danger small">{b.defective} defective</div>}</>) },
     {
       header: 'Amount', className: 'text-end',
       cell: (b) => (b.rate || b.deliveryCharge ? (

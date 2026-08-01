@@ -7,14 +7,14 @@ const num = (v) => (v === '' || v == null ? 0 : Number(v))
 
 const rowTo = (r) => ({
   id: r.id, crop: r.crop || 'Pepper', landId: r.land_id || '', nursery: r.nursery || '', phone: r.phone || '', address: r.address || '', variety: r.variety || '',
-  plantType: r.plant_type || '', growthForm: r.growth_form || '', quantity: Number(r.quantity) || 0,
+  plantType: r.plant_type || '', growthForm: r.growth_form || '', quantity: Number(r.quantity) || 0, defective: Number(r.defective) || 0,
   rate: Number(r.rate) || 0, deliveryCharge: Number(r.delivery_charge) || 0, advance: Number(r.advance) || 0,
   bookingDate: r.booking_date || '', deliveryDate: r.delivery_date || '',
   status: r.status || 'booked', assigned: r.assigned || '', actions: r.actions || '', note: r.note || '',
 })
 const toRow = (x) => ({
   id: x.id, crop: x.crop || 'Pepper', land_id: x.landId || null, nursery: x.nursery, phone: x.phone || null, address: x.address || null, variety: x.variety || null,
-  plant_type: x.plantType || null, growth_form: x.growthForm || null, quantity: num(x.quantity),
+  plant_type: x.plantType || null, growth_form: x.growthForm || null, quantity: num(x.quantity), defective: num(x.defective),
   rate: num(x.rate), delivery_charge: num(x.deliveryCharge), advance: num(x.advance),
   booking_date: x.bookingDate || null, delivery_date: x.deliveryDate || null,
   status: x.status || 'booked', assigned: x.assigned || null, actions: x.actions || null, note: x.note || null,

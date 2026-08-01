@@ -12,7 +12,7 @@ import {
 
 const LEVEL_LABEL = { zone: 'Zones', vertical: 'Rows', pole: 'Poles', plant: 'Plants' }
 const LEVEL_ORDER = ['zone', 'vertical', 'pole', 'plant']
-const DEFAULT_TYPES = ['regular', 'defect', 'dead', 'recovered']
+const DEFAULT_TYPES = ['regular', 'defect', 'dead', 'recovered', 'replanted']
 const typeLabel = (v) => (UPDATE_TYPE[v]?.label || (v ? v.charAt(0).toUpperCase() + v.slice(1) : v))
 
 /**
@@ -30,10 +30,10 @@ const todayISO = () => new Date().toISOString().slice(0, 10)
 const byDateDesc = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || '')
 const byDateAsc = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.createdAt || '').localeCompare(b.createdAt || '')
 // A logged type that should also move a plant's status badge.
-const STATUS_FOR = { defect: 'defect', dead: 'dead', recovered: 'healthy' }
+const STATUS_FOR = { defect: 'defect', dead: 'dead', recovered: 'healthy', replanted: 'healthy' }
 
-function Composer({ initial, kind, cascadeLevels, typeOptions, onSave, onCancel }) {
-  // kind: 'entry' (regular/defect/dead/recovered) | 'remedy' | 'result'
+function Composer({ initial, kind, cascadeLevels, typeOptions, poleTypeOptions, onSave, onCancel }) {
+  // kind: 'entry' (regular/defect/dead/recovered/replanted) | 'remedy' | 'result'
   const fixedType = kind === 'remedy' ? 'remedy' : kind === 'result' ? 'result' : null
   const [f, setF] = useState({
     type: initial?.type || fixedType || 'regular',
@@ -42,6 +42,7 @@ function Composer({ initial, kind, cascadeLevels, typeOptions, onSave, onCancel 
     detail: initial?.detail || '',
     image: initial?.image || '',
     status: initial?.status || 'open',
+    replantPoleType: '',
   })
   const [sel, setSel] = useState(new Set())
   const [saving, setSaving] = useState(false)
@@ -88,6 +89,16 @@ function Composer({ initial, kind, cascadeLevels, typeOptions, onSave, onCancel 
             </select>
           </div>
         )}
+        {f.type === 'replanted' && poleTypeOptions && poleTypeOptions.length > 0 && (
+          <div className="col-12">
+            <label className="form-label small mb-1">New pole type (optional)</label>
+            <select className="form-select form-select-sm" value={f.replantPoleType} onChange={(e) => set('replantPoleType', e.target.value)}>
+              <option value="">— keep current type —</option>
+              {poleTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <div className="form-text">Same pole — set this only if you replaced it with a different support.</div>
+          </div>
+        )}
         <div className="col-12">
           <label className="form-label small mb-1">Photo</label>
           <ImageField value={f.image} folder="plantation/updates" onChange={(v) => set('image', v)} />
@@ -120,7 +131,7 @@ function Dot({ type }) {
   return <span className={`tl-dot bg-${t.tone}-subtle text-${t.tone}`}><i className={t.icon} /></span>
 }
 
-export default function NodeTimeline({ open, entityType, entityId, entityLabel, landId, plantedDate, descendants, onSyncStatus, onClose }) {
+export default function NodeTimeline({ open, entityType, entityId, entityLabel, landId, plantedDate, descendants, poleTypeOptions, onReplantType, onSyncStatus, onClose }) {
   const { updates, reload } = useUpdates()
   const { lookups } = useLookups()
   const typeOptions = valuesFor(lookups, UPDATE_TYPE_LIST)
@@ -139,13 +150,14 @@ export default function NodeTimeline({ open, entityType, entityId, entityLabel, 
   const closeComposer = () => setComposer(null)
 
   const saveEntry = async (form) => {
-    const { cascade = [], ...fields } = form
+    const { cascade = [], replantPoleType, ...fields } = form
     const base = { entityType, entityId, landId }
     if (composer.edit) {
       await editUpdate({ ...composer.edit, ...fields })
     } else if (composer.mode === 'entry') {
       await addUpdate({ ...base, ...fields, id: 'upd-' + rid() })
       if (onSyncStatus && STATUS_FOR[fields.type]) onSyncStatus(STATUS_FOR[fields.type])
+      if (fields.type === 'replanted' && onReplantType && replantPoleType) onReplantType(replantPoleType)
       // Cascade the same entry individually onto each selected descendant.
       for (const lvl of cascade) {
         for (const n of descendants[lvl] || []) {
@@ -186,7 +198,7 @@ export default function NodeTimeline({ open, entityType, entityId, entityLabel, 
       </div>
 
       {composer && composer.mode === 'entry' && !composer.edit && (
-        <div className="mb-3"><Composer kind="entry" cascadeLevels={cascadeLevels} typeOptions={typeOptions} onSave={saveEntry} onCancel={closeComposer} /></div>
+        <div className="mb-3"><Composer kind="entry" cascadeLevels={cascadeLevels} typeOptions={typeOptions} poleTypeOptions={poleTypeOptions} onSave={saveEntry} onCancel={closeComposer} /></div>
       )}
 
       {entries.length === 0 && !composer ? (
@@ -201,7 +213,7 @@ export default function NodeTimeline({ open, entityType, entityId, entityLabel, 
                 <Dot type={e.type} />
                 <div className="tl-body">
                   {editingId === e.id ? (
-                    <Composer kind="entry" initial={e} typeOptions={typeOptions} onSave={saveEntry} onCancel={closeComposer} />
+                    <Composer kind="entry" initial={e} typeOptions={typeOptions} poleTypeOptions={poleTypeOptions} onSave={saveEntry} onCancel={closeComposer} />
                   ) : (
                     <>
                       <div className="d-flex align-items-center gap-2 flex-wrap">

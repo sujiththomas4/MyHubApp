@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { fmtDate } from '@/data/AppData'
 import {
-  useLands, useZones, useVerticals, usePoles, usePlants, editPlant, descendantsByLevel,
+  useLands, useZones, useVerticals, usePoles, usePlants, editPlant, editPole, descendantsByLevel,
 } from '@/data/plantationLandRepo'
+import { POLE_TYPE_LABEL } from '@/data/plantationForms'
 import {
   useUpdates, addUpdate, DEFECT_STATUS, DEFECT_STATUS_BADGE, UPDATE_TYPE,
 } from '@/data/plantationUpdatesRepo'
@@ -78,6 +79,13 @@ export default function PlantationDefects() {
 
   const counts = { open: 0, treating: 0, resolved: 0 }
   defects.filter((d) => !property || d.landId === property).forEach((d) => { counts[d.status || 'open'] = (counts[d.status || 'open'] || 0) + 1 })
+
+  const poleTypeOptions = Object.entries(POLE_TYPE_LABEL).map(([value, label]) => ({ value, label }))
+  const replantPoleType = (newType) => {
+    if (timeline?.entityType === 'pole' && timeline.node) {
+      editPole({ ...timeline.node, poleType: newType }).catch(console.error)
+    }
+  }
 
   const openTimeline = (d) => {
     const r = resolve(d.entityType, d.entityId)
@@ -190,6 +198,8 @@ export default function PlantationDefects() {
         entityType={timeline?.entityType} entityId={timeline?.entityId}
         entityLabel={timeline?.entityLabel} landId={timeline?.landId} plantedDate={timeline?.plantedDate}
         descendants={timeline?.descendants}
+        poleTypeOptions={timeline?.entityType === 'pole' ? poleTypeOptions : undefined}
+        onReplantType={replantPoleType}
         onSyncStatus={timeline?.entityType === 'plant' && timeline?.node ? ((status) => editPlant({ ...timeline.node, status }).catch(console.error)) : undefined}
         onClose={() => setTimeline(null)}
       />

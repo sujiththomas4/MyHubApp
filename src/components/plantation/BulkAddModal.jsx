@@ -24,7 +24,7 @@ export default function BulkAddModal({ open, type, parentRef = '', defaultStart 
   const [namePrefix, setNamePrefix] = useState('')
   const [codePrefix, setCodePrefix] = useState('')
   const [start, setStart] = useState(1)
-  const [pad, setPad] = useState(0)
+  const [pad, setPad] = useState(2)
   const [shared, setShared] = useState({})
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
@@ -35,7 +35,7 @@ export default function BulkAddModal({ open, type, parentRef = '', defaultStart 
     setNamePrefix(bulk?.namePrefix ?? '')
     setCodePrefix(bulk?.codePrefix ?? '')
     setStart(defaultStart || 1)
-    setPad(0)
+    setPad(2)
     setShared(cfg.blank())
     setErr(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps

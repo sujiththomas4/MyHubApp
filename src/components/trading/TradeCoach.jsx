@@ -110,8 +110,10 @@ export default function TradeCoach({ today }) {
             <h6 className="mb-0">Market now</h6>
           </div>
           <div className="card-body py-2">
+            <div className="row g-2">
             {SIGNALS.map((sig) => (
-              <div className="coach-signal" key={sig.id}>
+              <div className={sig.colClass || 'col-12'} key={sig.id}>
+              <div className="coach-signal">
                 <label className="coach-signal-label" htmlFor={`coach-${sig.id}`}>
                   {sig.label}
                 </label>
@@ -144,7 +146,9 @@ export default function TradeCoach({ today }) {
                 )}
                 {sig.hint && <div className="coach-signal-hint">{sig.hint}</div>}
               </div>
+              </div>
             ))}
+            </div>
 
             {/* Derived OI read, so the direction is never a guess */}
             {oi.bias && (

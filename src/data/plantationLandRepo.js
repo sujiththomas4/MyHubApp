@@ -102,11 +102,13 @@ export const removePole = (id) => deleteRow('plantation_poles', id)
 // ---- Plants -----------------------------------------------------------------
 const rowToPlant = (r) => ({
   id: r.id, poleId: r.pole_id, tag: r.tag || '', code: r.code || '', variety: r.variety || '', plantedDate: r.planted_date || '',
-  status: r.status || 'healthy', isMother: !!r.is_mother, note: r.note || '', image: r.image || '', sortOrder: r.sort_order ?? 0,
+  status: r.status || 'healthy', stage: r.stage || 'planted', crop: r.crop || '', plantType: r.plant_type || '',
+  isMother: !!r.is_mother, note: r.note || '', image: r.image || '', sortOrder: r.sort_order ?? 0,
 })
 const plantToRow = (x) => ({
   id: x.id, pole_id: x.poleId, tag: x.tag || null, code: x.code || null, variety: x.variety || null, planted_date: x.plantedDate || null,
-  status: x.status || 'healthy', is_mother: !!x.isMother, note: x.note || null, image: x.image || null, sort_order: x.sortOrder ?? 0, updated_at: iso(),
+  status: x.status || 'healthy', stage: x.stage || 'planted', crop: x.crop || null, plant_type: x.plantType || null,
+  is_mother: !!x.isMother, note: x.note || null, image: x.image || null, sort_order: x.sortOrder ?? 0, updated_at: iso(),
 })
 export function usePlants() {
   const { data, loading, error } = useCollection('plantation_plants', [], { orderBy: 'sort_order', ascending: true, map: rowToPlant })
