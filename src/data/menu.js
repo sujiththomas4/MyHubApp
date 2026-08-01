@@ -164,6 +164,7 @@ export const menu = [
       { id: 'plantation-pepper-booked', label: 'Plants Booked', to: '/business/plantations/pepper-booked' },
       { id: 'plantation-propagation', label: 'Plant Factory', to: '/business/plantations/propagation' },
       { id: 'plantation-activities', label: 'Activities', to: '/business/plantations/activities' },
+      { id: 'plantation-supervisor', label: 'Supervisor Updates', to: '/business/plantations/supervisor-updates' },
     ],
   },
 

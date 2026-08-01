@@ -56,6 +56,7 @@ export const UPDATE_TYPE = {
   dead: { label: 'Dead', icon: 'ri-skull-2-line', tone: 'dark' },
   recovered: { label: 'Recovered', icon: 'ri-heart-pulse-line', tone: 'success' },
   replanted: { label: 'Replanted', icon: 'ri-seedling-line', tone: 'success' },
+  support_leg: { label: 'Installed supporting leg', icon: 'ri-tools-line', tone: 'info' },
   remedy: { label: 'Remedy', icon: 'ri-medicine-bottle-line', tone: 'warning' },
   result: { label: 'Result', icon: 'ri-flask-line', tone: 'success' },
 }

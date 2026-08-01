@@ -10,19 +10,17 @@ import AddPlantModal from '@/components/plantation/AddPlantModal'
 import NodeTimeline from '@/components/plantation/NodeTimeline'
 import Modal from '@/components/ui/Modal'
 import HierarchyFilter from '@/components/plantation/HierarchyFilter'
-import CrudCard from '@/components/plantation/CrudCard'
 import { computeVisible, emptyHierarchyFilter } from '@/components/plantation/hierarchyScope'
 import { ENTITY, POLE_TYPE_LABEL, PLANT_STATUS_BADGE, PLANT_STATUS_LABEL, PLANT_STAGE_BADGE, PLANT_STAGE_LABEL } from '@/data/plantationForms'
 import {
   useLands, useZones, useVerticals, usePoles, usePlants,
   useZoneItems, useCare, editPlant, descendantsByLevel,
   removeZoneItem, removeCare,
-  usePlotFeatures, addPlotFeature, editPlotFeature, removePlotFeature, PLOT_FEATURE_KINDS,
+  usePlotFeatures, editPlotFeature, PLOT_FEATURE_KINDS,
 } from '@/data/plantationLandRepo'
 import { useUpdates, removeUpdate, UPDATE_TYPE } from '@/data/plantationUpdatesRepo'
 import { useLookups, valuesFor } from '@/data/lookupsRepo'
 
-const rid2 = () => Math.random().toString(36).slice(2, 8)
 const FEATURE_ICON = Object.fromEntries(PLOT_FEATURE_KINDS.map((k) => [k.value, k.icon]))
 const FEATURE_LABEL = Object.fromEntries(PLOT_FEATURE_KINDS.map((k) => [k.value, k.label]))
 const PLANT_TONE = { healthy: 'success', defect: 'warning', dead: 'danger' }
@@ -419,26 +417,6 @@ export default function PlantationExplorer() {
   // Border colour: red if the pole itself is dead, else green when it has healthy plants.
   const poleBorderTone = (po, ps) => (poleIsDead(po.id) ? 'danger' : poleTone(ps))
 
-  // ---- Plot structures (features) management --------------------------------
-  const featLandName = (id) => (lands.find((l) => l.id === id) || {}).name || '—'
-  const featureFields = [
-    { key: 'landId', label: 'Property', type: 'select', options: [{ value: '', label: '— select —' }, ...lands.map((l) => ({ value: l.id, label: l.name }))], required: true, colClass: 'col-md-6' },
-    { key: 'kind', label: 'Type', type: 'select', options: PLOT_FEATURE_KINDS.map((k) => ({ value: k.value, label: k.label })), colClass: 'col-md-6' },
-    { key: 'label', label: 'Label', type: 'text', placeholder: 'e.g. Main Gate' },
-    { key: 'x', label: 'X', type: 'number', colClass: 'col-3' },
-    { key: 'y', label: 'Y', type: 'number', colClass: 'col-3' },
-    { key: 'w', label: 'Width', type: 'number', colClass: 'col-3' },
-    { key: 'h', label: 'Height', type: 'number', colClass: 'col-3' },
-  ]
-  const featureBlank = () => ({ landId: lands[0]?.id || '', kind: 'gate', label: '', x: '', y: '', w: '', h: '' })
-  const featureSave = async (f) => { if (f.id) await editPlotFeature(f); else await addPlotFeature({ ...f, id: 'ft-' + rid2(), sortOrder: features.length }) }
-  const featureColumns = [
-    { header: 'Structure', cell: (f) => <span className="fw-medium"><i className={(FEATURE_ICON[f.kind] || FEATURE_ICON.other) + ' me-1'} />{f.label || FEATURE_LABEL[f.kind]}</span> },
-    { header: 'Type', className: 'text-muted', cell: (f) => FEATURE_LABEL[f.kind] || f.kind },
-    { header: 'Property', className: 'text-muted', cell: (f) => featLandName(f.landId) },
-    { header: 'Box (x,y,w,h)', className: 'text-muted', cell: (f) => `${f.x || 0}, ${f.y || 0}, ${f.w || 0}, ${f.h || 0}` },
-  ]
-
   // ---- Plot arrange (drag / resize zones & structures) ----------------------
   const [arrange, setArrange] = useState(false)
   const [live, setLive] = useState(null)   // { id, x, y, w, h } while dragging
@@ -447,18 +425,30 @@ export default function PlantationExplorer() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [plantSearch, setPlantSearch] = useState(null)  // { crop, ptype, variety, count } — locate planned poles (not stored)
 
+  // "Find to plant" — match planned plants (skip dead plants / dead poles) and
+  // allocate first-pole-first: full pole → green star, partial → yellow star.
   const searchMatches = plantSearch
-    ? plants.filter((p) => p.stage === 'planned' && p.crop === plantSearch.crop && (!plantSearch.ptype || p.plantType === plantSearch.ptype) && (!plantSearch.variety || p.variety === plantSearch.variety))
+    ? plants.filter((p) => p.stage === 'planned' && p.status !== 'dead'
+      && p.crop === plantSearch.crop && (!plantSearch.ptype || p.plantType === plantSearch.ptype) && (!plantSearch.variety || p.variety === plantSearch.variety)
+      && !poleIsDead(p.poleId))
     : []
-  const starredPoles = (() => {
-    if (!plantSearch) return new Set()
+  const starInfo = (() => {
+    if (!plantSearch) return {}
     const byPole = {}
     searchMatches.forEach((p) => { byPole[p.poleId] = (byPole[p.poleId] || 0) + 1 })
-    const ids = Object.keys(byPole)
-    if (!plantSearch.count) return new Set(ids)
-    let acc = 0; const set = new Set()
-    for (const pid of ids) { if (acc >= plantSearch.count) break; set.add(pid); acc += byPole[pid] }
-    return set
+    const ids = Object.keys(byPole).sort((a, b) => (refOf('pole', byId.pole[a] || {}) || a).localeCompare(refOf('pole', byId.pole[b] || {}) || b))
+    const info = {}
+    const need = plantSearch.count
+    if (!need) { ids.forEach((id) => { info[id] = { tone: 'success', available: byPole[id], planting: byPole[id] } }); return info }
+    let acc = 0
+    for (const id of ids) {
+      if (acc >= need) break
+      const available = byPole[id]
+      const planting = Math.min(available, need - acc)
+      info[id] = { tone: planting >= available ? 'success' : 'warning', available, planting }
+      acc += planting
+    }
+    return info
   })()
   const unplacedZones = zones.filter((z) => !(Number(z.layoutW) > 0 && Number(z.layoutH) > 0))
 
@@ -763,7 +753,7 @@ export default function PlantationExplorer() {
               {plantSearch && (
                 <div className="alert alert-warning py-2 small mb-3 d-flex align-items-center">
                   <i className="ri-star-fill text-warning me-2" />
-                  <span className="flex-grow-1">{searchMatches.length} planned {plantSearch.crop}{plantSearch.variety ? ` · ${plantSearch.variety}` : ''} plant{searchMatches.length === 1 ? '' : 's'} across <strong>{starredPoles.size}</strong> pole{starredPoles.size === 1 ? '' : 's'} — starred below{plantSearch.count ? ` (enough for ${plantSearch.count})` : ''}.</span>
+                  <span className="flex-grow-1">{searchMatches.length} planned {plantSearch.crop}{plantSearch.variety ? ` · ${plantSearch.variety}` : ''} plant{searchMatches.length === 1 ? '' : 's'} across <strong>{Object.keys(starInfo).length}</strong> pole{Object.keys(starInfo).length === 1 ? '' : 's'} — <span className="text-success">★ full</span> / <span className="text-warning">★ partial</span>{plantSearch.count ? ` · planting ${plantSearch.count}` : ''}.</span>
                   <button className="btn btn-sm btn-ghost-danger" onClick={() => setPlantSearch(null)}>Clear</button>
                 </div>
               )}
@@ -843,7 +833,7 @@ export default function PlantationExplorer() {
                                             onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ poleId: po.id, top: r.bottom + 6, left: r.left }) }}
                                             onMouseLeave={() => setTip(null)}
                                           >
-                                            <span className="plot-pole-star">{starredPoles.has(po.id) ? <i className="ri-star-fill" /> : null}</span>
+                                            <span className="plot-pole-star">{starInfo[po.id] ? <span className={`text-${starInfo[po.id].tone}`}><i className="ri-star-fill" />{starInfo[po.id].tone === 'warning' && <span className="plot-star-note">{starInfo[po.id].planting}/{starInfo[po.id].available}</span>}</span> : null}</span>
                                             <span className={`plot-pole-box border-${poleBorderTone(po, ps)}`}>
                                               {ps.length === 0 ? (
                                                 <span className="plot-pole-empty">·</span>
@@ -874,12 +864,6 @@ export default function PlantationExplorer() {
             </div>
           </div>
 
-          <CrudCard
-            title="Plot structures (gate, shed, tank…)" addLabel="Add structure" modalTitle="structure" modalSize="lg"
-            emptyText="No structures yet. Add a gate, shed, water tank or path to place on the plot."
-            rows={features} columns={featureColumns} fields={featureFields} makeBlank={featureBlank} onSave={featureSave} onDelete={removePlotFeature}
-          />
-
           {tip && (() => {
             const po = poles.find((p) => p.id === tip.poleId)
             if (!po) return null
@@ -905,6 +889,9 @@ export default function PlantationExplorer() {
                 <div className="plot-tip-row"><i className="ri-bug-line text-danger" /> <strong>{defectN}</strong> open defects</div>
                 {varieties.length > 0 && (
                   <div className="plot-tip-row"><i className="ri-flask-line text-primary" /> {varieties.map(([v, n]) => `${v} (${n})`).join(', ')}</div>
+                )}
+                {starInfo[po.id] && (
+                  <div className={'plot-tip-row text-' + starInfo[po.id].tone}><i className="ri-star-fill" /> Planting <strong>{starInfo[po.id].planting}</strong> of {starInfo[po.id].available} planned here</div>
                 )}
               </div>
             )

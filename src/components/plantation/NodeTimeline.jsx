@@ -12,7 +12,7 @@ import {
 
 const LEVEL_LABEL = { zone: 'Zones', vertical: 'Rows', pole: 'Poles', plant: 'Plants' }
 const LEVEL_ORDER = ['zone', 'vertical', 'pole', 'plant']
-const DEFAULT_TYPES = ['regular', 'defect', 'dead', 'recovered', 'replanted']
+const DEFAULT_TYPES = ['regular', 'defect', 'dead', 'recovered', 'replanted', 'support_leg']
 const typeLabel = (v) => (UPDATE_TYPE[v]?.label || (v ? v.charAt(0).toUpperCase() + v.slice(1) : v))
 
 /**
