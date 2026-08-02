@@ -1,4 +1,4 @@
-import { useCollection, insertRow, updateRow, deleteRow } from '@/lib/api'
+import { useCollection, insertRow, updateRow, deleteRow, upsertRow } from '@/lib/api'
 import { loans as staticLoans, installments as staticInstallments } from '@/data/AppData'
 
 /** Loans + installments + lump-sum prepayments (Supabase or localStorage). */
@@ -34,3 +34,9 @@ export const removePrepayment = (id) =>
 // Mark an installment paid / not paid (updates the stored row's status).
 export const setInstallmentStatus = (id, status) =>
   updateRow('installments', id, { status })
+
+// Mark an installment paid / not paid, creating the row if it does not exist yet
+// (the detail page auto-generates months past the last seeded EMI, so those rows
+// need an insert-or-update, not a plain update).
+export const saveInstallment = (i) =>
+  upsertRow('installments', { id: i.id, loan_id: i.loanId, number: i.number, date: i.date, amount: i.amount, status: i.status })

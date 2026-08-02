@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ReactApexChart from 'react-apexcharts'
-import { money, fmtDate, fmtMonth, slugOf, loanStats, balanceAfter, rateOf, remainingMonths, forwardBalances } from '@/data/AppData'
-import { useLoans, useInstallments, usePrepayments, addPrepayment, removePrepayment, setInstallmentStatus } from '@/data/loansRepo'
+import { money, fmtDate, fmtMonth, slugOf, loanStats, balanceAfter, rateOf, remainingMonths, forwardBalances, tenureMonths } from '@/data/AppData'
+import { useLoans, useInstallments, usePrepayments, addPrepayment, removePrepayment, saveInstallment } from '@/data/loansRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 
 const PAGE_SIZE = 12
@@ -12,13 +12,13 @@ const PAGE_SIZE = 12
  * -----------------------------------------------------------------------------
  * A single loan's sub-page (route /loans/:slug).
  *
- * The installments array only holds PAID records; the future months are
- * generated here as 'not paid' rows with a "Mark paid" action. Marking a month
- * paid, or adding a lump-sum, reduces the outstanding by the EMI / lump amount
- * and everything recomputes reactively: EMIs paid, remaining count, payoff
- * date, and the projected-outstanding chart.
- *
- * Marks + prepayments are local state for now (seeded from AppData).
+ * The schedule shown = the installment rows stored in the DB PLUS months
+ * auto-generated up to the current month (continuing monthly from the last
+ * stored row). So the current month always has a "Mark paid" action without
+ * re-seeding each month. Marking a month writes/updates that row in Supabase
+ * (saveInstallment upserts, since generated months have no row yet); marking a
+ * month paid, or adding a lump-sum, reduces the outstanding and everything
+ * recomputes reactively: EMIs paid, remaining count, payoff date, and chart.
  */
 
 const rid = () => Math.random().toString(36).slice(2, 8)
@@ -83,7 +83,7 @@ export default function LoanDetail() {
     return found ? { ...found, ...loanStats(found) } : null
   }, [loansData, slug])
 
-  const [markedPaid, setMarkedPaid] = useState(() => new Set())
+  const [statusOverride, setStatusOverride] = useState({}) // optimistic { [id]: 'paid' | 'not paid' }
   const [prepays, setPrepays] = useState([])
   const [page, setPage] = useState(1)
   const [chartType, setChartType] = useState('area') // 'area' | 'bar'
@@ -91,7 +91,7 @@ export default function LoanDetail() {
   useEffect(() => {
     setPrepays(livePrepays.filter((p) => loan && p.loanId === loan.id).sort((a, b) => b.date.localeCompare(a.date)))
   }, [livePrepays, loan])
-  useEffect(() => { setPage(1); setMarkedPaid(new Set()) }, [slug])
+  useEffect(() => { setPage(1); setStatusOverride({}) }, [slug])
 
   if (!loan) {
     return (
@@ -110,19 +110,32 @@ export default function LoanDetail() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const start = new Date(loan.startDate + 'T00:00:00')
 
-  // Static installments (only up to the current month). 'not paid' rows can be
-  // marked paid; already-paid rows are locked.
-  const schedule = installments.filter((i) => i.loanId === loan.id)
-  const allRows = schedule
-    .map((s) => ({
-      ...s,
-      editable: s.status !== 'paid',
-      status: s.status === 'paid' || markedPaid.has(s.id) ? 'paid' : 'not paid',
-    }))
+  // The schedule: every stored installment PLUS auto-generated months to bring it
+  // up to the current month. Historical rows keep their exact seeded dates; new
+  // months continue monthly from the last stored row (so e.g. August appears on
+  // its own once the calendar reaches it — no need to re-seed each month).
+  const stored = installments.filter((i) => i.loanId === loan.id).sort((a, b) => a.number - b.number)
+  const tenure = tenureMonths(loan)
+  const rows = [...stored]
+  let last = stored[stored.length - 1] || null
+  if (!last) {
+    // No stored rows at all: the first EMI falls one month after the start date.
+    const d0 = addMonths(start, 1)
+    if (d0 <= today) { last = { id: `${loan.id}-emi-1`, loanId: loan.id, number: 1, date: isoOf(d0), amount: emi, status: 'not paid' }; rows.push(last) }
+  }
+  while (last && last.number < tenure) {
+    const d = addMonths(new Date(last.date + 'T00:00:00'), 1)
+    if (d > today) break
+    last = { id: `${loan.id}-emi-${last.number + 1}`, loanId: loan.id, number: last.number + 1, date: isoOf(d), amount: emi, status: 'not paid' }
+    rows.push(last)
+  }
+
+  const allRows = rows
+    .map((s) => ({ ...s, status: statusOverride[s.id] ?? s.status }))
     .sort((a, b) => b.date.localeCompare(a.date))
 
   // Reactive calculations
-  const emisPaid = allRows.filter((s) => s.status === 'paid').length // base + marked
+  const emisPaid = allRows.filter((s) => s.status === 'paid').length
   const totalPrepaid = prepays.reduce((s, p) => s + p.amount, 0)
   const outstanding = Math.max(0, balanceAfter(loan, emisPaid) - totalPrepaid)
   const remainingEmis = remainingMonths(outstanding, emi, r)
@@ -131,10 +144,10 @@ export default function LoanDetail() {
   const cleared = loan.amount - outstanding
   const pctPaid = Math.round((cleared / loan.amount) * 100)
 
-  const togglePaid = (id) => {
-    const willPay = !markedPaid.has(id)
-    setMarkedPaid((s) => { const n = new Set(s); willPay ? n.add(id) : n.delete(id); return n })
-    setInstallmentStatus(id, willPay ? 'paid' : 'not paid').catch(console.error)
+  const togglePaid = (row) => {
+    const next = row.status === 'paid' ? 'not paid' : 'paid'
+    setStatusOverride((s) => ({ ...s, [row.id]: next }))
+    saveInstallment({ id: row.id, loanId: loan.id, number: row.number, date: row.date, amount: row.amount, status: next }).catch(console.error)
   }
   const addPrepay = (p) => {
     const row = { ...p, loanId: loan.id }
@@ -290,14 +303,12 @@ export default function LoanDetail() {
                             {paid ? (
                               <span className="d-inline-flex align-items-center gap-1">
                                 <span className="badge bg-success">Paid</span>
-                                {i.editable && (
-                                  <button className="btn btn-sm btn-ghost-secondary p-0" title="Mark unpaid" onClick={() => togglePaid(i.id)}>
-                                    <i className="ri-close-circle-line" />
-                                  </button>
-                                )}
+                                <button className="btn btn-sm btn-ghost-secondary p-0" title="Mark unpaid" onClick={() => togglePaid(i)}>
+                                  <i className="ri-close-circle-line" />
+                                </button>
                               </span>
                             ) : (
-                              <button className="btn btn-sm btn-soft-primary py-0" onClick={() => togglePaid(i.id)}>
+                              <button className="btn btn-sm btn-soft-primary py-0" onClick={() => togglePaid(i)}>
                                 <i className="ri-check-line me-1" />Mark paid
                               </button>
                             )}
