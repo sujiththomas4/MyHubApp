@@ -946,11 +946,12 @@ export default function PlantationExplorer() {
           )
           return (
             <>
-              <div className="d-flex align-items-center flex-wrap gap-2 mb-3">
+              <div className="d-flex align-items-center flex-wrap gap-2 mb-2">
                 <span className="text-muted small flex-grow-1">{POLE_TYPE_LABEL[po.poleType] || 'Pole'} · {ps.length} plant{ps.length === 1 ? '' : 's'}</span>
                 <button className="btn btn-sm btn-primary" onClick={() => openAdd('plant', po.id)}><i className="ri-add-line me-1" />Add plants</button>
                 <button className="btn btn-sm btn-soft-info" onClick={() => openTimeline('pole', po)}><i className="ri-time-line me-1" />Pole observations{updByEntity['pole:' + po.id] ? ` (${updByEntity['pole:' + po.id]})` : ''}</button>
               </div>
+              <div className="mb-3 ps-1 border-start"><div className="ps-2"><ObsList items={obsOf('pole', po.id)} /></div></div>
 
               {ps.length === 0 ? (
                 <p className="text-muted text-center py-3 mb-0">No plants on this pole yet. Add one above.</p>
