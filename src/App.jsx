@@ -13,6 +13,7 @@ import { BrokerOverview, BrokerAccount } from '@/pages/BrokerModule'
 import { optionBuyingModule, intradayStocksModule, optionSellingModule } from '@/data/AppData'
 import PnL from '@/pages/PnL'
 import Capital from '@/pages/Capital'
+import TradingStrategies from '@/pages/TradingStrategies'
 import DailyOptionSelling from '@/pages/DailyOptionSelling'
 import DailyRoutines from '@/pages/DailyRoutines'
 import GymWorkouts from '@/pages/GymWorkouts'
@@ -116,6 +117,7 @@ export default function App() {
           <Route path="/business/option-selling/:slug" element={<BrokerAccount module={optionSellingModule} />} />
           <Route path="/trading/pnl" element={<PnL />} />
           <Route path="/business/capital" element={<Capital />} />
+          <Route path="/business/strategies" element={<TradingStrategies />} />
           <Route path="/business/daily-option-selling" element={<DailyOptionSelling />} />
           <Route path="/personal/daily-routines" element={<DailyRoutines />} />
           <Route path="/personal/gym-workouts" element={<GymWorkouts />} />

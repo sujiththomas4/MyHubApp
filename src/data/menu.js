@@ -110,6 +110,13 @@ export const menu = [
 
   { id: 'trading-pnl', label: 'P&L', icon: 'ri-line-chart-line', to: '/trading/pnl' },
   { id: 'business-capital', label: 'Capital', icon: 'ri-wallet-3-line', to: '/business/capital' },
+  {
+    id: 'business-strategies',
+    label: 'Strategies',
+    icon: 'ri-book-marked-line',
+    to: '/business/strategies',
+    badge: { text: 'Imp', variant: 'warning' },
+  },
   { id: 'daily-option-selling', label: 'Daily Option Selling', icon: 'ri-star-line', to: '/business/daily-option-selling' },
 
   {
