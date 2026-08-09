@@ -51,7 +51,7 @@ export function useActivityLogger() {
 export const LOG_CATEGORY = {
   booking: { label: 'Plants Booked', icon: 'ri-bookmark-line', tone: 'warning' },
   plant: { label: 'Plants', icon: 'ri-plant-line', tone: 'success' },
-  supervisor: { label: 'Supervisor', icon: 'ri-user-star-line', tone: 'primary' },
+  supervisor: { label: 'Site Update', icon: 'ri-user-star-line', tone: 'primary' },
   schedule: { label: 'Schedule', icon: 'ri-repeat-line', tone: 'secondary' },
   activity: { label: 'Activity', icon: 'ri-list-check-2', tone: 'info' },
   comment: { label: 'Comment', icon: 'ri-chat-3-line', tone: 'info' },

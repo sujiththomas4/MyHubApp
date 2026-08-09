@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
@@ -18,12 +18,26 @@ import Field from '@/components/plantation/Field'
  *   onSave    — async (form) => void  (decide add vs edit via form.id)
  *   onDelete  — async (id) => void
  */
-export default function CrudCard({ title, addLabel = 'Add', modalTitle, modalSize, emptyText = 'Nothing yet.', rows, columns, fields, makeBlank, onSave, onDelete, openTo, openLabel = 'Open', rowExtra }) {
+export default function CrudCard({ title, addLabel = 'Add', modalTitle, modalSize, emptyText = 'Nothing yet.', rows, columns, fields, makeBlank, onSave, onDelete, openTo, openLabel = 'Open', rowExtra, onReorder }) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
   const [confirm, setConfirm] = useState(null)
+  const dragIdx = useRef(null)
+  const [overIdx, setOverIdx] = useState(null)
+
+  // Drag-and-drop reorder (only when onReorder is provided).
+  const onDrop = (toIdx) => {
+    const from = dragIdx.current
+    dragIdx.current = null
+    setOverIdx(null)
+    if (from == null || from === toIdx) return
+    const next = [...rows]
+    const [moved] = next.splice(from, 1)
+    next.splice(toIdx, 0, moved)
+    onReorder(next)
+  }
 
   const set = (k, val) => setForm((f) => ({ ...f, [k]: val }))
   const openAdd = () => { setForm(makeBlank()); setErr(null); setOpen(true) }
@@ -55,11 +69,19 @@ export default function CrudCard({ title, addLabel = 'Add', modalTitle, modalSiz
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
-                <tr>{columns.map((c, i) => <th key={i} className={c.className}>{c.header}</th>)}<th className="text-end">Actions</th></tr>
+                <tr>{onReorder && <th style={{ width: 28 }} />}{columns.map((c, i) => <th key={i} className={c.className}>{c.header}</th>)}<th className="text-end">Actions</th></tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
+                {rows.map((row, idx) => (
+                  <tr key={row.id}
+                    draggable={Boolean(onReorder)}
+                    onDragStart={onReorder ? () => { dragIdx.current = idx } : undefined}
+                    onDragOver={onReorder ? (e) => { e.preventDefault(); setOverIdx(idx) } : undefined}
+                    onDrop={onReorder ? () => onDrop(idx) : undefined}
+                    onDragEnd={onReorder ? () => { dragIdx.current = null; setOverIdx(null) } : undefined}
+                    className={onReorder && overIdx === idx ? 'table-active' : undefined}
+                  >
+                    {onReorder && <td className="text-muted" style={{ cursor: 'grab' }} title="Drag to reorder"><i className="ri-draggable" /></td>}
                     {columns.map((c, i) => <td key={i} className={c.className}>{c.cell(row)}</td>)}
                     <td className="text-end text-nowrap">
                       {rowExtra && rowExtra(row)}

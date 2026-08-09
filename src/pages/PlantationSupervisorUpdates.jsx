@@ -120,18 +120,9 @@ function ScheduleForm({ initial, landOpts, people, onSave, onCancel }) {
           </select>
         </div>
         <div className="col-md-6">
-          <label className="form-label small mb-1">Supervisor</label>
+          <label className="form-label small mb-1">Reported by</label>
           <input className="form-control" list="sup-dl" placeholder="Name" value={f.supervisor} onChange={(e) => set('supervisor', e.target.value)} />
           <datalist id="sup-dl">{people.map((p) => <option key={p} value={p} />)}</datalist>
-        </div>
-
-        <div className="col-md-6">
-          <label className="form-label small mb-1">Start date</label>
-          <input type="date" className="form-control" value={f.startDate} onChange={(e) => set('startDate', e.target.value)} />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label small mb-1">End date <span className="text-muted">(optional — defaults to 6 years)</span></label>
-          <input type="date" className="form-control" value={f.endDate} onChange={(e) => set('endDate', e.target.value)} />
         </div>
 
         <div className="col-md-4">
@@ -140,16 +131,29 @@ function ScheduleForm({ initial, landOpts, people, onSave, onCancel }) {
             {FREQUENCIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-        <div className="col-md-8">
-          <label className="form-label small mb-1">Repeat every</label>
-          <div className="input-group">
-            <input type="number" min="1" className="form-control" value={f.interval} onChange={(e) => set('interval', e.target.value)} style={{ maxWidth: 90 }} />
-            <span className="input-group-text">{f.frequency === 'monthly' ? 'month(s)' : 'week(s)'}</span>
-          </div>
+        <div className={f.frequency === 'once' ? 'col-md-8' : 'col-md-4'}>
+          <label className="form-label small mb-1">{f.frequency === 'once' ? 'Date' : 'Start date'}</label>
+          <input type="date" className="form-control" value={f.startDate} onChange={(e) => set('startDate', e.target.value)} />
         </div>
+        {f.frequency !== 'once' && (
+          <div className="col-md-4">
+            <label className="form-label small mb-1">End date <span className="text-muted">(optional)</span></label>
+            <input type="date" className="form-control" value={f.endDate} onChange={(e) => set('endDate', e.target.value)} />
+          </div>
+        )}
 
-        {f.frequency === 'weekly' ? (
-          <div className="col-12">
+        {f.frequency !== 'once' && (
+          <div className="col-md-4">
+            <label className="form-label small mb-1">Repeat every</label>
+            <div className="input-group">
+              <input type="number" min="1" className="form-control" value={f.interval} onChange={(e) => set('interval', e.target.value)} style={{ maxWidth: 90 }} />
+              <span className="input-group-text">{f.frequency === 'monthly' ? 'month(s)' : 'week(s)'}</span>
+            </div>
+          </div>
+        )}
+
+        {f.frequency === 'weekly' && (
+          <div className="col-md-8">
             <label className="form-label small mb-1">On these days</label>
             <div className="d-flex flex-wrap gap-1">
               {WEEKDAYS.map((w) => (
@@ -159,7 +163,8 @@ function ScheduleForm({ initial, landOpts, people, onSave, onCancel }) {
               ))}
             </div>
           </div>
-        ) : (
+        )}
+        {f.frequency === 'monthly' && (
           <div className="col-md-4">
             <label className="form-label small mb-1">Day of month</label>
             <input type="number" min="1" max="31" className="form-control" value={f.dayOfMonth || ''} onChange={(e) => set('dayOfMonth', e.target.value)} />
@@ -251,7 +256,7 @@ export default function PlantationSupervisorUpdates() {
   const blankUpdate = (seed = {}) => ({ landId: property || '', supervisor: '', periodFrom: '', periodTo: '', date: todayISO(), title: '', workDone: '', highlights: '', concerns: '', nextPlan: '', image: '', scheduleId: '', occurrenceDate: '', ...seed })
   const updateFields = [
     { key: 'landId', label: 'Property', type: 'select', options: landOpts, colClass: 'col-md-6' },
-    { key: 'supervisor', label: 'Supervisor', type: 'search', options: people, allowCustom: true, placeholder: 'Name', colClass: 'col-md-6' },
+    { key: 'supervisor', label: 'Reported by', type: 'search', options: people, allowCustom: true, placeholder: 'Name', colClass: 'col-md-6' },
     { key: 'periodFrom', label: 'Scheduled date', type: 'computed', compute: (f) => (f.periodFrom ? fmtDate(f.periodFrom) : '—'), colClass: 'col-md-6' },
     { key: 'date', label: 'Report date', type: 'computed', compute: (f) => fmtDate(f.date || todayISO()), colClass: 'col-md-6' },
     { key: 'title', label: 'Title', type: 'text', placeholder: 'e.g. Bi-weekly update — Zone A & B', required: true },
@@ -265,7 +270,7 @@ export default function PlantationSupervisorUpdates() {
     if (f.id) await editSupervisorUpdate(f)
     else {
       await addSupervisorUpdate({ ...f, id: 'sup-' + rid(), sortOrder: updates.length })
-      log('supervisor', `Supervisor update: "${f.title}"${f.supervisor ? ' by ' + f.supervisor : ''}`, { landId: f.landId })
+      log('supervisor', `Site update: "${f.title}"${f.supervisor ? ' by ' + f.supervisor : ''}`, { landId: f.landId })
     }
     await reloadUpdates()
   }
@@ -289,12 +294,12 @@ export default function PlantationSupervisorUpdates() {
   return (
     <div className="option-buying">
       <div className="page-title-box d-flex align-items-center">
-        <h4 className="flex-grow-1 mb-0">Supervisor Updates</h4>
+        <h4 className="flex-grow-1 mb-0">Site Updates</h4>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item"><a href="/">Hub</a></li>
             <li className="breadcrumb-item">Plantation</li>
-            <li className="breadcrumb-item active" aria-current="page">Supervisor Updates</li>
+            <li className="breadcrumb-item active" aria-current="page">Site Updates</li>
           </ol>
         </nav>
       </div>
@@ -325,7 +330,7 @@ export default function PlantationSupervisorUpdates() {
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0">
                   <thead className="table-light">
-                    <tr><th>Date</th><th>Schedule</th><th>Property</th><th>Supervisor</th><th className="text-center">Status</th><th className="text-end">Action</th></tr>
+                    <tr><th>Date</th><th>Schedule</th><th>Property</th><th>Reported by</th><th className="text-center">Status</th><th className="text-end">Action</th></tr>
                   </thead>
                   <tbody>
                     {shownOcc.map((o) => {
@@ -382,7 +387,7 @@ export default function PlantationSupervisorUpdates() {
                   <div className="card-header d-flex flex-wrap align-items-center gap-2">
                     <h6 className="card-title mb-0 flex-grow-1">{s.title}</h6>
                     <span className="badge fw-normal bg-primary-subtle text-primary">{describeSchedule(s)}</span>
-                    <span className="text-muted small">{fmtDate(s.startDate)} → {s.endDate ? fmtDate(s.endDate) : '6 yrs'} · {doneN}/{nodes.length}{capped ? '+' : ''} done</span>
+                    <span className="text-muted small">{s.frequency === 'once' ? fmtDate(s.startDate) : `${fmtDate(s.startDate)} → ${s.endDate ? fmtDate(s.endDate) : '6 yrs'}`} · {doneN}/{nodes.length}{capped ? '+' : ''} done</span>
                   </div>
                   <div className="card-body">
                     {nodes.length === 0 ? <p className="text-muted text-center mb-0">No occurrences in range.</p> : <Road nodes={nodes} />}
@@ -409,7 +414,7 @@ export default function PlantationSupervisorUpdates() {
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0">
                   <thead className="table-light">
-                    <tr><th>Title</th><th>Recurrence</th><th>Property</th><th>Supervisor</th><th>Range</th><th className="text-center">Active</th><th className="text-end">Actions</th></tr>
+                    <tr><th>Title</th><th>Recurrence</th><th>Property</th><th>Reported by</th><th>Range</th><th className="text-center">Active</th><th className="text-end">Actions</th></tr>
                   </thead>
                   <tbody>
                     {schedules.map((s) => (
@@ -418,7 +423,7 @@ export default function PlantationSupervisorUpdates() {
                         <td><span className="badge fw-normal bg-primary-subtle text-primary">{describeSchedule(s)}</span></td>
                         <td className="text-muted">{s.landId ? landName(s.landId) : '—'}</td>
                         <td className="text-muted">{s.supervisor || '—'}</td>
-                        <td className="text-muted small">{fmtDate(s.startDate)} → {s.endDate ? fmtDate(s.endDate) : '6 yrs'}</td>
+                        <td className="text-muted small">{s.frequency === 'once' ? fmtDate(s.startDate) : `${fmtDate(s.startDate)} → ${s.endDate ? fmtDate(s.endDate) : '6 yrs'}`}</td>
                         <td className="text-center">{s.active ? <span className="badge bg-success-subtle text-success">Active</span> : <span className="badge bg-secondary-subtle text-secondary">Off</span>}</td>
                         <td className="text-end text-nowrap">
                           <button className="btn btn-sm btn-ghost-secondary px-2" title="Edit" onClick={() => setSchModal({ initial: { ...s } })}><i className="ri-pencil-line" /></button>
@@ -443,7 +448,7 @@ export default function PlantationSupervisorUpdates() {
           </div>
           <div className="card-body">
             {scopedUpdates.length === 0 ? (
-              <p className="text-muted text-center py-5 mb-0">No supervisor updates yet.</p>
+              <p className="text-muted text-center py-5 mb-0">No updates yet.</p>
             ) : (
               <div className="tl">
                 {scopedUpdates.map((u) => (
@@ -477,7 +482,7 @@ export default function PlantationSupervisorUpdates() {
 
       <EntityModal
         open={Boolean(modal)}
-        title={modal?.initial?.id ? 'Edit update' : 'New supervisor update'}
+        title={modal?.initial?.id ? 'Edit update' : 'New site update'}
         fields={updateFields}
         initial={modal ? modal.initial : {}}
         onSave={saveUpdate}

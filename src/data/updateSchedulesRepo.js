@@ -50,6 +50,7 @@ export const removeSchedule = (id) => deleteRow('plantation_update_schedules', i
 
 // ---- Recurrence -----------------------------------------------------------
 export const FREQUENCIES = [
+  { value: 'once', label: 'One-time (specific date)' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ]
@@ -86,6 +87,10 @@ export function generateOccurrences(sch, fromISO, toISO, cap = 2000) {
   if (hi < lo) return []
   const out = []
 
+  if (sch.frequency === 'once') {
+    return start >= lo && start <= hi ? [isoOf(start)] : []
+  }
+
   if (sch.frequency === 'monthly') {
     const interval = Math.max(1, sch.interval || 1)
     const dom = sch.dayOfMonth || start.getDate()
@@ -117,6 +122,7 @@ export function generateOccurrences(sch, fromISO, toISO, cap = 2000) {
 /** Human summary, e.g. "Every 2 weeks on Sat, Sun" or "Monthly on day 1". */
 export function describeSchedule(sch) {
   if (!sch) return ''
+  if (sch.frequency === 'once') return 'One-time'
   const every = sch.interval > 1 ? `${sch.interval} ` : ''
   if (sch.frequency === 'monthly') {
     return `Every ${every}month${sch.interval > 1 ? 's' : ''} on day ${sch.dayOfMonth || 1}`

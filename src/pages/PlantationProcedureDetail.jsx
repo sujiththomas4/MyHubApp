@@ -30,10 +30,21 @@ export default function PlantationProcedureDetail() {
   ]
   const blank = () => ({ procedureId: procId, step: '', done: false, date: '', note: '' })
   const save = async (f) => { if (f.id) await editProcedureStep(f); else await addProcedureStep({ ...f, id: 'st-' + rid(), sortOrder: mySteps.length }) }
+  // Drag-and-drop reorder: renumber sort_order to the new positions.
+  const reorderSteps = (next) => {
+    next.forEach((st, i) => { if (st.sortOrder !== i) editProcedureStep({ ...st, sortOrder: i }).catch(console.error) })
+  }
   const columns = [
     { header: '#', className: 'text-muted', cell: (s) => mySteps.indexOf(s) + 1 },
-    { header: 'Step', cell: (s) => (<><div className={'fw-medium ' + (s.done ? 'text-decoration-line-through text-muted' : '')}>{s.step}</div>{s.note && <div className="text-muted small">{s.note}</div>}</>) },
-    { header: 'Status', cell: (s) => (s.done ? <span className="badge bg-success-subtle text-success">Done{s.date ? ` · ${fmtDate(s.date)}` : ''}</span> : <span className="badge bg-secondary-subtle text-secondary">Pending</span>) },
+    { header: 'Step', cell: (s) => (<div className="d-flex align-items-start gap-2">
+      {s.done
+        ? <i className="ri-checkbox-circle-fill text-success fs-5 mt-1" title="Done" />
+        : <i className="ri-loader-4-line text-warning fs-5 mt-1" title="Pending" />}
+      <div><div className="fw-medium">{s.step}</div>{s.note && <div className="text-muted small">{s.note}</div>}</div>
+    </div>) },
+    { header: 'Status', cell: (s) => (s.done
+      ? <span className="text-success"><i className="ri-checkbox-circle-fill me-1" />Done{s.date ? ` · ${fmtDate(s.date)}` : ''}</span>
+      : <span className="text-muted"><i className="ri-loader-4-line me-1" />Pending</span>) },
   ]
 
   return (
@@ -73,6 +84,7 @@ export default function PlantationProcedureDetail() {
         title={`Steps (${mySteps.length})`} addLabel="Add step" modalTitle="step"
         emptyText="No steps yet. Document each step you took."
         rows={mySteps} columns={columns} fields={fields} makeBlank={blank} onSave={save} onDelete={removeProcedureStep}
+        onReorder={reorderSteps}
       />
     </div>
   )
