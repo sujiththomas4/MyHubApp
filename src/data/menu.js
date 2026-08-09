@@ -164,6 +164,7 @@ export const menu = [
       { id: 'plantation-planned-crops', label: 'Planned Crops', to: '/business/plantations/planned-crops' },
       { id: 'plantation-fertilizers', label: 'Health Center', to: '/business/plantations/health-center' },
       { id: 'plantation-records', label: 'Setup & Procedures', to: '/business/plantations/records' },
+      { id: 'plantation-contacts', label: 'Contacts', to: '/business/plantations/contacts' },
       { id: 'plantation-defects', label: 'Defects', to: '/business/plantations/defects' },
       { id: 'plantation-capital', label: 'Capital', to: '/business/plantations/capital' },
       { id: 'plantation-expenses', label: 'Expenses', to: '/business/plantations/expenses' },
