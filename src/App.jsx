@@ -14,6 +14,7 @@ import { optionBuyingModule, intradayStocksModule, optionSellingModule } from '@
 import PnL from '@/pages/PnL'
 import Capital from '@/pages/Capital'
 import TradingStrategies from '@/pages/TradingStrategies'
+import RoadMap from '@/pages/RoadMap'
 import DailyOptionSelling from '@/pages/DailyOptionSelling'
 import DailyRoutines from '@/pages/DailyRoutines'
 import GymWorkouts from '@/pages/GymWorkouts'
@@ -124,6 +125,7 @@ export default function App() {
           <Route path="/money/emis" element={<MonthlyEmis />} />
           <Route path="/money/lent" element={<MoneyLent />} />
           <Route path="/money/income-planner" element={<IncomePlanner />} />
+          <Route path="/business/plantations/road-map" element={<RoadMap />} />
           <Route path="/trading-challenge/10-clean" element={<TradingChallenge10 />} />
         </>}
 

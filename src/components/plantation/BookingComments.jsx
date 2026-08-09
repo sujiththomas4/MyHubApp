@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { addBookingComment, removeBookingComment, timeAgo, fullDateTime } from '@/data/bookingCommentsRepo'
+import { logActivity } from '@/data/activityLogRepo'
 
 /**
  * BookingComments — a threaded comments panel for one plants-booked row.
@@ -102,6 +103,8 @@ export default function BookingComments({ booking, comments, reload, users, curr
 
   const add = async ({ body, mentions }) => {
     await addBookingComment({ id: 'cmt-' + rid(), bookingId: booking.id, body, mentions, authorId: currentUserId, authorName: currentUserName, createdAt: new Date().toISOString() })
+    const trimmed = body.length > 60 ? body.slice(0, 60) + '…' : body
+    logActivity({ category: 'comment', description: `Comment on ${booking.crop || 'booking'}${booking.variety ? ' · ' + booking.variety : ''}: "${trimmed}"`, meta: { bookingId: booking.id }, actorId: currentUserId, actorName: currentUserName }).catch((e) => console.error('log failed', e))
     await reload()
   }
   const confirmDelete = async () => { const t = del; setDel(null); await removeBookingComment(t.id); await reload() }

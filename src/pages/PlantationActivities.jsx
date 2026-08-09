@@ -4,6 +4,7 @@ import { fmtDate } from '@/data/AppData'
 import { usePlantationActivities, addActivity as apiAdd, editActivity as apiEdit, removeActivity as apiRemove } from '@/data/plantationRepo'
 import { useLands, landLabel } from '@/data/plantationLandRepo'
 import { useProfiles, personName } from '@/data/profilesRepo'
+import { useActivityLogger } from '@/data/activityLogRepo'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import PropertyBar from '@/components/plantation/PropertyBar'
@@ -19,6 +20,17 @@ const todayISO = () => new Date().toISOString().slice(0, 10)
 const isCompleted = (a) => a.status === 'done'
 const isPending = (a) => a.status !== 'done'
 const isDelayed = (a) => a.status !== 'done' && a.dueDate < todayISO()
+// Friendly due-date label: Today / Tomorrow / N days ago / in N days.
+const dueLabel = (iso) => {
+  if (!iso) return '—'
+  const d = new Date(iso + 'T00:00:00'); d.setHours(0, 0, 0, 0)
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const days = Math.round((d - now) / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days > 1) return `in ${days} days`
+  return `${-days} day${-days === 1 ? '' : 's'} ago`
+}
 
 function ActivityForm({ initial, onSave, onCancel, landOpts, userOpts }) {
   const [f, setF] = useState({
@@ -156,6 +168,7 @@ export default function PlantationActivities() {
   const live = usePlantationActivities()
   const { lands } = useLands()
   const { profiles } = useProfiles()
+  const log = useActivityLogger()
   const [items, setItems] = useState([])
   const [property, setProperty] = useState('')
   const [tab, setTab] = useState('pending')
@@ -182,7 +195,10 @@ export default function PlantationActivities() {
   const rows = [...scoped].filter(TABS.find((t) => t.id === tab).filter)
     .sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || b.dueDate.localeCompare(a.dueDate))
 
-  const addItem = (a) => { setItems((xs) => [...xs, a]); setAdding(false); apiAdd(a).catch(console.error) }
+  const addItem = (a) => {
+    setItems((xs) => [...xs, a]); setAdding(false); apiAdd(a).catch(console.error)
+    log('activity', `Activity created: "${a.activity}"${a.landId ? ' · ' + landName(a.landId) : ''}`, { id: a.id, dueDate: a.dueDate })
+  }
   const updateItem = (a) => { setItems((xs) => xs.map((x) => (x.id === a.id ? a : x))); setEditRow(null); apiEdit(a).catch(console.error) }
   const confirmDelete = () => { const id = deleteRow.id; setItems((xs) => xs.filter((x) => x.id !== id)); setDeleteRow(null); apiRemove(id).catch(console.error) }
   const toggleDone = (a) => { const next = { ...a, status: a.status === 'done' ? 'planned' : 'done' }; setItems((xs) => xs.map((x) => (x.id === a.id ? next : x))); apiEdit(next).catch(console.error) }
@@ -246,17 +262,17 @@ export default function PlantationActivities() {
                     <td>
                       {a.assignedTo && a.assignedTo.length ? (
                         <div className="d-flex flex-wrap gap-1">
-                          {a.assignedTo.map((id) => <span key={id} className="badge bg-info-subtle text-info"><i className="ri-user-line me-1" />{userName(id) || 'Unknown'}</span>)}
+                          {a.assignedTo.map((id) => <span key={id} className="badge fw-normal" style={{ backgroundColor: '#ede9fe', color: '#6d28d9' }}><i className="ri-user-line me-1" />{userName(id) || 'Unknown'}</span>)}
                         </div>
                       ) : <span className="text-muted">—</span>}
                     </td>
                     <td>{fmtDate(a.date)}</td>
-                    <td className={isDelayed(a) ? 'text-danger' : ''}>
-                      {fmtDate(a.dueDate)}{isDelayed(a) && <i className="ri-alarm-warning-line ms-1" title="Delayed" />}
+                    <td className={isDelayed(a) ? 'text-danger' : ''} title={fmtDate(a.dueDate)}>
+                      {dueLabel(a.dueDate)}{isDelayed(a) && <i className="ri-alarm-warning-line ms-1" title="Delayed" />}
                     </td>
                     <td className="text-center">
                       <button
-                        className={'badge border-0 ' + (a.status === 'done' ? 'bg-success' : isDelayed(a) ? 'bg-danger' : 'bg-warning')}
+                        className={'badge border-0 fw-normal ' + (a.status === 'done' ? 'bg-success' : isDelayed(a) ? 'bg-danger' : 'bg-warning text-dark')}
                         title="Toggle done" onClick={() => toggleDone(a)}
                       >
                         {a.status === 'done' ? 'Done' : isDelayed(a) ? 'Delayed' : 'Pending'}

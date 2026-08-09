@@ -8,6 +8,7 @@ import { useProfiles, personName } from '@/data/profilesRepo'
 import { useLands, landLabel, usePlants, usePoles, useVerticals, useZones, addPlant } from '@/data/plantationLandRepo'
 import { useUpdates } from '@/data/plantationUpdatesRepo'
 import { useBookingComments } from '@/data/bookingCommentsRepo'
+import { useActivityLogger } from '@/data/activityLogRepo'
 import { useAuth } from '@/context/AuthContext'
 import PropertyBar from '@/components/plantation/PropertyBar'
 import BookingComments from '@/components/plantation/BookingComments'
@@ -301,6 +302,7 @@ export default function PlantationPepperBooked() {
   const { lookups } = useLookups()
   const { profiles } = useProfiles()
   const { comments, reload: reloadComments } = useBookingComments()
+  const log = useActivityLogger()
   const { session, userName } = useAuth()
   const currentUserId = session?.user?.id || ''
   const varieties = valuesFor(lookups, VARIETY_LIST)
@@ -412,7 +414,13 @@ export default function PlantationPepperBooked() {
     { key: 'note', label: 'Note', type: 'textarea' },
   ]
   const makeBlank = () => ({ crop, landId: '', nursery: '', phone: '', address: '', variety: '', plantType: isPepper ? 'Grafted' : 'Normal', growthForm: '', quantity: '', defective: '', rate: '', deliveryCharge: '', advance: '', bookingDate: todayISO(), deliveryDate: '', assigned: '', status: 'booked', actions: '', note: '' })
-  const onSave = async (f) => { if (f.id) await editBooking(f); else await addBooking({ ...f, id: 'pb-' + rid(), crop }) }
+  const onSave = async (f) => {
+    if (f.id) await editBooking(f)
+    else {
+      await addBooking({ ...f, id: 'pb-' + rid(), crop })
+      log('booking', `Booked ${f.quantity || 0} ${crop}${f.variety ? ' · ' + f.variety : ''}${f.nursery ? ' from ' + f.nursery : ''}`, { crop, variety: f.variety, quantity: f.quantity })
+    }
+  }
 
   const allColumns = [
     {

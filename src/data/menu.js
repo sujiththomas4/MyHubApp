@@ -172,6 +172,7 @@ export const menu = [
       { id: 'plantation-propagation', label: 'Plant Factory', to: '/business/plantations/propagation' },
       { id: 'plantation-activities', label: 'Activities', to: '/business/plantations/activities' },
       { id: 'plantation-supervisor', label: 'Supervisor Updates', to: '/business/plantations/supervisor-updates' },
+      { id: 'plantation-road-map', label: 'Road Map', to: '/business/plantations/road-map' },
     ],
   },
 

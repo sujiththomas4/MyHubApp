@@ -4,6 +4,20 @@ import SimpleBar from 'simplebar-react'
 import { menuForRole } from '@/data/menu'
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
+import { usePlantationActivities } from '@/data/plantationRepo'
+
+/* Live count badges for nav items (keyed by node id). Activities shows how many
+   are pending (yellow) and delayed (red). */
+function useNavBadges() {
+  const activities = usePlantationActivities()
+  const today = new Date().toISOString().slice(0, 10)
+  const pending = activities.filter((a) => a.status !== 'done').length
+  const delayed = activities.filter((a) => a.status !== 'done' && a.dueDate < today).length
+  const act = []
+  if (pending) act.push({ text: pending, variant: 'warning', title: `${pending} pending` })
+  if (delayed) act.push({ text: delayed, variant: 'danger', title: `${delayed} delayed` })
+  return { 'plantation-activities': act }
+}
 
 /* Find the id-path of ancestors that contain the active route, so those
    submenus start expanded. */
@@ -18,7 +32,18 @@ function findActiveTrail(nodes, pathname, trail = []) {
   return null
 }
 
-function MenuNode({ node, level, openIds, toggle }) {
+function CountBadges({ badges }) {
+  if (!badges || !badges.length) return null
+  return (
+    <span className="menu-badge d-inline-flex gap-1">
+      {badges.map((b, i) => (
+        <span key={i} className={`badge rounded-pill bg-${b.variant}` + (b.variant === 'warning' ? ' text-dark' : '')} title={b.title}>{b.text}</span>
+      ))}
+    </span>
+  )
+}
+
+function MenuNode({ node, level, openIds, toggle, badges = {} }) {
   const { pathname } = useLocation()
 
   if (node.isTitle) return <li className="menu-title">{node.label}</li>
@@ -37,6 +62,7 @@ function MenuNode({ node, level, openIds, toggle }) {
           {node.badge && (
             <span className={`menu-badge badge bg-${node.badge.variant}`}>{node.badge.text}</span>
           )}
+          <CountBadges badges={badges[node.id]} />
         </NavLink>
       </li>
     )
@@ -66,11 +92,12 @@ function MenuNode({ node, level, openIds, toggle }) {
         {node.badge && (
           <span className={`menu-badge badge bg-${node.badge.variant} me-2`}>{node.badge.text}</span>
         )}
+        <CountBadges badges={badges[node.id]} />
         <i className="menu-arrow ri-arrow-right-s-line" />
       </NavLink>
       <ul className="submenu">
         {node.children.map((child) => (
-          <MenuNode key={child.id} node={child} level={level + 1} openIds={openIds} toggle={toggle} />
+          <MenuNode key={child.id} node={child} level={level + 1} openIds={openIds} toggle={toggle} badges={badges} />
         ))}
       </ul>
     </li>
@@ -85,6 +112,7 @@ function VerticalMenu() {
   const items = useMemo(() => menuForRole(role, settings.profileMode), [role, settings.profileMode])
   const initialOpen = useMemo(() => findActiveTrail(items, pathname) || ['loans'], [items, pathname])
   const [openIds, setOpenIds] = useState(initialOpen)
+  const badges = useNavBadges()
 
   const toggle = (id) =>
     setOpenIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
@@ -92,7 +120,7 @@ function VerticalMenu() {
   return (
     <ul className="menu-list">
       {items.map((node) => (
-        <MenuNode key={node.id} node={node} level={0} openIds={openIds} toggle={toggle} />
+        <MenuNode key={node.id} node={node} level={0} openIds={openIds} toggle={toggle} badges={badges} />
       ))}
     </ul>
   )
@@ -105,6 +133,7 @@ function TwoColumn() {
   const groups = menuForRole(role, settings.profileMode).filter((m) => !m.isTitle)
   const [activeId, setActiveId] = useState(groups[0]?.id)
   const active = groups.find((g) => g.id === activeId)
+  const badges = useNavBadges()
 
   return (
     <>
@@ -131,7 +160,7 @@ function TwoColumn() {
           <ul className="menu-list py-2">
             {active?.children ? (
               active.children.map((child) => (
-                <MenuNode key={child.id} node={child} level={0} openIds={[]} toggle={() => {}} />
+                <MenuNode key={child.id} node={child} level={0} openIds={[]} toggle={() => {}} badges={badges} />
               ))
             ) : (
               <li>
