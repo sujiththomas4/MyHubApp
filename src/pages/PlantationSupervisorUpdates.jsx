@@ -55,7 +55,7 @@ function Section({ icon, tone, title, text }) {
 function Callout({ n }) {
   return (
     <div className="rm-box">
-      <div className="fw-medium small">W{n.week}</div>
+      <div className="fw-medium small text-truncate">{n.title || `W${n.week}`}</div>
       <div className="text-muted" style={{ fontSize: 11 }}>{fmtDate(n.date)}</div>
       {n.hex
         ? <span className="badge fw-normal" style={{ fontSize: 10, backgroundColor: '#ffe8d6', color: n.hex }}>{n.label}</span>
@@ -363,7 +363,10 @@ export default function PlantationSupervisorUpdates() {
       {/* ROAD MAP */}
       {tab === 'roadmap' && (() => {
         const active = schedules.filter((s) => s.active && (!property || s.landId === property))
-        if (active.length === 0) return <div className="card mb-0"><div className="card-body text-center text-muted py-5">No active schedules to map. Add one under Schedules.</div></div>
+        const adhoc = updates.filter((u) => (!property || u.landId === property) && !u.scheduleId)
+          .slice().sort((a, b) => (a.periodFrom || a.date || '').localeCompare(b.periodFrom || b.date || ''))
+        if (active.length === 0 && adhoc.length === 0) return <div className="card mb-0"><div className="card-body text-center text-muted py-5">Nothing to map yet. Add a schedule or a site update.</div></div>
+        const adhocNodes = adhoc.map((u, i) => { const date = u.periodFrom || u.date || ''; return { key: u.id, date, week: i + 1, title: u.title, done: true, ...OCC_STATUS(u, date) } })
         return (
           <div className="d-flex flex-column gap-3">
             {active.map((s) => {
@@ -396,6 +399,16 @@ export default function PlantationSupervisorUpdates() {
                 </div>
               )
             })}
+            {adhocNodes.length > 0 && (
+              <div className="card mb-0">
+                <div className="card-header d-flex flex-wrap align-items-center gap-2">
+                  <h6 className="card-title mb-0 flex-grow-1">Adhoc &amp; one-time updates</h6>
+                  <span className="badge fw-normal bg-secondary-subtle text-secondary">Not recurring</span>
+                  <span className="text-muted small">{adhocNodes.length} update{adhocNodes.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="card-body"><Road nodes={adhocNodes} /></div>
+              </div>
+            )}
           </div>
         )
       })()}

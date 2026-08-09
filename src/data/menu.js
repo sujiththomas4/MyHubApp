@@ -171,7 +171,7 @@ export const menu = [
       { id: 'plantation-pepper-booked', label: 'Plants Booked', to: '/business/plantations/pepper-booked' },
       { id: 'plantation-propagation', label: 'Plant Factory', to: '/business/plantations/propagation' },
       { id: 'plantation-activities', label: 'Activities', to: '/business/plantations/activities' },
-      { id: 'plantation-supervisor', label: 'Site Updates', to: '/business/plantations/supervisor-updates' },
+      { id: 'plantation-supervisor', label: 'Site Updates', trailingIcon: 'ri-star-fill text-warning', to: '/business/plantations/supervisor-updates' },
       { id: 'plantation-road-map', label: 'Road Map', to: '/business/plantations/road-map' },
     ],
   },

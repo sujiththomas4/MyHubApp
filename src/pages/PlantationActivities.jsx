@@ -5,9 +5,12 @@ import { usePlantationActivities, addActivity as apiAdd, editActivity as apiEdit
 import { useLands, landLabel } from '@/data/plantationLandRepo'
 import { useProfiles, personName } from '@/data/profilesRepo'
 import { useActivityLogger } from '@/data/activityLogRepo'
+import { useActivityComments } from '@/data/activityCommentsRepo'
+import { useAuth } from '@/context/AuthContext'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import PropertyBar from '@/components/plantation/PropertyBar'
+import ActivityComments from '@/components/plantation/ActivityComments'
 
 /**
  * PlantationActivities.jsx
@@ -169,10 +172,14 @@ export default function PlantationActivities() {
   const { lands } = useLands()
   const { profiles } = useProfiles()
   const log = useActivityLogger()
+  const { comments: actComments, reload: reloadComments } = useActivityComments()
+  const { session, userName, isAdmin } = useAuth()
+  const currentUserId = session?.user?.id || ''
   const [items, setItems] = useState([])
   const [property, setProperty] = useState('')
   const [tab, setTab] = useState('pending')
   const [assignee, setAssignee] = useState(new Set())
+  const [commentsActivity, setCommentsActivity] = useState(null)
   const [adding, setAdding] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
@@ -182,7 +189,8 @@ export default function PlantationActivities() {
   const landOpts = [{ value: '', label: '— select —' }, ...lands.map((l) => ({ value: l.id, label: landLabel(l) }))]
   const landName = (id) => landLabel(lands.find((l) => l.id === id))
   const userOpts = profiles.map((p) => ({ value: p.id, label: personName(p) }))
-  const userName = (id) => { const p = profiles.find((x) => x.id === id); return p ? personName(p) : '' }
+  const nameOf = (id) => { const p = profiles.find((x) => x.id === id); return p ? personName(p) : '' }
+  const commentCount = (aid) => actComments.filter((c) => c.activityId === aid).length
 
   const matchAssignee = (a) => {
     if (!assignee.size) return true
@@ -230,7 +238,7 @@ export default function PlantationActivities() {
             ))}
           </div>
           <AssigneeFilter users={userOpts} selected={assignee} onChange={setAssignee} includeUnassigned />
-          <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><i className="ri-add-line me-1" />Add activity</button>
+          {isAdmin && <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><i className="ri-add-line me-1" />Add activity</button>}
         </div>
         <div className="card-body p-0">
           <div className="table-responsive">
@@ -253,16 +261,18 @@ export default function PlantationActivities() {
                 ) : rows.map((a) => (
                   <tr key={a.id} className={a.important ? 'table-warning' : ''}>
                     <td className="fw-medium">
-                      <button className={'btn btn-sm p-0 me-1 ' + (a.important ? 'text-warning' : 'text-muted')} title={a.important ? 'Unmark important' : 'Mark high importance'} onClick={() => toggleImportant(a)}>
-                        <i className={a.important ? 'ri-star-fill' : 'ri-star-line'} />
-                      </button>
+                      {isAdmin ? (
+                        <button className={'btn btn-sm p-0 me-1 ' + (a.important ? 'text-warning' : 'text-muted')} title={a.important ? 'Unmark important' : 'Mark high importance'} onClick={() => toggleImportant(a)}>
+                          <i className={a.important ? 'ri-star-fill' : 'ri-star-line'} />
+                        </button>
+                      ) : (a.important && <i className="ri-star-fill text-warning me-1" title="High importance" />)}
                       {a.activity}
                     </td>
                     <td className="text-muted">{landName(a.landId) || '—'}</td>
                     <td>
                       {a.assignedTo && a.assignedTo.length ? (
                         <div className="d-flex flex-wrap gap-1">
-                          {a.assignedTo.map((id) => <span key={id} className="badge fw-normal" style={{ backgroundColor: '#ede9fe', color: '#6d28d9' }}><i className="ri-user-line me-1" />{userName(id) || 'Unknown'}</span>)}
+                          {a.assignedTo.map((id) => <span key={id} className="badge fw-normal" style={{ backgroundColor: '#ede9fe', color: '#6d28d9' }}><i className="ri-user-line me-1" />{nameOf(id) || 'Unknown'}</span>)}
                         </div>
                       ) : <span className="text-muted">—</span>}
                     </td>
@@ -271,18 +281,27 @@ export default function PlantationActivities() {
                       {dueLabel(a.dueDate)}{isDelayed(a) && <i className="ri-alarm-warning-line ms-1" title="Delayed" />}
                     </td>
                     <td className="text-center">
-                      <button
-                        className={'badge border-0 fw-normal ' + (a.status === 'done' ? 'bg-success' : isDelayed(a) ? 'bg-danger' : 'bg-warning text-dark')}
-                        title="Toggle done" onClick={() => toggleDone(a)}
-                      >
-                        {a.status === 'done' ? 'Done' : isDelayed(a) ? 'Delayed' : 'Pending'}
-                      </button>
+                      {isAdmin ? (
+                        <button
+                          className={'badge border-0 fw-normal ' + (a.status === 'done' ? 'bg-success' : isDelayed(a) ? 'bg-danger' : 'bg-warning text-dark')}
+                          title="Toggle done" onClick={() => toggleDone(a)}
+                        >
+                          {a.status === 'done' ? 'Done' : isDelayed(a) ? 'Delayed' : 'Pending'}
+                        </button>
+                      ) : (
+                        <span className={'badge fw-normal ' + (a.status === 'done' ? 'bg-success' : isDelayed(a) ? 'bg-danger' : 'bg-warning text-dark')}>
+                          {a.status === 'done' ? 'Done' : isDelayed(a) ? 'Delayed' : 'Pending'}
+                        </span>
+                      )}
                     </td>
                     <td className="text-muted small">{a.note}</td>
                     <td className="text-center">
                       <div className="d-flex gap-1 justify-content-center">
-                        <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => setEditRow(a)}><i className="ri-pencil-line" /></button>
-                        <button className="btn btn-sm btn-ghost-danger p-1" title="Delete" onClick={() => setDeleteRow(a)}><i className="ri-delete-bin-line" /></button>
+                        <button className="btn btn-sm btn-ghost-secondary p-1 position-relative" title="Comments" onClick={() => setCommentsActivity(a)}>
+                          <i className="ri-chat-3-line" />{commentCount(a.id) > 0 && <span className="badge bg-primary rounded-pill ms-1">{commentCount(a.id)}</span>}
+                        </button>
+                        {isAdmin && <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => setEditRow(a)}><i className="ri-pencil-line" /></button>}
+                        {isAdmin && <button className="btn btn-sm btn-ghost-danger p-1" title="Delete" onClick={() => setDeleteRow(a)}><i className="ri-delete-bin-line" /></button>}
                       </div>
                     </td>
                   </tr>
@@ -310,6 +329,18 @@ export default function PlantationActivities() {
           onCancel={() => { setAdding(false); setEditRow(null) }}
         />
       </Modal>
+
+      {commentsActivity && (
+        <ActivityComments
+          activity={commentsActivity}
+          comments={actComments}
+          reload={reloadComments}
+          users={userOpts}
+          currentUserId={currentUserId}
+          currentUserName={userName}
+          onClose={() => setCommentsActivity(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(deleteRow)}

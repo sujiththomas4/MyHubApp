@@ -59,6 +59,7 @@ function MenuNode({ node, level, openIds, toggle, badges = {} }) {
         >
           {node.icon && <i className={`menu-icon ${node.icon}`} />}
           <span className="menu-label">{node.label}</span>
+          {node.trailingIcon && <i className={node.trailingIcon + ' ms-1'} />}
           {node.badge && (
             <span className={`menu-badge badge bg-${node.badge.variant}`}>{node.badge.text}</span>
           )}

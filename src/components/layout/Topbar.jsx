@@ -2,6 +2,20 @@ import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
 import { PROFILE_MODES } from '@/data/menu'
+import { usePlantationActivities } from '@/data/plantationRepo'
+
+const todayISO = () => new Date().toISOString().slice(0, 10)
+const dueLabel = (iso) => {
+  if (!iso) return ''
+  const d = new Date(iso + 'T00:00:00'); d.setHours(0, 0, 0, 0)
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const days = Math.round((d - now) / 86400000)
+  if (days === 0) return 'today'
+  if (days === 1) return 'tomorrow'
+  if (days === -1) return 'yesterday'
+  if (days > 1) return `in ${days} days`
+  return `${-days} days ago`
+}
 
 function useClickOutside(ref, handler) {
   useEffect(() => {
@@ -15,7 +29,14 @@ function useClickOutside(ref, handler) {
 
 export default function Topbar({ onHamburger, onOpenCustomizer }) {
   const { settings, setSetting } = useTheme()
-  const { signOut, userName, isAdmin } = useAuth()
+  const { signOut, userName, isAdmin, session } = useAuth()
+  const activities = usePlantationActivities()
+  const uid = session?.user?.id || ''
+  const today = todayISO()
+  const mine = activities.filter((a) => Array.isArray(a.assignedTo) && a.assignedTo.includes(uid) && a.status !== 'done')
+  const delayed = mine.filter((a) => a.dueDate && a.dueDate < today).sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+  const pending = mine.filter((a) => !a.dueDate || a.dueDate >= today).sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+  const notifItems = [...delayed.map((a) => ({ a, kind: 'delayed' })), ...pending.map((a) => ({ a, kind: 'pending' }))]
   const userInitial = (userName || '?').trim().charAt(0).toUpperCase() || '?'
   const roleLabel = isAdmin ? 'Admin' : 'Plantation Member'
   const [openMenu, setOpenMenu] = useState(null) // 'notif' | 'user' | null
@@ -93,28 +114,28 @@ export default function Topbar({ onHamburger, onOpenCustomizer }) {
             onClick={() => setOpenMenu((m) => (m === 'notif' ? null : 'notif'))}
           >
             <i className="ri-notification-3-line" />
-            <span className="topbar-badge badge rounded-pill bg-danger">3</span>
+            {notifItems.length > 0 && (
+              <span className={'topbar-badge badge rounded-pill ' + (delayed.length ? 'bg-danger' : 'bg-warning text-dark')}>{notifItems.length}</span>
+            )}
           </button>
           {openMenu === 'notif' && (
             <div className="hub-dropdown-menu">
               <div className="dd-header d-flex justify-content-between">
-                <span>Notifications</span>
-                <span className="badge bg-light text-dark">4 New</span>
+                <span>My tasks</span>
+                <span className="badge bg-light text-dark">{delayed.length} delayed · {pending.length} pending</span>
               </div>
-              {[
-                { icon: 'ri-shopping-cart-line', text: 'Your order #VZ2112 was placed.', time: '30 sec ago' },
-                { icon: 'ri-user-add-line', text: 'Angela Bernier commented on your report.', time: '48 min ago' },
-                { icon: 'ri-mail-line', text: 'You received 20 new messages.', time: '2 hrs ago' },
-              ].map((n, i) => (
-                <div className="hub-dropdown-item" key={i}>
+              {notifItems.length === 0 ? (
+                <div className="hub-dropdown-item text-muted"><span className="flex-grow-1">You are all caught up. 🎉</span></div>
+              ) : notifItems.slice(0, 12).map(({ a, kind }) => (
+                <div className="hub-dropdown-item" key={a.id}>
                   <span className="avatar-xs">
-                    <span className="avatar-title bg-primary-subtle text-primary">
-                      <i className={n.icon} />
+                    <span className={'avatar-title ' + (kind === 'delayed' ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')}>
+                      <i className={kind === 'delayed' ? 'ri-alarm-warning-line' : 'ri-time-line'} />
                     </span>
                   </span>
                   <span className="flex-grow-1">
-                    <span className="d-block">{n.text}</span>
-                    <small className="text-muted">{n.time}</small>
+                    <span className="d-block">{a.activity}</span>
+                    <small className={kind === 'delayed' ? 'text-danger' : 'text-muted'}>{kind === 'delayed' ? 'Delayed' : 'Due'} {dueLabel(a.dueDate)}</small>
                   </span>
                 </div>
               ))}
