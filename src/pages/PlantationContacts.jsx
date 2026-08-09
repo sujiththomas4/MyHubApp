@@ -28,8 +28,15 @@ export default function PlantationContacts() {
         if (!hay.includes(q)) return false
       }
       return true
-    })
+    }).sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0))
   }, [contacts, search, cat])
+
+  const toggleImportant = (c) => editContact({ ...c, important: !c.important }).catch(console.error)
+  const starBtn = (c) => (
+    <button className={'btn btn-sm px-1 me-1 ' + (c.important ? 'text-warning' : 'btn-ghost-secondary')} title={c.important ? 'Unmark important' : 'Mark very important'} onClick={() => toggleImportant(c)}>
+      <i className={c.important ? 'ri-star-fill' : 'ri-star-line'} />
+    </button>
+  )
 
   const fields = [
     { key: 'name', label: 'Name', type: 'text', placeholder: 'e.g. Green Leaf Nursery / Ramesh', required: true, colClass: 'col-md-7' },
@@ -45,7 +52,7 @@ export default function PlantationContacts() {
   const save = async (f) => { if (f.id) await editContact(f); else await addContact({ ...f, id: 'ct-' + rid(), sortOrder: contacts.length }) }
 
   const columns = [
-    { header: 'Name', cell: (c) => (<><span className="fw-medium">{c.name}</span>{c.note && <div className="text-muted small">{c.note}</div>}</>) },
+    { header: 'Name', cell: (c) => (<>{c.important && <i className="ri-star-fill text-warning me-1" title="Very important" />}<span className="fw-medium">{c.name}</span>{c.note && <div className="text-muted small">{c.note}</div>}</>) },
     { header: 'Category', cell: (c) => (c.category ? <span className={`badge bg-${CAT_TONE[c.category] || 'secondary'}-subtle text-${CAT_TONE[c.category] || 'secondary'}`}>{c.category}</span> : '—') },
     { header: 'Specialised in', className: 'text-muted', cell: (c) => c.specialisedIn || '—' },
     { header: 'Contact', cell: (c) => (c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : '—') },
@@ -86,6 +93,7 @@ export default function PlantationContacts() {
         title="Contacts directory" addLabel="Add contact" modalTitle="contact" modalSize="lg"
         emptyText="No contacts yet. Save nurseries, brokers, suppliers, officers…"
         rows={rows} columns={columns} fields={fields} makeBlank={blank} onSave={save} onDelete={removeContact}
+        rowExtra={starBtn}
       />
     </div>
   )

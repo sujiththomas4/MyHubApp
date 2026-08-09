@@ -201,7 +201,7 @@ export default function PlantationActivities() {
   const scoped = (property ? items.filter((a) => a.landId === property) : items).filter(matchAssignee)
   const countFor = (t) => scoped.filter(t.filter).length
   const rows = [...scoped].filter(TABS.find((t) => t.id === tab).filter)
-    .sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || b.dueDate.localeCompare(a.dueDate))
+    .sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (a.dueDate || '').localeCompare(b.dueDate || ''))
 
   const addItem = (a) => {
     setItems((xs) => [...xs, a]); setAdding(false); apiAdd(a).catch(console.error)

@@ -35,8 +35,8 @@ export const editProcedureStep = (x) => updateRow('plantation_procedure_steps', 
 export const removeProcedureStep = (id) => deleteRow('plantation_procedure_steps', id)
 
 // ---- Contacts --------------------------------------------------------------
-const rowToContact = (r) => ({ id: r.id, name: r.name || '', role: r.role || '', category: r.category || '', district: r.district || '', specialisedIn: r.specialised_in || '', phone: r.phone || '', email: r.email || '', address: r.address || '', note: r.note || '', sortOrder: r.sort_order ?? 0 })
-const contactToRow = (x) => ({ id: x.id, name: x.name, role: x.role || null, category: x.category || null, district: x.district || null, specialised_in: x.specialisedIn || null, phone: x.phone || null, email: x.email || null, address: x.address || null, note: x.note || null, sort_order: x.sortOrder ?? 0, updated_at: iso() })
+const rowToContact = (r) => ({ id: r.id, name: r.name || '', role: r.role || '', category: r.category || '', district: r.district || '', specialisedIn: r.specialised_in || '', phone: r.phone || '', email: r.email || '', address: r.address || '', note: r.note || '', important: !!r.important, sortOrder: r.sort_order ?? 0 })
+const contactToRow = (x) => ({ id: x.id, name: x.name, role: x.role || null, category: x.category || null, district: x.district || null, specialised_in: x.specialisedIn || null, phone: x.phone || null, email: x.email || null, address: x.address || null, note: x.note || null, important: !!x.important, sort_order: x.sortOrder ?? 0, updated_at: iso() })
 export function useContacts() {
   const { data, loading, error } = useCollection('plantation_contacts', [], { orderBy: 'name', ascending: true, map: rowToContact })
   return { contacts: data, loading, error }

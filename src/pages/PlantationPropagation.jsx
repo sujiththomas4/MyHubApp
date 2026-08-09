@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { fmtDate } from '@/data/AppData'
 import CrudCard from '@/components/plantation/CrudCard'
 import { usePropagation, addPropagation, editPropagation, removePropagation } from '@/data/propagationRepo'
+import { PlannedCropsPanel } from '@/pages/PlantationPlannedCrops'
 import { useProfiles, personName } from '@/data/profilesRepo'
 import { usePlants, usePoles, useVerticals, useZones, useLands, landLabel, editPlant } from '@/data/plantationLandRepo'
 import HierarchyFilter, { MultiSelect } from '@/components/plantation/HierarchyFilter'
@@ -31,6 +33,7 @@ const STATUS_BADGE = {
 }
 const STATUS_LABEL = Object.fromEntries(STATUS.map((s) => [s.value, s.label]))
 const TABS = [
+  { id: 'plants', label: 'Plants', icon: 'ri-plant-fill' },
   { id: 'mothers', label: 'Mother Plants', icon: 'ri-plant-line' },
   { id: 'thippali', label: 'Thippali Nursery', method: 'Thippali Nursery', icon: 'ri-seedling-line' },
   { id: 'layering', label: 'Layering Unit', method: 'Layering Unit', icon: 'ri-git-branch-line' },
@@ -69,7 +72,8 @@ function usePlantOptions() {
 }
 
 export default function PlantationPropagation() {
-  const [tab, setTab] = useState('thippali')
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState(TABS.some((t) => t.id === params.get('tab')) ? params.get('tab') : 'plants')
   const [filter, setFilter] = useState(emptyHierarchyFilter)
   const [motherSel, setMotherSel] = useState(new Set())
   const active = TABS.find((t) => t.id === tab)
@@ -124,6 +128,7 @@ export default function PlantationPropagation() {
       )}
 
       {active.method && <BatchTracker lockType={active.method} matchBatch={matchBatch} />}
+      {tab === 'plants' && <PlannedCropsPanel />}
       {tab === 'mothers' && <MotherPlants plantVisible={plantVisible} motherSel={motherSel} data={data} />}
       {tab === 'inventory' && <NurseryInventory matchBatch={matchBatch} />}
       {tab === 'reports' && <Reports matchBatch={matchBatch} />}

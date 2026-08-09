@@ -122,7 +122,7 @@ export const ENTITY = {
     add: addPlant, edit: editPlant, remove: removePlant,
     name: (n) => n.tag || n.variety || 'Plant',
     bulk: { nameKey: 'tag', namePrefix: 'Plant ', codePrefix: 'BP', shared: ['stage', 'variety', 'status', 'plantedDate'], lookups: { variety: VARIETY_LIST, crop: CROP_LIST } },
-    blank: () => ({ tag: '', code: '', crop: '', plantType: '', variety: '', stage: 'planned', plantedDate: '', status: 'na', note: '', image: '' }),
+    blank: () => ({ tag: '', code: '', crop: '', plantType: '', variety: '', stage: 'planned', plantedDate: '', status: 'na', isMother: false, note: '', image: '' }),
     fields: [
       { key: 'tag', label: 'Plant tag', type: 'text', placeholder: 'TAG-001', required: true, colClass: 'col-md-8' },
       { key: 'code', label: 'Code', type: 'text', placeholder: 'BP1', colClass: 'col-md-4' },
@@ -132,6 +132,7 @@ export const ENTITY = {
       { key: 'stage', label: 'Stage', type: 'select', options: PLANT_STAGE, colClass: 'col-md-4' },
       { key: 'plantedDate', label: 'Planted on', type: 'date', colClass: 'col-md-4' },
       { key: 'status', label: 'Status', type: 'select', options: PLANT_STATUS, colClass: 'col-md-4' },
+      { key: 'isMother', label: 'Mother plant', type: 'switch', switchLabel: 'Use as mother plant', colClass: 'col-md-8' },
       { key: 'note', label: 'Note', type: 'textarea' },
       { key: 'image', label: 'Photo', type: 'image', folder: 'plantation/plants' },
     ],

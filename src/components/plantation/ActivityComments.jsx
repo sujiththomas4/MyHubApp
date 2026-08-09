@@ -17,8 +17,7 @@ export default function ActivityComments({ activity, comments, reload, users, cu
 
   const onAdd = async ({ body, mentions }) => {
     await addActivityComment({ id: 'acmt-' + rid(), activityId: activity.id, body, mentions, authorId: currentUserId, authorName: currentUserName, createdAt: new Date().toISOString() })
-    const trimmed = body.length > 60 ? body.slice(0, 60) + '…' : body
-    logActivity({ category: 'comment', description: `Comment on activity "${activity.activity}": "${trimmed}"`, meta: { activityId: activity.id }, actorId: currentUserId, actorName: currentUserName }).catch((e) => console.error('log failed', e))
+    logActivity({ category: 'comment', description: `Comment on activity "${activity.activity}": "${body}"`, meta: { activityId: activity.id }, actorId: currentUserId, actorName: currentUserName }).catch((e) => console.error('log failed', e))
     await reload()
   }
   const onDelete = async (c) => { await removeActivityComment(c.id); await reload() }

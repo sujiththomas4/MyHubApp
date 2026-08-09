@@ -42,7 +42,7 @@ export default function PlantationPlannedCropDetail() {
         <h4 className="flex-grow-1 mb-0">{crop ? crop.name : 'Planned crop'}</h4>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
-            <li className="breadcrumb-item"><Link to="/business/plantations/planned-crops" className="text-reset">Planned Crops</Link></li>
+            <li className="breadcrumb-item"><Link to="/business/plantations/propagation?tab=plants" className="text-reset">Plant Factory</Link></li>
             <li className="breadcrumb-item active" aria-current="page">{crop ? crop.name : cropId}</li>
           </ol>
         </nav>
@@ -65,7 +65,7 @@ export default function PlantationPlannedCropDetail() {
               </div>
               {crop.note && <div className="text-muted small mt-1">{crop.note}</div>}
             </div>
-            <Link to="/business/plantations/planned-crops" className="btn btn-sm btn-light"><i className="ri-arrow-left-line me-1" />Back</Link>
+            <Link to="/business/plantations/propagation?tab=plants" className="btn btn-sm btn-light"><i className="ri-arrow-left-line me-1" />Back</Link>
           </div>
         </div>
       )}

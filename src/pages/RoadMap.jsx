@@ -16,17 +16,39 @@ function chunk(arr, n) {
 // This road map tracks plantation activity only.
 const PLANT_CATS = new Set(['booking', 'plant', 'supervisor', 'schedule', 'activity', 'comment'])
 
-function Node({ n }) {
+function Node({ n, onHover, onLeave }) {
   const c = catOf(n.category)
   return (
-    <div className="rmap-cell">
+    <div className="rmap-cell" onMouseEnter={(e) => onHover(n, e)} onMouseMove={(e) => onHover(n, e)} onMouseLeave={onLeave}>
       <div className="rmap-node">
-        <span className={`rmap-dot bg-${c.tone}`} title={`${c.label} · ${fullDateTime(n.createdAt)}`}><i className={c.icon} /></span>
+        <span className={`rmap-dot bg-${c.tone}`}><i className={c.icon} /></span>
       </div>
       <div className="rmap-label">
-        <div className="small fw-medium text-truncate" style={{ whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.description}</div>
-        <div className="text-muted" style={{ fontSize: 11 }} title={fullDateTime(n.createdAt)}>{timeAgo(n.createdAt)}</div>
+        <div className="small fw-medium" style={{ whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.description}</div>
+        <div className="text-muted" style={{ fontSize: 11 }}>{timeAgo(n.createdAt)}</div>
         {n.actorName && <div className="text-muted" style={{ fontSize: 10 }}>{n.actorName}</div>}
+      </div>
+    </div>
+  )
+}
+
+// Cursor-following detail card.
+function RoadTip({ tip }) {
+  if (!tip) return null
+  const c = catOf(tip.n.category)
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  const left = Math.min(tip.x + 16, vw - 360)
+  const top = Math.min(tip.y + 16, vh - 40)
+  return (
+    <div className="rmap-tip card shadow border-0" style={{ position: 'fixed', left, top, zIndex: 3000, width: 340, maxHeight: vh - 24, overflow: 'auto', pointerEvents: 'none' }}>
+      <div className={`card-header py-1 px-2 bg-${c.tone}-subtle text-${c.tone} border-0 d-flex align-items-center gap-1`}>
+        <i className={c.icon} /><span className="fw-medium small">{c.label}</span>
+      </div>
+      <div className="card-body p-2">
+        <div className="fw-medium mb-1" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{tip.n.description}</div>
+        <div className="text-muted small"><i className="ri-time-line me-1" />{fullDateTime(tip.n.createdAt)} <span className="ms-1">· {timeAgo(tip.n.createdAt)}</span></div>
+        {tip.n.actorName && <div className="text-muted small"><i className="ri-user-line me-1" />{tip.n.actorName}</div>}
       </div>
     </div>
   )
@@ -36,6 +58,7 @@ export default function RoadMap() {
   const { logs: allLogs } = useActivityLog()
   const logs = useMemo(() => allLogs.filter((l) => PLANT_CATS.has(l.category)), [allLogs])
   const [cats, setCats] = useState(new Set())
+  const [tip, setTip] = useState(null)
   const wrapRef = useRef(null)
   const [perRow, setPerRow] = useState(4)
 
@@ -100,7 +123,7 @@ export default function RoadMap() {
                 const turnSide = rev ? 'left' : 'right'
                 return (
                   <div className={'rmap-row' + (rev ? ' rev' : '')} key={r}>
-                    {row.map((n) => <Node key={n.id} n={n} />)}
+                    {row.map((n) => <Node key={n.id} n={n} onHover={(nn, e) => setTip({ n: nn, x: e.clientX, y: e.clientY })} onLeave={() => setTip(null)} />)}
                     {/* pad short last row so cells keep a consistent width */}
                     {row.length < perRow && Array.from({ length: perRow - row.length }).map((_, i) => <div className="rmap-cell" key={'pad' + i} />)}
                     {!isLast && <span className={`rmap-turn ${turnSide}`} />}
@@ -111,6 +134,8 @@ export default function RoadMap() {
           )}
         </div>
       </div>
+
+      <RoadTip tip={tip} />
     </div>
   )
 }

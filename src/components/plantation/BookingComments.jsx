@@ -17,8 +17,7 @@ export default function BookingComments({ booking, comments, reload, users, curr
 
   const onAdd = async ({ body, mentions }) => {
     await addBookingComment({ id: 'cmt-' + rid(), bookingId: booking.id, body, mentions, authorId: currentUserId, authorName: currentUserName, createdAt: new Date().toISOString() })
-    const trimmed = body.length > 60 ? body.slice(0, 60) + '…' : body
-    logActivity({ category: 'comment', description: `Comment on ${booking.crop || 'booking'}${booking.variety ? ' · ' + booking.variety : ''}: "${trimmed}"`, meta: { bookingId: booking.id }, actorId: currentUserId, actorName: currentUserName }).catch((e) => console.error('log failed', e))
+    logActivity({ category: 'comment', description: `Comment on ${booking.crop || 'booking'}${booking.variety ? ' · ' + booking.variety : ''}: "${body}"`, meta: { bookingId: booking.id }, actorId: currentUserId, actorName: currentUserName }).catch((e) => console.error('log failed', e))
     await reload()
   }
   const onDelete = async (c) => { await removeBookingComment(c.id); await reload() }
