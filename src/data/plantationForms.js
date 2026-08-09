@@ -27,6 +27,7 @@ const POLE_TYPES = [
   { value: 'konna', label: 'Konna' },
   { value: 'pvc', label: 'PVC' },
   { value: 'concrete', label: 'Concrete' },
+  { value: 'support_leg', label: 'Supporting leg' },
   { value: 'plant', label: 'Plant itself' },
   { value: 'other', label: 'Other' },
 ]
