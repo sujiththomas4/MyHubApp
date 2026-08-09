@@ -12,9 +12,11 @@ const entryToRow = (e) => ({
 })
 const rowToActivity = (r) => ({
   id: r.id, date: r.date, dueDate: r.due_date, activity: r.activity, status: r.status, landId: r.land_id || '', note: r.note || '',
+  assignedTo: Array.isArray(r.assigned_ids) ? r.assigned_ids : (r.assigned_to ? [r.assigned_to] : []), important: !!r.important,
 })
 const activityToRow = (a) => ({
   id: a.id, date: a.date, due_date: a.dueDate, activity: a.activity, status: a.status, land_id: a.landId || null, note: a.note,
+  assigned_ids: Array.isArray(a.assignedTo) ? a.assignedTo : (a.assignedTo ? [a.assignedTo] : []), assigned_to: null, important: !!a.important,
 })
 
 export function usePlantationEntries() {

@@ -7,7 +7,10 @@ import { useLookups, valuesFor, VARIETY_LIST } from '@/data/lookupsRepo'
 import { useProfiles, personName } from '@/data/profilesRepo'
 import { useLands, landLabel, usePlants, usePoles, useVerticals, useZones, addPlant } from '@/data/plantationLandRepo'
 import { useUpdates } from '@/data/plantationUpdatesRepo'
+import { useBookingComments } from '@/data/bookingCommentsRepo'
+import { useAuth } from '@/context/AuthContext'
 import PropertyBar from '@/components/plantation/PropertyBar'
+import BookingComments from '@/components/plantation/BookingComments'
 
 /**
  * PlantationPepperBooked.jsx — plants ordered for our plantation, one screen for
@@ -297,8 +300,14 @@ export default function PlantationPepperBooked() {
   const { bookings } = usePepperBookings()
   const { lookups } = useLookups()
   const { profiles } = useProfiles()
+  const { comments, reload: reloadComments } = useBookingComments()
+  const { session, userName } = useAuth()
+  const currentUserId = session?.user?.id || ''
   const varieties = valuesFor(lookups, VARIETY_LIST)
   const people = [...new Set(profiles.map(personName).filter(Boolean))]
+  const mentionUsers = profiles.map((p) => ({ value: p.id, label: personName(p) })).filter((u) => u.label)
+  const commentCount = (bid) => comments.filter((c) => c.bookingId === bid).length
+  const [commentsBooking, setCommentsBooking] = useState(null)
   const crops = valuesFor(lookups, CROP_LIST)
   const cropButtons = crops.length ? crops : ['Pepper']
   const { lands } = useLands()
@@ -600,8 +609,29 @@ export default function PlantationPepperBooked() {
             addLabel={`Add ${crop.toLowerCase()} booking`} modalTitle={`${crop.toLowerCase()} booking`} modalSize="lg"
             emptyText={anyFilter ? 'No bookings match the filters.' : `No ${crop.toLowerCase()} bookings yet.`}
             rows={rows} columns={columns} fields={fields} makeBlank={makeBlank} onSave={onSave} onDelete={removeBooking}
+            rowExtra={(b) => {
+              const n = commentCount(b.id)
+              return (
+                <button className="btn btn-sm btn-ghost-secondary px-2 me-1 position-relative" title="Comments" onClick={() => setCommentsBooking(b)}>
+                  <i className="ri-chat-3-line" />
+                  {n > 0 && <span className="badge bg-primary rounded-pill ms-1">{n}</span>}
+                </button>
+              )
+            }}
           />
         </>
+      )}
+
+      {commentsBooking && (
+        <BookingComments
+          booking={commentsBooking}
+          comments={comments}
+          reload={reloadComments}
+          users={mentionUsers}
+          currentUserId={currentUserId}
+          currentUserName={userName}
+          onClose={() => setCommentsBooking(null)}
+        />
       )}
 
       {trackBooking && (() => {
