@@ -117,6 +117,8 @@ export const menu = [
     to: '/business/strategies',
     badge: { text: 'Imp', variant: 'warning' },
   },
+  { id: 'business-swing', label: 'Stock Swing Trading', icon: 'ri-stock-line', to: '/business/swing' },
+  { id: 'business-nifty-gold', label: 'Nifty–Gold Ratio', icon: 'ri-scales-3-line', to: '/business/nifty-gold' },
   { id: 'daily-option-selling', label: 'Daily Option Selling', icon: 'ri-star-line', to: '/business/daily-option-selling' },
 
   {
