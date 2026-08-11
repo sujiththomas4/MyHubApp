@@ -24,6 +24,7 @@ import MonthlyEmis from '@/pages/MonthlyEmis'
 import MoneyLent from '@/pages/MoneyLent'
 import IncomePlanner from '@/pages/IncomePlanner'
 import TradingChallenge10 from '@/pages/TradingChallenge10'
+import MyTrades from '@/pages/MyTrades'
 import PlantationTracker from '@/pages/PlantationTracker'
 import PlantationActivities from '@/pages/PlantationActivities'
 import PlantationDashboard from '@/pages/PlantationDashboard'
@@ -135,6 +136,7 @@ export default function App() {
           <Route path="/money/income-planner" element={<IncomePlanner />} />
           <Route path="/business/plantations/road-map" element={<RoadMap />} />
           <Route path="/trading-challenge/10-clean" element={<TradingChallenge10 />} />
+          <Route path="/my-trades" element={<MyTrades />} />
         </>}
 
         {/* Anything else: admins get the stub, members are sent to Plantation */}

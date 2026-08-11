@@ -15,6 +15,7 @@
 export const menu = [
   { id: 'title-challenge', label: 'Trading Challenge', isTitle: true },
   { id: 'challenge-10', label: '10 Clean Trades', icon: 'ri-focus-3-line', to: '/trading-challenge/10-clean' },
+  { id: 'my-trades', label: 'My Trades', icon: 'ri-booklet-line', to: '/my-trades' },
 
   { id: 'title-wealth', label: 'Overall Wealth', isTitle: true },
 

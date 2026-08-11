@@ -332,6 +332,15 @@
   color: var(--hub-heading-color);
   margin: 0.5rem 0 0.75rem;
 }
+/* Base: centers the icon for every .stat-icon, including those used outside a
+   .stat-card (holdings cards, list headers, etc.) which otherwise had no
+   centering and pushed the glyph to the top-left corner. */
+.stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+}
 .stat-card .stat-icon {
   width: 3.25rem;
   height: 3.25rem;
