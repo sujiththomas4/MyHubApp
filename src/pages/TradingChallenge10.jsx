@@ -15,7 +15,7 @@ import {
  * clean-trade count + rules-kept / rules-broken tally.
  */
 const CHALLENGE = '10-clean'
-const TARGET = 10
+const TARGET = 22
 const rid = () => Math.random().toString(36).slice(2, 8)
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const SIDE_LABEL = { ce: 'CE', pe: 'PE', sell_ce: 'CE', sell_pe: 'PE', other: '—' }
@@ -270,12 +270,12 @@ export default function TradingChallenge10() {
   return (
     <div className="option-buying">
       <div className="page-title-box d-flex align-items-center">
-        <h4 className="flex-grow-1 mb-0">10 Clean Trades Challenge</h4>
+        <h4 className="flex-grow-1 mb-0">22 Clean Trades Challenge</h4>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item"><a href="/">Hub</a></li>
             <li className="breadcrumb-item">Trading Challenge</li>
-            <li className="breadcrumb-item active" aria-current="page">10 Clean Trades</li>
+            <li className="breadcrumb-item active" aria-current="page">22 Clean Trades</li>
           </ol>
         </nav>
       </div>
