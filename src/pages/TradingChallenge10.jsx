@@ -19,11 +19,23 @@ const TARGET = 22
 const rid = () => Math.random().toString(36).slice(2, 8)
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const SIDE_LABEL = { ce: 'CE', pe: 'PE', sell_ce: 'CE', sell_pe: 'PE', other: '—' }
+const MAX_TRADES_PER_DAY = 5
+const MAX_DAILY_LOSS = 10000
+
+function FocusAlert({ tone, icon, title, text }) {
+  return (
+    <div className={`hub-focus-alert tone-${tone} alert alert-${tone} d-flex align-items-center gap-3 mb-3`}>
+      <i className={icon + ' hub-focus-icon fs-2'} />
+      <div><div className="fw-bold">{title}</div><div className="small mb-0">{text}</div></div>
+    </div>
+  )
+}
 const RESULT_BADGE = { open: 'bg-secondary-subtle text-secondary', win: 'bg-success-subtle text-success', loss: 'bg-danger-subtle text-danger', breakeven: 'bg-warning-subtle text-dark' }
 const RESULT_LABEL = Object.fromEntries(RESULTS.map((r) => [r.value, r.label]))
 
 function TradeForm({ initial, onSave, onCancel }) {
   const [f, setF] = useState(() => ({
+    id: initial?.id,
     date: initial?.date || todayISO(),
     symbol: initial?.symbol || '',
     dir: initial?.dir || 'buy',
@@ -255,6 +267,14 @@ export default function TradingChallenge10() {
   const losses = trades.filter((t) => t.result === 'loss').length
   const totalPoints = trades.reduce((s, t) => s + (capturedPoints(t) ?? 0), 0)
 
+  // Today's discipline checks.
+  const today = todayISO()
+  const todays = trades.filter((t) => t.date === today)
+  const takenToday = todays.filter((t) => t.stage !== 'planned').length
+  const pnlToday = todays.reduce((s, t) => s + ((capturedPoints(t) ?? 0) * (Number(t.qty) || 0)), 0)
+  const overTrading = takenToday > MAX_TRADES_PER_DAY
+  const bigLoss = pnlToday <= -MAX_DAILY_LOSS
+
   const openAdd = () => setModal({ initial: null })
   const openEdit = (t) => { if (t.stage === 'planned') setModal({ initial: t }) } // plan locked after activation
   const save = async (form) => {
@@ -269,6 +289,15 @@ export default function TradingChallenge10() {
 
   return (
     <div className="option-buying">
+      {overTrading && (
+        <FocusAlert tone="warning" icon="ri-alarm-warning-line" title="Slow down — too many trades today!"
+          text={`You've taken ${takenToday} trades today. Overtrading breaks discipline — step back and wait for A+ setups.`} />
+      )}
+      {bigLoss && (
+        <FocusAlert tone="danger" icon="ri-emotion-unhappy-line" title="Stop for the day — daily loss limit hit"
+          text={`You're down ${money(Math.round(pnlToday), 'INR')} today (limit −${money(MAX_DAILY_LOSS, 'INR')}). Protect your capital. No revenge trades.`} />
+      )}
+
       <div className="page-title-box d-flex align-items-center">
         <h4 className="flex-grow-1 mb-0">22 Clean Trades Challenge</h4>
         <nav aria-label="breadcrumb">
