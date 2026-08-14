@@ -9,18 +9,18 @@ const num = (v) => (v === '' || v == null ? null : Number(v))
 
 const rowToTrade = (r) => ({
   id: r.id, challenge: r.challenge || '10-clean', date: r.date || '', symbol: r.symbol || '', side: r.side || 'ce',
-  dir: r.dir || 'sell', stage: r.stage || 'planned', setupType: r.setup_type || '', entryTrigger: r.entry_trigger || '',
+  dir: r.dir || 'sell', stage: r.stage || 'planned', setupType: r.setup_type || '', entryTrigger: r.entry_trigger || '', confidence: r.confidence || '',
   qty: r.qty ?? 65, entry: r.entry ?? '', plannedEntry: r.planned_entry ?? '', sl: r.sl ?? '', target: r.target ?? '',
   marketRead: r.market_read || '', logic: r.logic || '', result: r.result || 'open', exit: r.exit ?? '', pnl: r.pnl ?? '',
-  rules: r.rules || {}, note: r.note || '', sortOrder: r.sort_order ?? 0,
+  rules: r.rules || {}, note: r.note || '', image: r.image || '', sortOrder: r.sort_order ?? 0,
   createdAt: r.created_at || '', activatedAt: r.activated_at || '',
 })
 const tradeToRow = (x) => ({
   id: x.id, challenge: x.challenge || '10-clean', date: x.date || null, symbol: x.symbol || null, side: x.side || null,
-  dir: x.dir || 'sell', stage: x.stage || 'planned', setup_type: x.setupType || null, entry_trigger: x.entryTrigger || null,
+  dir: x.dir || 'sell', stage: x.stage || 'planned', setup_type: x.setupType || null, entry_trigger: x.entryTrigger || null, confidence: x.confidence || null,
   qty: num(x.qty), entry: num(x.entry), planned_entry: num(x.plannedEntry), sl: num(x.sl), target: num(x.target),
   market_read: x.marketRead || null, logic: x.logic || null, result: x.result || 'open', exit: num(x.exit), pnl: num(x.pnl),
-  rules: x.rules || {}, note: x.note || null, sort_order: x.sortOrder ?? 0,
+  rules: x.rules || {}, note: x.note || null, image: x.image || null, sort_order: x.sortOrder ?? 0,
   activated_at: x.activatedAt || null, updated_at: iso(),
 })
 
@@ -67,6 +67,13 @@ export const STAGES = [
   { value: 'closed', label: 'Closed', tone: 'dark' },
 ]
 export const STAGE_MAP = Object.fromEntries(STAGES.map((s) => [s.value, s]))
+export const CONFIDENCE = [
+  { value: 'high', label: 'High', tone: 'success' },
+  { value: 'maybe', label: 'May be', tone: 'info' },
+  { value: 'not_sure', label: 'Not sure', tone: 'warning' },
+  { value: 'against', label: 'Against trend', tone: 'danger' },
+]
+export const CONFIDENCE_MAP = Object.fromEntries(CONFIDENCE.map((c) => [c.value, c]))
 // Points are direction-aware: for a Buy, profit is above entry; for a Sell, below.
 const n = (v) => (v === '' || v == null ? null : Number(v))
 export const slPoints = (t) => { const e = n(t.entry); const s = n(t.sl); if (e == null || s == null) return null; return t.dir === 'buy' ? e - s : s - e }

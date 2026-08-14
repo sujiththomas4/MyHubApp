@@ -2974,3 +2974,18 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(247, 184, 75, 0.5); }
   50% { box-shadow: 0 0 0 10px rgba(247, 184, 75, 0); }
 }
+
+/* --- Motivation banner (challenge) ---------------------------------------- */
+.hub-motivate {
+  border: 0; border-radius: 0.85rem; color: #fff; position: relative; overflow: hidden;
+  background: linear-gradient(120deg, #4b93ff 0%, #6f42c1 55%, #f7508d 100%);
+  box-shadow: 0 6px 20px rgba(111, 66, 193, 0.25);
+  animation: hubFocusPop 0.45s ease both;
+}
+.hub-motivate::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-18deg); animation: hubFocusShimmer 3.4s ease-in-out infinite;
+}
+.hub-motivate .hub-motivate-icon { animation: hubFloat 2.6s ease-in-out infinite; }
+@keyframes hubFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }

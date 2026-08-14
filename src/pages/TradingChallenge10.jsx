@@ -2,10 +2,12 @@ import { Fragment, useState } from 'react'
 import { fmtDate, money } from '@/data/AppData'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import PasteImage from '@/components/ui/PasteImage'
 import {
   useChallengeTrades, addChallengeTrade, editChallengeTrade, removeChallengeTrade,
   CLEAN_RULES, isClean, ruleOk, RESULTS, SIDES, DIRECTIONS, slPoints, targetPoints, capturedPoints,
   SETUP_TYPES, SETUP_MAP, ENTRY_TRIGGERS, ENTRY_TRIGGER_MAP, STAGE_MAP, entryDeviation, ENTRY_DRIFT_LIMIT,
+  CONFIDENCE, CONFIDENCE_MAP,
 } from '@/data/challengeRepo'
 
 /**
@@ -21,6 +23,22 @@ const todayISO = () => new Date().toISOString().slice(0, 10)
 const SIDE_LABEL = { ce: 'CE', pe: 'PE', sell_ce: 'CE', sell_pe: 'PE', other: '—' }
 const MAX_TRADES_PER_DAY = 5
 const MAX_DAILY_LOSS = 10000
+
+function MotivationBanner({ remaining, done }) {
+  return (
+    <div className="hub-motivate d-flex align-items-center gap-3 p-3 mb-3">
+      <i className={(done ? 'ri-trophy-line' : 'ri-rocket-2-line') + ' hub-motivate-icon fs-1'} />
+      <div>
+        <div className="fw-bold fs-6">{done ? 'Challenge complete — outstanding discipline! 🎉' : `You're just ${remaining} clean trade${remaining === 1 ? '' : 's'} away from the challenge!`}</div>
+        <div className="small" style={{ opacity: 0.9 }}>
+          {done
+            ? 'You proved that consistency wins. Keep the same discipline going.'
+            : 'Stick to clean, rule-based trades. Consistency — not one big win — makes you successful. Stay patient, trust the process, and the results will follow. 🚀'}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function FocusAlert({ tone, icon, title, text }) {
   return (
@@ -41,6 +59,7 @@ function TradeForm({ initial, onSave, onCancel }) {
     dir: initial?.dir || 'buy',
     side: initial?.side === 'pe' || initial?.side === 'sell_pe' ? 'pe' : 'ce',
     setupType: initial?.setupType || 'support',
+    confidence: initial?.confidence || '',
     qty: initial?.qty ?? 65,
     entry: initial?.entry ?? '',
     sl: initial?.sl ?? '',
@@ -55,6 +74,7 @@ function TradeForm({ initial, onSave, onCancel }) {
     createdAt: initial?.createdAt || '',
     activatedAt: initial?.activatedAt || '',
     plannedEntry: initial?.plannedEntry || '',
+    image: initial?.image || '',
     // Only manual rules are stored; the rest are auto-evaluated from the trade.
     rules: initial?.rules && Object.keys(initial.rules).length ? { ...initial.rules } : Object.fromEntries(CLEAN_RULES.filter((r) => !r.auto).map((r) => [r.id, true])),
     note: initial?.note || '',
@@ -71,6 +91,7 @@ function TradeForm({ initial, onSave, onCancel }) {
 
   const save = async () => {
     if (!f.symbol.trim()) { setErr('Enter the instrument.'); return }
+    if (!f.confidence) { setErr('Select your confidence in this trade.'); return }
     if (f.entry === '' || f.sl === '' || f.target === '') { setErr('Entry, SL and Target must all be set before the trade.'); return }
     setErr(null); setSaving(true)
     try { await onSave({ ...f }) } catch (e) { setErr(e.message || 'Could not save.'); setSaving(false) }
@@ -79,11 +100,18 @@ function TradeForm({ initial, onSave, onCancel }) {
   return (
     <>
       <div className="row g-2">
-        <div className="col-md-5">
-          <label className="form-label small mb-1">Instrument</label>
-          <input className="form-control form-control-sm" placeholder="e.g. NIFTY 24500 CE (weekly)" value={f.symbol} onChange={(e) => set('symbol', e.target.value)} />
-        </div>
+        {/* Line 1 — instrument, option, direction, qty */}
         <div className="col-md-4">
+          <label className="form-label small mb-1">Instrument</label>
+          <input className="form-control form-control-sm" placeholder="e.g. NIFTY 24500 (weekly)" value={f.symbol} onChange={(e) => set('symbol', e.target.value)} />
+        </div>
+        <div className="col-md-2">
+          <label className="form-label small mb-1">Option</label>
+          <select className="form-select form-select-sm" value={f.side} onChange={(e) => set('side', e.target.value)}>
+            {SIDES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+        <div className="col-md-3">
           <label className="form-label small mb-1">Entry direction</label>
           <div className="btn-group btn-group-sm w-100">
             {DIRECTIONS.map((d) => (
@@ -95,27 +123,30 @@ function TradeForm({ initial, onSave, onCancel }) {
           <label className="form-label small mb-1">Qty (1 lot)</label>
           <input type="number" className="form-control form-control-sm" value={f.qty} onChange={(e) => set('qty', e.target.value)} />
         </div>
+
+        {/* Line 2 — setup, confidence, entry, SL, target */}
         <div className="col-md-3">
-          <label className="form-label small mb-1">Option</label>
-          <select className="form-select form-select-sm" value={f.side} onChange={(e) => set('side', e.target.value)}>
-            {SIDES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
-        <div className="col-md-3">
-          <label className="form-label small mb-1">Setup (entry criteria)</label>
+          <label className="form-label small mb-1">Setup</label>
           <select className="form-select form-select-sm" value={f.setupType} onChange={(e) => set('setupType', e.target.value)}>
             {SETUP_TYPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
         <div className="col-md-3">
+          <label className="form-label small mb-1">Confidence <span className="text-danger">*</span></label>
+          <select className="form-select form-select-sm" value={f.confidence} onChange={(e) => set('confidence', e.target.value)}>
+            <option value="">— select —</option>
+            {CONFIDENCE.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+        <div className="col-md-2">
           <label className="form-label small mb-1">Entry</label>
           <input type="number" className="form-control form-control-sm" value={f.entry} onChange={(e) => set('entry', e.target.value)} />
         </div>
-        <div className="col-md-3">
+        <div className="col-md-2">
           <label className="form-label small mb-1">Stop loss</label>
           <input type="number" className="form-control form-control-sm" value={f.sl} onChange={(e) => set('sl', e.target.value)} />
         </div>
-        <div className="col-md-3">
+        <div className="col-md-2">
           <label className="form-label small mb-1">Target</label>
           <input type="number" className="form-control form-control-sm" value={f.target} onChange={(e) => set('target', e.target.value)} />
         </div>
@@ -205,13 +236,13 @@ function ActivateForm({ trade, onSave, onCancel }) {
 // Compact exit / result form — record the outcome from the row without opening
 // the full trade editor. P&L is a free custom number (can be negative).
 function ExitForm({ trade, onSave, onCancel }) {
-  const [f, setF] = useState({ result: trade.result && trade.result !== 'open' ? trade.result : 'win', exit: trade.exit ?? '', note: trade.note || '' })
+  const [f, setF] = useState({ result: trade.result && trade.result !== 'open' ? trade.result : 'win', exit: trade.exit ?? '', note: trade.note || '', image: trade.image || '' })
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
   const pts = capturedPoints({ ...trade, exit: f.exit })
   const qty = Number(trade.qty) || 0
   const pnl = pts != null ? pts * qty : null
-  const save = async () => { setSaving(true); try { await onSave({ ...trade, result: f.result, exit: f.exit, note: f.note, pnl: pnl ?? '', stage: 'closed' }) } catch { setSaving(false) } }
+  const save = async () => { setSaving(true); try { await onSave({ ...trade, result: f.result, exit: f.exit, note: f.note, image: f.image, pnl: pnl ?? '', stage: 'closed' }) } catch { setSaving(false) } }
   return (
     <>
       <div className="small text-muted mb-2">
@@ -242,6 +273,10 @@ function ExitForm({ trade, onSave, onCancel }) {
           <label className="form-label small mb-1">Note</label>
           <input className="form-control" value={f.note} onChange={(e) => set('note', e.target.value)} />
         </div>
+        <div className="col-12">
+          <label className="form-label small mb-1">Screenshot</label>
+          <PasteImage value={f.image} onChange={(v) => set('image', v)} folder="challenge" label="chart screenshot" />
+        </div>
       </div>
       <div className="d-flex justify-content-end gap-2 mt-3">
         <button className="btn btn-light" onClick={onCancel} disabled={saving}>Cancel</button>
@@ -257,6 +292,7 @@ export default function TradingChallenge10() {
   const [activate, setActivate] = useState(null) // planned trade being activated
   const [exit, setExit] = useState(null)     // active trade being exited
   const [del, setDel] = useState(null)
+  const [imgView, setImgView] = useState(null) // full-screen screenshot
 
   const trades = all.filter((t) => (t.challenge || '10-clean') === CHALLENGE)
   // A clean trade counts once it has been taken (active or closed), not while planned.
@@ -309,6 +345,8 @@ export default function TradingChallenge10() {
         </nav>
       </div>
 
+      <MotivationBanner remaining={remaining} done={cleanCount >= TARGET} />
+
       {/* Stats + rules on one row */}
       <div className="row g-3 mb-3">
         <div className="col-lg-3 col-6">
@@ -346,7 +384,7 @@ export default function TradingChallenge10() {
               ) : (
                 <div className="table-responsive">
                   <table className="table table-hover align-middle mb-0">
-                    <thead className="table-light"><tr><th>#</th><th>Instrument</th><th className="text-end">Entry</th><th className="text-end">SL</th><th className="text-end">Target</th><th className="text-center">Status</th><th className="text-center">Points</th><th className="text-end">P&amp;L</th><th className="text-center">Rules</th><th className="text-end">Actions</th></tr></thead>
+                    <thead className="table-light"><tr><th>#</th><th>Instrument</th><th className="text-center">Confidence</th><th className="text-end">Entry</th><th className="text-end">SL</th><th className="text-end">Target</th><th className="text-center">Status</th><th className="text-center">Points</th><th className="text-end">P&amp;L</th><th className="text-center">Rules</th><th className="text-end">Actions</th></tr></thead>
                     <tbody>
                       {(() => {
                         const groups = {}; const order = []
@@ -355,7 +393,7 @@ export default function TradingChallenge10() {
                         let n = 0
                         return order.map((d) => (
                           <Fragment key={d || 'nd'}>
-                            <tr className="table-active"><td colSpan={10} className="fw-semibold py-1"><i className="ri-calendar-2-line me-1" />{d ? fmtDate(d) : 'No date'} <span className="text-muted fw-normal small">· {groups[d].length} trade{groups[d].length === 1 ? '' : 's'}</span></td></tr>
+                            <tr className="table-active"><td colSpan={11} className="fw-semibold py-1"><i className="ri-calendar-2-line me-1" />{d ? fmtDate(d) : 'No date'} <span className="text-muted fw-normal small">· {groups[d].length} trade{groups[d].length === 1 ? '' : 's'}</span></td></tr>
                             {groups[d].map((t) => {
                               n += 1
                               const followed = CLEAN_RULES.filter((r) => ruleOk(t, r)).length
@@ -376,6 +414,12 @@ export default function TradingChallenge10() {
                                 {t.entryTrigger && <span className="ms-1" title={ENTRY_TRIGGER_MAP[t.entryTrigger]?.label}><i className={t.entryTrigger === 'confirmation' ? 'ri-check-double-line' : 'ri-focus-2-line'} /></span>}
                                 <span> · {t.date ? fmtDate(t.date) : ''}</span>
                               </div>
+                              {t.image && <img src={t.image} alt="" onClick={() => setImgView(t.image)} style={{ width: 46, height: 30, objectFit: 'cover', borderRadius: 4, cursor: 'zoom-in', marginTop: 4, border: '1px solid var(--bs-border-color)' }} title="Click to view" />}
+                            </td>
+                            <td className="text-center">
+                              {t.confidence
+                                ? <span className={`badge fw-normal bg-${CONFIDENCE_MAP[t.confidence]?.tone || 'secondary'}-subtle text-${CONFIDENCE_MAP[t.confidence]?.tone || 'secondary'}`}>{CONFIDENCE_MAP[t.confidence]?.label || t.confidence}</span>
+                                : <span className="text-muted">—</span>}
                             </td>
                             <td className="text-end small text-nowrap">
                               {t.entry || '—'}
@@ -445,6 +489,13 @@ export default function TradingChallenge10() {
         open={Boolean(del)} title="Delete trade?" message={del ? `Trade ${del.symbol || ''} will be removed.` : ''} confirmLabel="Delete"
         onConfirm={async () => { const t = del; setDel(null); await removeChallengeTrade(t.id) }} onCancel={() => setDel(null)}
       />
+
+      {imgView && (
+        <div onClick={() => setImgView(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
+          <img src={imgView} alt="" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }} />
+          <button className="btn btn-light position-absolute" style={{ top: 16, right: 16 }} onClick={() => setImgView(null)}><i className="ri-close-line" /></button>
+        </div>
+      )}
     </div>
   )
 }
