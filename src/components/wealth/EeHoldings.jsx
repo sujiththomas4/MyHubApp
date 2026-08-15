@@ -200,6 +200,46 @@ export default function EeHoldings({ categories, target = null, itemLabel = 'hol
   }
   const countLabel = (k) => (target ? `${countOf(k)}/${target}` : countOf(k))
 
+  const activeDisplay = display.filter(({ st }) => st.quantity > 0)
+  const exitedDisplay = display.filter(({ st }) => st.quantity <= 0)
+  const holdingsTable = (list) => (
+    <div className="table-responsive">
+      <table className="table table-hover align-middle mb-0">
+        <thead className="table-light">
+          <tr><Th label="Name" k="stock" />{showCat && <Th label="Category" k="category" />}<Th label="Avg price" k="avgPrice" className="text-end" /><Th label="Qty" k="quantity" className="text-end" /><Th label="LTP" k="ltp" className="text-end" /><Th label="Invested" k="invested" className="text-end" /><Th label="Total" k="total" className="text-end" /><Th label="Unrealised" k="unrealised" className="text-end" /><Th label="Booked" k="realised" className="text-end" /><th className="text-end">Actions</th></tr>
+        </thead>
+        <tbody>
+          {list.map(({ s, st }) => (
+            <tr key={s.id}>
+              <td><div className="fw-medium">{s.symbol || s.name}</div>{s.symbol && s.name && <div className="text-muted small">{s.name}</div>}</td>
+              {showCat && <td>{(() => { const m = catMeta(s.category); return m ? <span className={`badge bg-${m.tone}-subtle text-${m.tone}`}>{m.label}</span> : <span className="text-muted">{s.category}</span> })()}</td>}
+              <td className="text-end">{st.avgPrice ? money(st.avgPrice, 'INR') : '—'}</td>
+              <td className="text-end">{st.quantity || '—'}</td>
+              <td className="text-end">{st.quantity > 0
+                ? <input type="number" defaultValue={s.currentPrice} key={s.id + ':' + s.currentPrice} className="form-control form-control-sm text-end p-1" style={{ width: 90, display: 'inline-block' }} onBlur={(e) => setLtp(s, e.target.value)} title="Current price" />
+                : <span className="text-muted">—</span>}</td>
+              <td className="text-end">{st.invested ? money(Math.round(st.invested), 'INR') : '—'}</td>
+              <td className="text-end">{st.total ? money(Math.round(st.total), 'INR') : '—'}</td>
+              <td className="text-end">
+                {st.quantity > 0 && st.ltp
+                  ? <><PnL v={st.unrealised} /><div className={'small ' + (st.unrealised >= 0 ? 'text-success' : 'text-danger')}>{st.invested ? `${st.unrealised >= 0 ? '+' : ''}${((st.unrealised / st.invested) * 100).toFixed(1)}%` : ''}</div></>
+                  : <span className="text-muted">—</span>}
+              </td>
+              <td className="text-end">{st.realised ? <PnL v={st.realised} /> : <span className="text-muted">—</span>}</td>
+              <td className="text-end text-nowrap">
+                {st.quantity > 0 && <button className="btn btn-sm btn-soft-success px-2 me-1" title="Add / average" onClick={() => setBuy(s)}><i className="ri-add-line" /></button>}
+                {st.quantity > 0 && <button className="btn btn-sm btn-soft-danger px-2 me-1" title="Exit" onClick={() => setExit({ s, holding: st.quantity })}><i className="ri-logout-box-r-line" /></button>}
+                {st.quantity <= 0 && <button className="btn btn-sm btn-soft-success px-2 me-1" title="Re-buy" onClick={() => setBuy(s)}><i className="ri-refresh-line" /></button>}
+                <button className="btn btn-sm btn-ghost-secondary px-2" title="Edit" onClick={() => setEditStock(s)}><i className="ri-pencil-line" /></button>
+                <button className="btn btn-sm btn-ghost-danger px-2" title="Delete" onClick={() => setDel(s)}><i className="ri-delete-bin-line" /></button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
   return (
     <>
       {/* Portfolio totals + per-category returns */}
@@ -270,42 +310,18 @@ export default function EeHoldings({ categories, target = null, itemLabel = 'hol
             <p className="text-muted text-center py-5 mb-0">No {tabbed && !isAll ? active.label.toLowerCase() + ' ' : ''}{itemLabel}s yet. Add your first one.</p>
           ) : display.length === 0 ? (
             <p className="text-muted text-center py-5 mb-0">No {itemLabel}s match “{search}”.</p>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead className="table-light">
-                  <tr><Th label="Name" k="stock" />{showCat && <Th label="Category" k="category" />}<Th label="Avg price" k="avgPrice" className="text-end" /><Th label="Qty" k="quantity" className="text-end" /><Th label="LTP" k="ltp" className="text-end" /><Th label="Invested" k="invested" className="text-end" /><Th label="Total" k="total" className="text-end" /><Th label="Unrealised" k="unrealised" className="text-end" /><Th label="Booked" k="realised" className="text-end" /><th className="text-end">Actions</th></tr>
-                </thead>
-                <tbody>
-                  {display.map(({ s, st }) => (
-                    <tr key={s.id}>
-                      <td><div className="fw-medium">{s.symbol || s.name}</div>{s.symbol && s.name && <div className="text-muted small">{s.name}</div>}</td>
-                      {showCat && <td>{(() => { const m = catMeta(s.category); return m ? <span className={`badge bg-${m.tone}-subtle text-${m.tone}`}>{m.label}</span> : <span className="text-muted">{s.category}</span> })()}</td>}
-                      <td className="text-end">{st.avgPrice ? money(st.avgPrice, 'INR') : '—'}</td>
-                      <td className="text-end">{st.quantity || '—'}</td>
-                      <td className="text-end"><input type="number" defaultValue={s.currentPrice} key={s.id + ':' + s.currentPrice} className="form-control form-control-sm text-end p-1" style={{ width: 90, display: 'inline-block' }} onBlur={(e) => setLtp(s, e.target.value)} title="Current price" /></td>
-                      <td className="text-end">{st.invested ? money(Math.round(st.invested), 'INR') : '—'}</td>
-                      <td className="text-end">{st.total ? money(Math.round(st.total), 'INR') : '—'}</td>
-                      <td className="text-end">
-                        {st.quantity > 0 && st.ltp
-                          ? <><PnL v={st.unrealised} /><div className={'small ' + (st.unrealised >= 0 ? 'text-success' : 'text-danger')}>{st.invested ? `${st.unrealised >= 0 ? '+' : ''}${((st.unrealised / st.invested) * 100).toFixed(1)}%` : ''}</div></>
-                          : <span className="text-muted">—</span>}
-                      </td>
-                      <td className="text-end">{st.realised ? <PnL v={st.realised} /> : <span className="text-muted">—</span>}</td>
-                      <td className="text-end text-nowrap">
-                        <button className="btn btn-sm btn-soft-success px-2 me-1" title="Add / average" onClick={() => setBuy(s)}><i className="ri-add-line" /></button>
-                        {st.quantity > 0 && <button className="btn btn-sm btn-soft-danger px-2 me-1" title="Exit" onClick={() => setExit({ s, holding: st.quantity })}><i className="ri-logout-box-r-line" /></button>}
-                        <button className="btn btn-sm btn-ghost-secondary px-2" title="Edit" onClick={() => setEditStock(s)}><i className="ri-pencil-line" /></button>
-                        <button className="btn btn-sm btn-ghost-danger px-2" title="Delete" onClick={() => setDel(s)}><i className="ri-delete-bin-line" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          ) : activeDisplay.length === 0 ? (
+            <p className="text-muted text-center py-4 mb-0">No active {itemLabel}s. See exited below.</p>
+          ) : holdingsTable(activeDisplay)}
         </div>
       </div>
+
+      {exitedDisplay.length > 0 && (
+        <div className="card mb-0 mt-3">
+          <div className="card-header"><h6 className="card-title mb-0 text-muted"><i className="ri-history-line me-1" />Exited <span className="fw-normal">({exitedDisplay.length})</span></h6></div>
+          <div className="card-body p-0">{holdingsTable(exitedDisplay)}</div>
+        </div>
+      )}
 
       <Modal open={adding} title={<><i className="ri-add-line me-2 text-primary" />Add {tabbed && !isAll ? `${active.label} ` : ''}{itemLabel}</>} onClose={() => setAdding(false)}>
         {adding && <AddForm itemLabel={itemLabel} categories={showCat ? categories : null} defaultCategory={showCat ? (catFilter || categories[0].key) : tab} onSave={saveAdd} onCancel={() => setAdding(false)} />}
