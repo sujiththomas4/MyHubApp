@@ -31,6 +31,17 @@ export function useChallengeTrades() {
 // created_at is set on insert only — never overwritten on edits (needed for the
 // "planned ahead of execution" rule).
 export const addChallengeTrade = (x) => insertRow('challenge_trades', { ...tradeToRow(x), created_at: iso() })
+
+// ---- Key notes -------------------------------------------------------------
+const rowToNote = (r) => ({ id: r.id, body: r.body || '', image: r.image || '', sortOrder: r.sort_order ?? 0, createdAt: r.created_at || '' })
+const noteToRow = (x) => ({ id: x.id, body: x.body || null, image: x.image || null, sort_order: x.sortOrder ?? 0, updated_at: iso() })
+export function useChallengeNotes() {
+  const { data, loading, error, reload } = useCollection('challenge_notes', [], { orderBy: 'sort_order', ascending: true, map: rowToNote })
+  return { notes: data, loading, error, reload }
+}
+export const addChallengeNote = (x) => insertRow('challenge_notes', { ...noteToRow(x), created_at: iso() })
+export const editChallengeNote = (x) => updateRow('challenge_notes', x.id, noteToRow(x))
+export const removeChallengeNote = (id) => deleteRow('challenge_notes', id)
 export const editChallengeTrade = (x) => updateRow('challenge_trades', x.id, tradeToRow(x))
 export const removeChallengeTrade = (id) => deleteRow('challenge_trades', id)
 

@@ -5,6 +5,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import PasteImage from '@/components/ui/PasteImage'
 import {
   useChallengeTrades, addChallengeTrade, editChallengeTrade, removeChallengeTrade,
+  useChallengeNotes, addChallengeNote, editChallengeNote, removeChallengeNote,
   CLEAN_RULES, isClean, ruleOk, RESULTS, SIDES, DIRECTIONS, slPoints, targetPoints, capturedPoints,
   SETUP_TYPES, SETUP_MAP, ENTRY_TRIGGERS, ENTRY_TRIGGER_MAP, STAGE_MAP, entryDeviation, ENTRY_DRIFT_LIMIT,
   CONFIDENCE, CONFIDENCE_MAP,
@@ -23,6 +24,61 @@ const todayISO = () => new Date().toISOString().slice(0, 10)
 const SIDE_LABEL = { ce: 'CE', pe: 'PE', sell_ce: 'CE', sell_pe: 'PE', other: '—' }
 const MAX_TRADES_PER_DAY = 5
 const MAX_DAILY_LOSS = 10000
+
+// Key notes — free-form notes with an optional screenshot.
+function KeyNotes({ open, onClose, onViewImage, notes, reload }) {
+  const [f, setF] = useState({ body: '', image: '' })
+  const [editId, setEditId] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [del, setDel] = useState(null)
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
+  const reset = () => { setF({ body: '', image: '' }); setEditId(null) }
+  const save = async () => {
+    if (!f.body.trim() && !f.image) return
+    setSaving(true)
+    try {
+      if (editId) await editChallengeNote({ id: editId, ...f, sortOrder: notes.find((n) => n.id === editId)?.sortOrder ?? notes.length })
+      else await addChallengeNote({ id: 'note-' + rid(), ...f, sortOrder: notes.length })
+      reset(); await reload()
+    } finally { setSaving(false) }
+  }
+  const startEdit = (n) => { setEditId(n.id); setF({ body: n.body, image: n.image }) }
+  const confirmDel = async () => { const t = del; setDel(null); await removeChallengeNote(t.id); await reload() }
+
+  return (
+    <Modal open={open} size="lg" title={<><i className="ri-sticky-note-line me-2 text-warning" />Key notes</>} onClose={onClose}>
+      <div className="border rounded p-2 mb-3 bg-light">
+        <label className="form-label small mb-1">{editId ? 'Edit note' : 'New note'}</label>
+        <textarea className="form-control" rows={3} placeholder="Type an important reminder / lesson / rule…" value={f.body} onChange={(e) => set('body', e.target.value)} />
+        <label className="form-label small mb-1 mt-2">Image <span className="text-muted">(optional)</span></label>
+        <PasteImage value={f.image} onChange={(v) => set('image', v)} folder="challenge/notes" label="note image" />
+        <div className="d-flex gap-2 mt-2">
+          <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}><i className="ri-save-3-line me-1" />{saving ? 'Saving…' : editId ? 'Update note' : 'Add note'}</button>
+          {editId && <button className="btn btn-light btn-sm" onClick={reset}>Cancel</button>}
+        </div>
+      </div>
+
+      {notes.length === 0 ? (
+        <p className="text-muted text-center py-3 mb-0">No key notes yet. Add your first reminder above.</p>
+      ) : (
+        <div className="d-flex flex-column gap-2">
+          {[...notes].reverse().map((n) => (
+            <div className="border rounded p-2" key={n.id}>
+              <div className="d-flex align-items-start gap-2">
+                <div className="flex-grow-1" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{n.body || <span className="text-muted fst-italic">No text</span>}</div>
+                <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => startEdit(n)}><i className="ri-pencil-line" /></button>
+                <button className="btn btn-sm btn-ghost-danger p-1" title="Delete" onClick={() => setDel(n)}><i className="ri-delete-bin-line" /></button>
+              </div>
+              {n.image && <img src={n.image} alt="" onClick={() => onViewImage(n.image)} style={{ maxWidth: 160, maxHeight: 110, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', marginTop: 6, border: '1px solid var(--bs-border-color)' }} title="Click to view" />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog open={Boolean(del)} title="Delete note?" message="This key note will be removed." confirmLabel="Delete" onConfirm={confirmDel} onCancel={() => setDel(null)} />
+    </Modal>
+  )
+}
 
 function MotivationBanner({ remaining, done }) {
   return (
@@ -288,6 +344,8 @@ function ExitForm({ trade, onSave, onCancel }) {
 
 export default function TradingChallenge10() {
   const { trades: all } = useChallengeTrades()
+  const { notes: keyNotes, reload: reloadNotes } = useChallengeNotes()
+  const [notesOpen, setNotesOpen] = useState(false)
   const [modal, setModal] = useState(null)   // { initial } | null
   const [activate, setActivate] = useState(null) // planned trade being activated
   const [exit, setExit] = useState(null)     // active trade being exited
@@ -376,6 +434,7 @@ export default function TradingChallenge10() {
       <div className="card mb-0">
             <div className="card-header d-flex align-items-center">
               <h5 className="card-title mb-0 flex-grow-1">Trades <span className="text-muted fs-13 fw-normal">({trades.length})</span></h5>
+              <button className="btn btn-soft-warning btn-sm me-2" onClick={() => setNotesOpen(true)}><i className="ri-sticky-note-line me-1" />Key notes{keyNotes.length > 0 && <span className="badge bg-warning text-dark ms-1">{keyNotes.length}</span>}</button>
               <button className="btn btn-primary btn-sm" onClick={openAdd}><i className="ri-add-line me-1" />Plan a trade</button>
             </div>
             <div className="card-body p-0">
@@ -489,6 +548,8 @@ export default function TradingChallenge10() {
         open={Boolean(del)} title="Delete trade?" message={del ? `Trade ${del.symbol || ''} will be removed.` : ''} confirmLabel="Delete"
         onConfirm={async () => { const t = del; setDel(null); await removeChallengeTrade(t.id) }} onCancel={() => setDel(null)}
       />
+
+      <KeyNotes open={notesOpen} onClose={() => setNotesOpen(false)} onViewImage={setImgView} notes={keyNotes} reload={reloadNotes} />
 
       {imgView && (
         <div onClick={() => setImgView(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
