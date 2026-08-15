@@ -53,6 +53,17 @@ export const menu = [
     ],
   },
 
+  {
+    id: 'eva-ezaak',
+    label: 'Eva & Ezaak Portfolio',
+    icon: 'ri-bear-smile-line',
+    to: '/wealth/eva-ezaak/top-stocks',
+    children: [
+      { id: 'ee-top-stocks', label: 'Top 20 Stocks', to: '/wealth/eva-ezaak/top-stocks' },
+      { id: 'ee-metals', label: 'Gold & Silver', to: '/wealth/eva-ezaak/metals' },
+    ],
+  },
+
   { id: 'title-money', label: 'Money', isTitle: true },
 
   { id: 'monthly-emis', label: 'Monthly EMIs & Expenses', icon: 'ri-bank-card-line', to: '/money/emis' },

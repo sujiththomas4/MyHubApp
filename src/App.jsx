@@ -49,6 +49,8 @@ import PlantationContacts from '@/pages/PlantationContacts'
 import PlantationInventory from '@/pages/PlantationInventory'
 import PlantationSupervisorUpdates from '@/pages/PlantationSupervisorUpdates'
 import MasterData from '@/pages/MasterData'
+import EvaEzaakTopStocks from '@/pages/EvaEzaakTopStocks'
+import EvaEzaakMetals from '@/pages/EvaEzaakMetals'
 import Savings from '@/pages/Savings'
 import SavingsCategory from '@/pages/SavingsCategory'
 import Settings from '@/pages/Settings'
@@ -105,6 +107,8 @@ export default function App() {
           <Route path="/admin/master-data" element={<MasterData />} />
           <Route path="/loans" element={<Loans />} />
           <Route path="/loans/:slug" element={<LoanDetail />} />
+          <Route path="/wealth/eva-ezaak/top-stocks" element={<EvaEzaakTopStocks />} />
+          <Route path="/wealth/eva-ezaak/metals" element={<EvaEzaakMetals />} />
           <Route path="/wealth/savings" element={<Savings />} />
           <Route path="/wealth/savings/:category" element={<SavingsCategory />} />
           <Route path="/settings" element={<Settings />} />
