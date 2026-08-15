@@ -33,8 +33,8 @@ export function useChallengeTrades() {
 export const addChallengeTrade = (x) => insertRow('challenge_trades', { ...tradeToRow(x), created_at: iso() })
 
 // ---- Key notes -------------------------------------------------------------
-const rowToNote = (r) => ({ id: r.id, body: r.body || '', image: r.image || '', sortOrder: r.sort_order ?? 0, createdAt: r.created_at || '' })
-const noteToRow = (x) => ({ id: x.id, body: x.body || null, image: x.image || null, sort_order: x.sortOrder ?? 0, updated_at: iso() })
+const rowToNote = (r) => ({ id: r.id, body: r.body || '', image: r.image || '', tags: Array.isArray(r.tags) ? r.tags : [], sortOrder: r.sort_order ?? 0, createdAt: r.created_at || '' })
+const noteToRow = (x) => ({ id: x.id, body: x.body || null, image: x.image || null, tags: Array.isArray(x.tags) ? [...new Set(x.tags.map((t) => String(t).trim()).filter(Boolean))] : [], sort_order: x.sortOrder ?? 0, updated_at: iso() })
 export function useChallengeNotes() {
   const { data, loading, error, reload } = useCollection('challenge_notes', [], { orderBy: 'sort_order', ascending: true, map: rowToNote })
   return { notes: data, loading, error, reload }

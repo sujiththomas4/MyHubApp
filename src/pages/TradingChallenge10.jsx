@@ -25,53 +25,113 @@ const SIDE_LABEL = { ce: 'CE', pe: 'PE', sell_ce: 'CE', sell_pe: 'PE', other: '�
 const MAX_TRADES_PER_DAY = 5
 const MAX_DAILY_LOSS = 10000
 
-// Key notes — free-form notes with an optional screenshot.
+// Key notes — full-screen popup. Notes list row-wise; the add/edit form is behind
+// a button to save space.
 function KeyNotes({ open, onClose, onViewImage, notes, reload }) {
-  const [f, setF] = useState({ body: '', image: '' })
+  const [f, setF] = useState({ body: '', image: '', tags: [] })
+  const [tagInput, setTagInput] = useState('')
+  const [composing, setComposing] = useState(false)
   const [editId, setEditId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [del, setDel] = useState(null)
+  const [q, setQ] = useState('')
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
-  const reset = () => { setF({ body: '', image: '' }); setEditId(null) }
+  const openAdd = () => { setF({ body: '', image: '', tags: [] }); setTagInput(''); setEditId(null); setComposing(true) }
+  const openEdit = (n) => { setF({ body: n.body, image: n.image, tags: n.tags || [] }); setTagInput(''); setEditId(n.id); setComposing(true) }
+  const cancel = () => { setComposing(false); setEditId(null); setF({ body: '', image: '', tags: [] }); setTagInput('') }
+  const addTag = () => { const t = tagInput.trim(); if (t) setF((s) => (s.tags.includes(t) ? s : { ...s, tags: [...s.tags, t] })); setTagInput('') }
+  const removeTag = (t) => setF((s) => ({ ...s, tags: s.tags.filter((x) => x !== t) }))
   const save = async () => {
-    if (!f.body.trim() && !f.image) return
+    if (!f.body.trim() && !f.image && f.tags.length === 0) return
     setSaving(true)
     try {
       if (editId) await editChallengeNote({ id: editId, ...f, sortOrder: notes.find((n) => n.id === editId)?.sortOrder ?? notes.length })
       else await addChallengeNote({ id: 'note-' + rid(), ...f, sortOrder: notes.length })
-      reset(); await reload()
+      cancel(); await reload()
     } finally { setSaving(false) }
   }
-  const startEdit = (n) => { setEditId(n.id); setF({ body: n.body, image: n.image }) }
   const confirmDel = async () => { const t = del; setDel(null); await removeChallengeNote(t.id); await reload() }
 
+  const query = q.trim().toLowerCase()
+  const shown = [...notes].reverse().filter((n) => {
+    if (!query) return true
+    return (n.body || '').toLowerCase().includes(query) || (n.tags || []).some((t) => t.toLowerCase().includes(query))
+  })
+
   return (
-    <Modal open={open} size="lg" title={<><i className="ri-sticky-note-line me-2 text-warning" />Key notes</>} onClose={onClose}>
-      <div className="border rounded p-2 mb-3 bg-light">
-        <label className="form-label small mb-1">{editId ? 'Edit note' : 'New note'}</label>
-        <textarea className="form-control" rows={3} placeholder="Type an important reminder / lesson / rule…" value={f.body} onChange={(e) => set('body', e.target.value)} />
-        <label className="form-label small mb-1 mt-2">Image <span className="text-muted">(optional)</span></label>
-        <PasteImage value={f.image} onChange={(v) => set('image', v)} folder="challenge/notes" label="note image" />
-        <div className="d-flex gap-2 mt-2">
-          <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}><i className="ri-save-3-line me-1" />{saving ? 'Saving…' : editId ? 'Update note' : 'Add note'}</button>
-          {editId && <button className="btn btn-light btn-sm" onClick={reset}>Cancel</button>}
+    <Modal open={open} size="fullscreen" title={<><i className="ri-sticky-note-line me-2 text-warning" />Key notes ({notes.length})</>} onClose={onClose}>
+      <div className="d-flex align-items-center flex-wrap gap-2 mb-3">
+        <div className="input-group input-group-sm" style={{ maxWidth: 320 }}>
+          <span className="input-group-text"><i className="ri-search-line" /></span>
+          <input className="form-control" placeholder="Search notes or tags…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
+        <span className="text-muted small flex-grow-1">{query ? `${shown.length} of ${notes.length}` : 'Reminders, lessons and key takeaways.'}</span>
+        {!composing && <button className="btn btn-primary btn-sm" onClick={openAdd}><i className="ri-add-line me-1" />Add key note</button>}
       </div>
 
-      {notes.length === 0 ? (
-        <p className="text-muted text-center py-3 mb-0">No key notes yet. Add your first reminder above.</p>
-      ) : (
-        <div className="d-flex flex-column gap-2">
-          {[...notes].reverse().map((n) => (
-            <div className="border rounded p-2" key={n.id}>
-              <div className="d-flex align-items-start gap-2">
-                <div className="flex-grow-1" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{n.body || <span className="text-muted fst-italic">No text</span>}</div>
-                <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => startEdit(n)}><i className="ri-pencil-line" /></button>
-                <button className="btn btn-sm btn-ghost-danger p-1" title="Delete" onClick={() => setDel(n)}><i className="ri-delete-bin-line" /></button>
+      {composing && (
+        <div className="border rounded p-3 mb-3 bg-light">
+          <div className="row g-2">
+            <div className="col-lg-8">
+              <label className="form-label small mb-1">{editId ? 'Edit note' : 'New note'}</label>
+              <textarea className="form-control" rows={4} placeholder="Type an important reminder / lesson / rule…" value={f.body} onChange={(e) => set('body', e.target.value)} autoFocus />
+              <label className="form-label small mb-1 mt-2">Tags (key takeaways)</label>
+              <div className="input-group input-group-sm">
+                <input className="form-control" placeholder="e.g. Day-high break → bullish" value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() } }} />
+                <button className="btn btn-outline-secondary" type="button" onClick={addTag}>Add tag</button>
               </div>
-              {n.image && <img src={n.image} alt="" onClick={() => onViewImage(n.image)} style={{ maxWidth: 160, maxHeight: 110, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', marginTop: 6, border: '1px solid var(--bs-border-color)' }} title="Click to view" />}
+              {f.tags.length > 0 && (
+                <div className="d-flex flex-wrap gap-1 mt-2">
+                  {f.tags.map((t) => (
+                    <span key={t} className="badge rounded-pill bg-primary-subtle text-primary">{t} <i className="ri-close-line ms-1" style={{ cursor: 'pointer' }} onClick={() => removeTag(t)} /></span>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
+            <div className="col-lg-4">
+              <label className="form-label small mb-1">Image <span className="text-muted">(optional)</span></label>
+              <PasteImage value={f.image} onChange={(v) => set('image', v)} folder="challenge/notes" label="note image" />
+            </div>
+          </div>
+          <div className="d-flex gap-2 mt-2">
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}><i className="ri-save-3-line me-1" />{saving ? 'Saving…' : editId ? 'Update note' : 'Add note'}</button>
+            <button className="btn btn-light btn-sm" onClick={cancel}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        <p className="text-muted text-center py-4 mb-0">{notes.length === 0 ? 'No key notes yet. Click “Add key note” to create one.' : 'No notes match your search.'}</p>
+      ) : (
+        <div className="table-responsive">
+          <table className="table align-middle">
+            <thead className="table-light"><tr><th style={{ width: 110 }}></th><th>Note</th><th>Tags</th><th className="text-end" style={{ width: 90 }}>Actions</th></tr></thead>
+            <tbody>
+              {shown.map((n) => (
+                <tr key={n.id}>
+                  <td>
+                    {n.image
+                      ? <img src={n.image} alt="" onClick={() => onViewImage(n.image)} style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', border: '1px solid var(--bs-border-color)' }} title="Click to view" />
+                      : <span className="text-muted d-flex align-items-center justify-content-center bg-light rounded" style={{ width: 90, height: 60 }}><i className="ri-sticky-note-line" /></span>}
+                  </td>
+                  <td style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', minWidth: 240 }}>{n.body || <span className="text-muted fst-italic">No text</span>}</td>
+                  <td>
+                    {(n.tags && n.tags.length) ? (
+                      <div className="d-flex flex-wrap gap-1">
+                        {n.tags.map((t) => <span key={t} className="badge rounded-pill bg-primary-subtle text-primary">{t}</span>)}
+                      </div>
+                    ) : <span className="text-muted">—</span>}
+                  </td>
+                  <td className="text-end text-nowrap">
+                    <button className="btn btn-sm btn-ghost-secondary p-1" title="Edit" onClick={() => openEdit(n)}><i className="ri-pencil-line" /></button>
+                    <button className="btn btn-sm btn-ghost-danger p-1" title="Delete" onClick={() => setDel(n)}><i className="ri-delete-bin-line" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
