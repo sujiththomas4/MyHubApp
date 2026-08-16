@@ -49,13 +49,17 @@ import PlantationContacts from '@/pages/PlantationContacts'
 import PlantationInventory from '@/pages/PlantationInventory'
 import PlantationSupervisorUpdates from '@/pages/PlantationSupervisorUpdates'
 import MasterData from '@/pages/MasterData'
-import EvaEzaakTopStocks from '@/pages/EvaEzaakTopStocks'
-import EvaEzaakMetals from '@/pages/EvaEzaakMetals'
+import StrategiesHub from '@/pages/StrategiesHub'
+import Steady25 from '@/pages/Steady25'
+import Focus25 from '@/pages/Focus25'
+import Metal25 from '@/pages/Metal25'
+import EeNiftyGold from '@/pages/EeNiftyGold'
 import Savings from '@/pages/Savings'
 import SavingsCategory from '@/pages/SavingsCategory'
 import Settings from '@/pages/Settings'
 import StockPnL from '@/pages/StockPnL'
 import StockAccount from '@/pages/StockAccount'
+import StockStrengthPage from '@/pages/StockStrengthPage'
 import Placeholder from '@/pages/Placeholder'
 
 /**
@@ -107,12 +111,19 @@ export default function App() {
           <Route path="/admin/master-data" element={<MasterData />} />
           <Route path="/loans" element={<Loans />} />
           <Route path="/loans/:slug" element={<LoanDetail />} />
-          <Route path="/wealth/eva-ezaak/top-stocks" element={<EvaEzaakTopStocks />} />
-          <Route path="/wealth/eva-ezaak/metals" element={<EvaEzaakMetals />} />
+          <Route path="/wealth/eva-ezaak" element={<StrategiesHub />} />
+          <Route path="/wealth/eva-ezaak/steady-25" element={<Steady25 />} />
+          <Route path="/wealth/eva-ezaak/focus-25" element={<Focus25 />} />
+          <Route path="/wealth/eva-ezaak/metal-25" element={<Metal25 />} />
+          <Route path="/wealth/eva-ezaak/nifty-gold" element={<EeNiftyGold />} />
+          {/* Legacy routes → redirect to the new hub */}
+          <Route path="/wealth/eva-ezaak/top-stocks" element={<Navigate to="/wealth/eva-ezaak" replace />} />
+          <Route path="/wealth/eva-ezaak/metals" element={<Navigate to="/wealth/eva-ezaak" replace />} />
           <Route path="/wealth/savings" element={<Savings />} />
           <Route path="/wealth/savings/:category" element={<SavingsCategory />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/investments/pnl" element={<StockPnL />} />
+          <Route path="/investments/stock-strength" element={<StockStrengthPage />} />
           <Route path="/investments/india" element={<StockPnL region="India" />} />
           <Route path="/investments/uae" element={<StockPnL region="UAE" />} />
           <Route path="/investments/:slug" element={<StockAccount />} />

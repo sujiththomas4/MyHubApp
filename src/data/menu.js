@@ -35,6 +35,8 @@ export const menu = [
       { id: 'post-office', label: 'Post office', to: '/wealth/savings/post-office' },
       { id: 'lic', label: 'LIC', to: '/wealth/savings/lic' },
       { id: 'nishanth-chitty', label: 'Nishanth Chitty', to: '/wealth/savings/nishanth-chitty' },
+      { id: 'ksfe-chitty-10k', label: 'KSFE Chitty x 10K (3L)', to: '/wealth/savings/ksfe-chitty-10k' },
+      { id: 'ksfe-chitty-8k', label: 'KSFE Chitty x 8K (2L)', to: '/wealth/savings/ksfe-chitty-8k' },
     ],
   },
 
@@ -57,10 +59,13 @@ export const menu = [
     id: 'eva-ezaak',
     label: 'Eva & Ezaak Portfolio',
     icon: 'ri-bear-smile-line',
-    to: '/wealth/eva-ezaak/top-stocks',
+    to: '/wealth/eva-ezaak',
     children: [
-      { id: 'ee-top-stocks', label: 'Top 20 Stocks', to: '/wealth/eva-ezaak/top-stocks' },
-      { id: 'ee-metals', label: 'Gold & Silver', to: '/wealth/eva-ezaak/metals' },
+      { id: 'ee-hub', label: 'Strategies', to: '/wealth/eva-ezaak' },
+      { id: 'ee-steady', label: 'Steady 25 SIP', to: '/wealth/eva-ezaak/steady-25' },
+      { id: 'ee-focus', label: 'Focus 25 Stocks', to: '/wealth/eva-ezaak/focus-25' },
+      { id: 'ee-metal', label: 'Metal 25', to: '/wealth/eva-ezaak/metal-25' },
+      { id: 'ee-nifty-gold', label: 'Nifty–Gold Ratio', to: '/wealth/eva-ezaak/nifty-gold' },
     ],
   },
 
@@ -73,6 +78,13 @@ export const menu = [
   { id: 'title-stock-market', label: 'Stock Market Investments', isTitle: true },
 
   { id: 'investments-pnl', label: 'P&L', icon: 'ri-line-chart-line', to: '/investments/pnl' },
+  {
+    id: 'investments-stock-strength',
+    label: 'Stock Strength',
+    icon: 'ri-bar-chart-grouped-line',
+    to: '/investments/stock-strength',
+    badge: { text: 'Imp', variant: 'warning' },
+  },
   {
     id: 'investments-india',
     label: 'India',
@@ -129,7 +141,7 @@ export const menu = [
     to: '/business/strategies',
     badge: { text: 'Imp', variant: 'warning' },
   },
-  { id: 'business-swing', label: 'Stock Swing Trading', icon: 'ri-stock-line', to: '/business/swing' },
+  { id: 'business-swing', label: 'Swing 50', icon: 'ri-stock-line', to: '/business/swing', badge: { text: 'Rules', variant: 'dark' } },
   { id: 'business-nifty-gold', label: 'Nifty–Gold Ratio', icon: 'ri-scales-3-line', to: '/business/nifty-gold' },
   { id: 'daily-option-selling', label: 'Daily Option Selling', icon: 'ri-star-line', to: '/business/daily-option-selling' },
 

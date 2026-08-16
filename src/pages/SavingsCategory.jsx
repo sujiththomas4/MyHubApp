@@ -25,11 +25,11 @@ function lockInfo(s) {
   return { locked: unlock > new Date(), unlockISO: unlock.toISOString().slice(0, 10) }
 }
 
-function SavingForm({ initial, defaultCurrency = 'INR', onSave, onCancel }) {
+function SavingForm({ initial, defaultCurrency = 'INR', defaultInvested, onSave, onCancel }) {
   const [f, setF] = useState({
     name: initial?.name || '',
     currency: initial?.currency || defaultCurrency,
-    invested: initial?.invested ?? '',
+    invested: initial?.invested ?? (defaultInvested ?? ''),
     currentValue: initial?.currentValue ?? '',
     startDate: initial?.startDate || todayISO(),
     lockedYears: initial?.lockedYears ?? 0,
@@ -244,6 +244,7 @@ export default function SavingsCategory() {
           key={editRow?.id || 'new'}
           initial={editRow}
           defaultCurrency={cat.currency}
+          defaultInvested={cat.default_invested}
           onSave={editRow ? updateItem : addItem}
           onCancel={() => { setAdding(false); setEditRow(null) }}
         />

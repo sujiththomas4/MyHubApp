@@ -35,7 +35,7 @@ export default function Savings() {
       legend: { position: 'bottom', labels: { colors: colors.text } },
       dataLabels: { enabled: false },
       stroke: { width: 0 },
-      tooltip: { theme: 'light', y: { formatter: (v) => money(v, 'INR') } },
+      tooltip: { theme: 'dark', y: { formatter: (v) => money(v, 'INR') } },
       plotOptions: { pie: { donut: { size: '68%', labels: { show: true, total: { show: true, label: 'Value', formatter: () => money(all.value, 'INR') } } } } },
     },
     series: rows.map((r) => r.value),

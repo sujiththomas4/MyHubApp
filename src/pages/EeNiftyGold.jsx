@@ -2,15 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { money } from '@/data/AppData'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { ASSETS, ASSET, lotInfo, qtyFor } from '@/data/ngRepo'
 import {
-  useNgTrades, addNgTrade, editNgTrade, removeNgTrade,
-  useNgSettings, saveNgSettings, assetStats, qtyFor, lotInfo, ASSETS, ASSET,
-} from '@/data/ngRepo'
+  useEeNgTrades, addEeNgTrade, editEeNgTrade, removeEeNgTrade,
+  useEeNgSettings, saveEeNgSettings, eeAssetStats,
+} from '@/data/eeNgRepo'
 
 /**
- * NiftyGold.jsx — Nifty–Gold Ratio investment (route /business/nifty-gold).
- * Add transaction is always a BUY (long-term accumulate or short-term rotate).
- * Short-term buys can be sold from their own row (specific-lot P&L).
+ * EeNiftyGold.jsx — Eva & Ezaak "Nifty–Gold Ratio (Short Term)" rotation
+ * (route /wealth/eva-ezaak/nifty-gold). Rotate between Nifty and Gold on the
+ * Nifty/Gold ratio breaking its previous 20-day high/low. The signal is judged
+ * manually (outside the tool); this screen records the rotation trades & P&L.
  */
 const rid = () => Math.random().toString(36).slice(2, 8)
 const todayISO = () => new Date().toISOString().slice(0, 10)
@@ -50,9 +52,8 @@ function BuyForm({ initial, prices, onSave, onCancel }) {
         <div className="col-md-6"><label className="form-label small mb-1">Date</label><input type="date" className="form-control" value={f.date} onChange={(e) => set('date', e.target.value)} /></div>
         <div className="col-md-6"><label className="form-label small mb-1">Quantity</label><input type="number" className="form-control" value={f.qty} onChange={(e) => set('qty', e.target.value)} autoFocus /></div>
         <div className="col-md-6"><label className="form-label small mb-1">Unit price (₹)</label><input type="number" className="form-control" value={f.price} onChange={(e) => setF((s) => ({ ...s, price: e.target.value, priceTouched: true }))} /></div>
-        <div className="col-12"><label className="form-label small mb-1">Indication / note</label><textarea className="form-control" rows={2} value={f.note} onChange={(e) => set('note', e.target.value)} /></div>
+        <div className="col-12"><label className="form-label small mb-1">Indication / note</label><textarea className="form-control" rows={2} value={f.note} onChange={(e) => set('note', e.target.value)} placeholder="e.g. ratio broke 20-day low → rotate into Nifty" /></div>
       </div>
-      <div className="text-muted small mt-2"><i className="ri-information-line me-1" />Long-term (accumulation) — not squared off; you keep buying. Short-term rotation now lives under Eva &amp; Ezaak Portfolio.</div>
       {err && <div className="alert alert-danger py-2 mt-3 mb-0">{err}</div>}
       <div className="d-flex justify-content-end gap-2 mt-3">
         <button className="btn btn-light" onClick={onCancel} disabled={saving}>Cancel</button>
@@ -62,7 +63,7 @@ function BuyForm({ initial, prices, onSave, onCancel }) {
   )
 }
 
-// --- Sell form (square off a specific short-term buy lot) --------------------
+// --- Sell form (square off a specific buy lot) ------------------------------
 function SellForm({ buy, remaining, topPrice, onSave, onCancel }) {
   const [f, setF] = useState({ qty: String(remaining), price: topPrice ?? '', date: todayISO(), note: '' })
   const [saving, setSaving] = useState(false)
@@ -74,7 +75,7 @@ function SellForm({ buy, remaining, topPrice, onSave, onCancel }) {
     if (!q || q <= 0) { setErr('Enter a quantity.'); return }
     if (q > remaining) { setErr(`Only ${remaining} remaining in this lot.`); return }
     setErr(null); setSaving(true)
-    try { await onSave({ id: 'ng-' + rid(), asset: buy.asset, action: 'sell', parentId: buy.id, qty: f.qty, price: f.price, date: f.date, note: f.note }) }
+    try { await onSave({ id: 'eeng-' + rid(), asset: buy.asset, action: 'sell', parentId: buy.id, qty: f.qty, price: f.price, date: f.date, note: f.note }) }
     catch (e) { setErr(e.message || 'Could not save.'); setSaving(false) }
   }
   return (
@@ -98,13 +99,13 @@ function SellForm({ buy, remaining, topPrice, onSave, onCancel }) {
   )
 }
 
-export default function NiftyGold() {
-  const { trades, reload: reloadTrades } = useNgTrades()
-  const { settings, reload: reloadSettings } = useNgSettings()
+export default function EeNiftyGold() {
+  const { trades, reload: reloadTrades } = useEeNgTrades()
+  const { settings, reload: reloadSettings } = useEeNgSettings()
 
   const [prices, setPrices] = useState({ niftyPrice: '', goldPrice: '' })
   useEffect(() => { setPrices({ niftyPrice: settings.niftyPrice, goldPrice: settings.goldPrice }) }, [settings.niftyPrice, settings.goldPrice])
-  const savePrices = async () => { await saveNgSettings(prices); await reloadSettings() }
+  const savePrices = async () => { await saveEeNgSettings(prices); await reloadSettings() }
 
   // Calculator
   const [capital, setCapital] = useState('')
@@ -113,8 +114,8 @@ export default function NiftyGold() {
   useEffect(() => { setUnitPrice(calcAsset === 'nifty' ? (prices.niftyPrice ?? '') : (prices.goldPrice ?? '')) }, [calcAsset, prices.niftyPrice, prices.goldPrice])
   const calc = qtyFor(capital, unitPrice)
 
-  const nifty = useMemo(() => assetStats('nifty', trades, prices.niftyPrice), [trades, prices.niftyPrice])
-  const gold = useMemo(() => assetStats('gold', trades, prices.goldPrice), [trades, prices.goldPrice])
+  const nifty = useMemo(() => eeAssetStats('nifty', trades, prices.niftyPrice), [trades, prices.niftyPrice])
+  const gold = useMemo(() => eeAssetStats('gold', trades, prices.goldPrice), [trades, prices.goldPrice])
   const lots = useMemo(() => lotInfo(trades), [trades])
   const ratio = num(prices.niftyPrice) && num(prices.goldPrice) ? num(prices.niftyPrice) / num(prices.goldPrice) : null
   const priceOf = (a) => (a === 'nifty' ? prices.niftyPrice : prices.goldPrice)
@@ -127,16 +128,15 @@ export default function NiftyGold() {
   const [buyModal, setBuyModal] = useState(null)
   const [sellLot, setSellLot] = useState(null)
   const [del, setDel] = useState(null)
-  const openAdd = () => setBuyModal({ asset: 'nifty', term: 'long', qty: '', price: prices.niftyPrice ?? '', date: todayISO(), note: '' })
-  const saveBuy = async (f) => { if (f.id) await editNgTrade(f); else await addNgTrade({ ...f, id: 'ng-' + rid() }); await reloadTrades(); setBuyModal(null) }
-  const saveSell = async (f) => { await addNgTrade(f); await reloadTrades(); setSellLot(null) }
-  // Deleting a buy also removes its sells (they belong to the lot).
+  const openAdd = () => setBuyModal({ asset: 'nifty', qty: '', price: prices.niftyPrice ?? '', date: todayISO(), note: '' })
+  const saveBuy = async (f) => { if (f.id) await editEeNgTrade(f); else await addEeNgTrade({ ...f, id: 'eeng-' + rid() }); await reloadTrades(); setBuyModal(null) }
+  const saveSell = async (f) => { await addEeNgTrade(f); await reloadTrades(); setSellLot(null) }
   const confirmDelete = async () => {
     const t = del; setDel(null)
-    for (const s of trades.filter((x) => x.parentId === t.id)) await removeNgTrade(s.id) // eslint-disable-line no-await-in-loop
-    await removeNgTrade(t.id); await reloadTrades()
+    for (const s of trades.filter((x) => x.parentId === t.id)) await removeEeNgTrade(s.id) // eslint-disable-line no-await-in-loop
+    await removeEeNgTrade(t.id); await reloadTrades()
   }
-  const removeSell = async (id) => { await removeNgTrade(id); await reloadTrades() }
+  const removeSell = async (id) => { await removeEeNgTrade(id); await reloadTrades() }
 
   const Holding = ({ a, st }) => {
     const meta = ASSET[a]
@@ -150,21 +150,12 @@ export default function NiftyGold() {
               <h5 className="mb-0 flex-grow-1">{meta.label}</h5>
               {active ? <span className={`badge bg-${meta.tone}`}>Holding {st.holding}</span> : <span className="badge bg-light text-muted">Not held</span>}
             </div>
-            <div className="row g-2">
-              <div className="col-6"><div className="border rounded p-2 h-100">
-                <div className="small fw-medium mb-1"><i className="ri-archive-line me-1 text-success" />Long term</div>
-                <div className="small text-muted">Qty <span className="fw-semibold text-body">{st.long.qty || '—'}</span></div>
-                <div className="small text-muted">Avg <span className="fw-semibold text-body">{st.long.avg ? money(st.long.avg, 'INR') : '—'}</span></div>
-                <div className="small text-muted">Invested <span className="fw-semibold text-body">{st.long.invested ? money(Math.round(st.long.invested), 'INR') : '—'}</span></div>
-                <div className="small text-muted">Unrealised {st.long.qty > 0 && st.ltp ? <PnL v={st.long.unrealised} /> : '—'}</div>
-              </div></div>
-              <div className="col-6"><div className="border rounded p-2 h-100">
-                <div className="small fw-medium mb-1"><i className="ri-loop-left-line me-1 text-primary" />Short term</div>
-                <div className="small text-muted">Qty <span className="fw-semibold text-body">{st.short.qty || '—'}</span></div>
-                <div className="small text-muted">Avg <span className="fw-semibold text-body">{st.short.avg ? money(st.short.avg, 'INR') : '—'}</span></div>
-                <div className="small text-muted">Realised {st.short.realised ? <PnL v={st.short.realised} /> : '—'}</div>
-                <div className="small text-muted">Unrealised {st.short.qty > 0 && st.ltp ? <PnL v={st.short.unrealised} /> : '—'}</div>
-              </div></div>
+            <div className="row g-2 small text-muted">
+              <div className="col-6">Qty <span className="fw-semibold text-body">{st.qty || '—'}</span></div>
+              <div className="col-6">Avg <span className="fw-semibold text-body">{st.avg ? money(st.avg, 'INR') : '—'}</span></div>
+              <div className="col-6">Invested <span className="fw-semibold text-body">{st.invested ? money(Math.round(st.invested), 'INR') : '—'}</span></div>
+              <div className="col-6">Realised {st.realised ? <PnL v={st.realised} /> : '—'}</div>
+              <div className="col-12">Unrealised {st.qty > 0 && st.ltp ? <PnL v={st.unrealised} /> : '—'}</div>
             </div>
           </div>
         </div>
@@ -176,16 +167,26 @@ export default function NiftyGold() {
     .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''))
 
   return (
-    <div className="option-buying">
+    <div className="ee-nifty-gold">
       <div className="page-title-box d-flex align-items-center">
-        <h4 className="flex-grow-1 mb-0">Nifty–Gold Ratio</h4>
+        <div className="flex-grow-1">
+          <h4 className="mb-0">Nifty–Gold Ratio (Short Term)</h4>
+          <small className="text-muted">For Eva &amp; Ezaak · rotate between Nifty &amp; Gold on the ratio&apos;s 20-day break.</small>
+        </div>
         <nav aria-label="breadcrumb">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item"><a href="/">Hub</a></li>
-            <li className="breadcrumb-item">Business</li>
+            <li className="breadcrumb-item"><a href="/wealth/eva-ezaak">Eva &amp; Ezaak Portfolio</a></li>
             <li className="breadcrumb-item active" aria-current="page">Nifty–Gold Ratio</li>
           </ol>
         </nav>
+      </div>
+
+      <div className="alert alert-info border-0 d-flex gap-2 mb-3" role="alert">
+        <i className="ri-compass-3-line fs-18" />
+        <div className="small">
+          <strong>How this works.</strong> This is a short-term rotation between Nifty and Gold driven by the <strong>Nifty / Gold ratio</strong> breaking its <strong>previous 20-day high or low</strong>. When the ratio breaks out, rotate the holding from one asset into the other — only one side is held at a time. The breakout signal (previous 20-day high/low) is judged manually outside this tool; here you record each rotation buy, square it off when the ratio flips, and track the realised P&L.
+        </div>
       </div>
 
       <div className="card mb-3">
@@ -239,40 +240,36 @@ export default function NiftyGold() {
 
       <div className="card mb-0">
         <div className="card-header d-flex align-items-center">
-          <h5 className="card-title mb-0 flex-grow-1">Transactions</h5>
+          <h5 className="card-title mb-0 flex-grow-1">Rotation trades</h5>
           <button className="btn btn-primary btn-sm" onClick={openAdd}><i className="ri-add-line me-1" />Add transaction</button>
         </div>
         <div className="card-body p-0">
           {shownBuys.length === 0 ? (
-            <p className="text-muted text-center py-5 mb-0">No transactions yet. Buy Nifty or Gold based on the indication.</p>
+            <p className="text-muted text-center py-5 mb-0">No transactions yet. Buy Nifty or Gold when the ratio breaks the 20-day high/low.</p>
           ) : (
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
                 <thead className="table-light">
-                  <tr><th>Date</th><th>Asset</th><th>Type</th><th className="text-end">Qty</th><th className="text-end">Buy price</th><th className="text-end">Sell price</th><th className="text-center">Remaining</th><th className="text-end">P&L</th><th>Indication</th><th className="text-end">Actions</th></tr>
+                  <tr><th>Date</th><th>Asset</th><th className="text-end">Qty</th><th className="text-end">Buy price</th><th className="text-end">Sell price</th><th className="text-center">Remaining</th><th className="text-end">P&L</th><th>Indication</th><th className="text-end">Actions</th></tr>
                 </thead>
                 <tbody>
                   {shownBuys.map((t) => {
                     const info = lots[t.id] || { soldQty: 0, remaining: num(t.qty), realised: 0, sells: [] }
-                    const isShort = t.term === 'short'
                     const soldQty = info.soldQty
                     const avgSell = soldQty > 0 ? info.sells.reduce((s, x) => s + num(x.qty) * num(x.price), 0) / soldQty : 0
                     const sellTitle = info.sells.map((x) => `${x.date || ''}: ${x.qty} @ ${money(num(x.price), 'INR')}`).join('\n')
-                    const canSell = isShort && info.remaining > 0
+                    const canSell = info.remaining > 0
                     const lastSell = info.sells[info.sells.length - 1]
                     return (
                       <tr key={t.id}>
                         <td className="text-muted">{t.date || '—'}</td>
                         <td><span className={`badge bg-${ASSET[t.asset]?.tone || 'secondary'}-subtle text-${ASSET[t.asset]?.tone || 'secondary'}`}><i className={(ASSET[t.asset]?.icon || '') + ' me-1'} />{ASSET[t.asset]?.label || t.asset}</span></td>
-                        <td><span className={'badge fw-normal ' + (isShort ? 'bg-primary-subtle text-primary' : 'bg-secondary-subtle text-secondary')}>{isShort ? 'Short' : 'Long'}</span></td>
                         <td className="text-end">{t.qty}</td>
                         <td className="text-end">{money(num(t.price), 'INR')}</td>
                         <td className="text-end">
-                          {!isShort ? <span className="text-muted">—</span>
-                            : soldQty > 0 ? <span title={sellTitle}>{money(avgSell, 'INR')}{soldQty < num(t.qty) ? <span className="text-muted small"> ({soldQty})</span> : null}</span>
-                              : <span className="text-muted">—</span>}
+                          {soldQty > 0 ? <span title={sellTitle}>{money(avgSell, 'INR')}{soldQty < num(t.qty) ? <span className="text-muted small"> ({soldQty})</span> : null}</span> : <span className="text-muted">—</span>}
                         </td>
-                        <td className="text-center">{isShort ? `${info.remaining}/${t.qty}` : '—'}</td>
+                        <td className="text-center">{info.remaining}/{t.qty}</td>
                         <td className="text-end">{soldQty > 0 ? <PnL v={info.realised} /> : <span className="text-muted">—</span>}</td>
                         <td className="text-muted small" style={{ maxWidth: 200, whiteSpace: 'normal' }}>{t.note || '—'}</td>
                         <td className="text-end text-nowrap">

@@ -1,16 +1,13 @@
 import { useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
-import StockStrength from '@/components/business/StockStrength'
 import { useStrategies, addStrategy, editStrategy, removeStrategy } from '@/data/strategiesRepo'
 
 /**
  * TradingStrategies.jsx — the strategy playbook (route /business/strategies).
- * Two tabs:
- *   - Strategies: each strategy defines its OWN columns (text or dropdown) and
- *     shows a table of columns + values. Dropdown columns let you add new option
- *     values inline.
- *   - Stock Strength: a sortable/filterable watch-table of stocks.
+ * Each strategy defines its OWN columns (text or dropdown) and shows a table of
+ * columns + values. Dropdown columns let you add new option values inline.
+ * (Stock Strength moved to Stock Market Investments → /investments/stock-strength.)
  * Backend-only.
  */
 const rid = () => Math.random().toString(36).slice(2, 8)
@@ -239,15 +236,8 @@ function StrategiesTab() {
   )
 }
 
-// --- Page (tabs) ------------------------------------------------------------
-const TABS = [
-  { id: 'strategies', label: 'Strategies', icon: 'ri-book-marked-line' },
-  { id: 'stock-strength', label: 'Stock Strength', icon: 'ri-bar-chart-grouped-line' },
-]
-
+// --- Page -------------------------------------------------------------------
 export default function TradingStrategies() {
-  const [tab, setTab] = useState('strategies')
-
   return (
     <div className="option-buying">
       <div className="page-title-box d-flex align-items-center">
@@ -261,17 +251,7 @@ export default function TradingStrategies() {
         </nav>
       </div>
 
-      <ul className="nav nav-tabs nav-tabs-custom mb-3">
-        {TABS.map((t) => (
-          <li className="nav-item" key={t.id}>
-            <button className={'nav-link ' + (tab === t.id ? 'active' : '')} onClick={() => setTab(t.id)}>
-              <i className={t.icon + ' me-1'} />{t.label}
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {tab === 'strategies' ? <StrategiesTab /> : <StockStrength />}
+      <StrategiesTab />
     </div>
   )
 }
