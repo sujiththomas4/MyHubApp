@@ -90,6 +90,8 @@ export const addTrade = (x) => insertRow('swing50_trades', {
   entry_date: x.entry_date || null, created_at: iso(),
 })
 export const editTrade = (id, patch) => updateRow('swing50_trades', id, patch)
+/** Batch LTP write — one call per changed row, resolved together, one reload after. */
+export const saveLtps = (entries) => Promise.all(entries.map(({ id, ltp }) => updateRow('swing50_trades', id, { ltp: num(ltp) })))
 export const removeTrade = (id) => deleteRow('swing50_trades', id)
 
 // ---- Halt log -------------------------------------------------------------

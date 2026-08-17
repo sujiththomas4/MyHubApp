@@ -15,6 +15,7 @@ import PnL from '@/pages/PnL'
 import Capital from '@/pages/Capital'
 import TradingStrategies from '@/pages/TradingStrategies'
 import StockSwing from '@/pages/StockSwing'
+import SwingOneHour from '@/pages/SwingOneHour'
 import NiftyGold from '@/pages/NiftyGold'
 import RoadMap from '@/pages/RoadMap'
 import DailyOptionSelling from '@/pages/DailyOptionSelling'
@@ -144,6 +145,7 @@ export default function App() {
           <Route path="/business/capital" element={<Capital />} />
           <Route path="/business/strategies" element={<TradingStrategies />} />
           <Route path="/business/swing" element={<StockSwing />} />
+          <Route path="/business/swing-1h" element={<SwingOneHour />} />
           <Route path="/business/nifty-gold" element={<NiftyGold />} />
           <Route path="/business/daily-option-selling" element={<DailyOptionSelling />} />
           <Route path="/personal/daily-routines" element={<DailyRoutines />} />

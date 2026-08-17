@@ -4,7 +4,7 @@ import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import {
   useStockStrength, addStock, editStock, removeStock,
-  TREND_OPTIONS, STRENGTH_OPTIONS, BIAS_OPTIONS, TREND, STRENGTH, BIAS,
+  TREND_OPTIONS, STRENGTH_OPTIONS, BIAS_OPTIONS, BUCKET_OPTIONS, TREND, STRENGTH, BIAS, BUCKET,
 } from '@/data/stockStrengthRepo'
 
 /**
@@ -14,7 +14,7 @@ import {
  */
 const rid = () => Math.random().toString(36).slice(2, 8)
 const todayISO = () => new Date().toISOString().slice(0, 10)
-const makeBlank = (order) => ({ symbol: '', name: '', sector: '', trend: '', strength: '', bias: '', rating: '', observation: '', updatedDate: todayISO(), sortOrder: order })
+const makeBlank = (order) => ({ symbol: '', name: '', sector: '', bucket: '', rationale: '', trend: '', strength: '', bias: '', rating: '', observation: '', updatedDate: todayISO(), sortOrder: order })
 
 const Tone = ({ map, value }) => {
   const o = map[value]
@@ -92,6 +92,18 @@ function StockForm({ initial, onSave, onCancel, sectorSuggestions }) {
           <datalist id="sector-dl">{sectorSuggestions.map((s) => <option key={s} value={s} />)}</datalist>
         </div>
 
+        <div className="col-md-4">
+          <label className="form-label small mb-1">Bucket</label>
+          <select className="form-select" value={f.bucket || ''} onChange={(e) => set('bucket', e.target.value)}>
+            <option value="">— none —</option>
+            {BUCKET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="col-md-8">
+          <label className="form-label small mb-1">Why this bucket <span className="text-muted">(optional)</span></label>
+          <input className="form-control" placeholder="e.g. Dollar earner, weak-rupee winner" value={f.rationale || ''} onChange={(e) => set('rationale', e.target.value)} />
+        </div>
+
         <div className="col-md-3">
           <label className="form-label small mb-1">Trend</label>
           <select className="form-select" value={f.trend} onChange={(e) => set('trend', e.target.value)}>
@@ -154,6 +166,7 @@ export default function StockStrength() {
   const { stocks, reload } = useStockStrength()
   const [search, setSearch] = useState('')
   const [fSector, setFSector] = useState(new Set())
+  const [fBucket, setFBucket] = useState(new Set())
   const [fTrend, setFTrend] = useState(new Set())
   const [fStrength, setFStrength] = useState(new Set())
   const [fBias, setFBias] = useState(new Set())
@@ -168,6 +181,7 @@ export default function StockStrength() {
     const q = search.trim().toLowerCase()
     let out = stocks.filter((s) => {
       if (fSector.size && !fSector.has(s.sector)) return false
+      if (fBucket.size && !fBucket.has(s.bucket)) return false
       if (fTrend.size && !fTrend.has(s.trend)) return false
       if (fStrength.size && !fStrength.has(s.strength)) return false
       if (fBias.size && !fBias.has(s.bias)) return false
@@ -184,10 +198,10 @@ export default function StockStrength() {
       return String(av).localeCompare(String(bv)) * dir
     })
     return out
-  }, [stocks, search, fSector, fTrend, fStrength, fBias, sort])
+  }, [stocks, search, fSector, fBucket, fTrend, fStrength, fBias, sort])
 
-  const activeFilters = fSector.size + fTrend.size + fStrength.size + fBias.size
-  const clearAll = () => { setFSector(new Set()); setFTrend(new Set()); setFStrength(new Set()); setFBias(new Set()); setSearch('') }
+  const activeFilters = fSector.size + fBucket.size + fTrend.size + fStrength.size + fBias.size
+  const clearAll = () => { setFSector(new Set()); setFBucket(new Set()); setFTrend(new Set()); setFStrength(new Set()); setFBias(new Set()); setSearch('') }
 
   const openAdd = () => setEditing(makeBlank(stocks.length))
   const openEdit = (s) => setEditing({ ...s })
@@ -207,6 +221,7 @@ export default function StockStrength() {
             <input className="form-control" placeholder="Search symbol, name, notes…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <MultiFilter label="Sector" icon="ri-building-2-line" options={sectorOptions} selected={fSector} onChange={setFSector} />
+          <MultiFilter label="Bucket" icon="ri-stack-line" options={BUCKET_OPTIONS} selected={fBucket} onChange={setFBucket} />
           <MultiFilter label="Trend" icon="ri-line-chart-line" options={TREND_OPTIONS} selected={fTrend} onChange={setFTrend} />
           <MultiFilter label="Strength" icon="ri-flashlight-line" options={STRENGTH_OPTIONS} selected={fStrength} onChange={setFStrength} />
           <MultiFilter label="Bias" icon="ri-scales-3-line" options={BIAS_OPTIONS} selected={fBias} onChange={setFBias} />
@@ -228,6 +243,7 @@ export default function StockStrength() {
                 <tr>
                   <Th label="Symbol" sortKey="symbol" sort={sort} setSort={setSort} />
                   <Th label="Sector" sortKey="sector" sort={sort} setSort={setSort} />
+                  <Th label="Bucket" sortKey="bucket" sort={sort} setSort={setSort} className="text-center" />
                   <Th label="Trend" sortKey="trend" sort={sort} setSort={setSort} />
                   <Th label="Strength" sortKey="strength" sort={sort} setSort={setSort} />
                   <Th label="Bias" sortKey="bias" sort={sort} setSort={setSort} />
@@ -242,6 +258,9 @@ export default function StockStrength() {
                   <tr key={s.id}>
                     <td><div className="fw-medium">{s.symbol}</div>{s.name && <div className="text-muted small">{s.name}</div>}</td>
                     <td>{s.sector ? <span className="badge bg-light text-body">{s.sector}</span> : <span className="text-muted">—</span>}</td>
+                    <td className="text-center">{s.bucket
+                      ? <span className={`badge bg-${(BUCKET[s.bucket] || {}).tone || 'secondary'}-subtle text-${(BUCKET[s.bucket] || {}).tone || 'secondary'}`} title={s.rationale || (BUCKET[s.bucket] || {}).label}>{s.bucket}</span>
+                      : <span className="text-muted">—</span>}</td>
                     <td><Tone map={TREND} value={s.trend} /></td>
                     <td><Tone map={STRENGTH} value={s.strength} /></td>
                     <td><Tone map={BIAS} value={s.bias} /></td>

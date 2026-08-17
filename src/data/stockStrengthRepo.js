@@ -11,6 +11,8 @@ const rowToStock = (r) => ({
   symbol: r.symbol || '',
   name: r.name || '',
   sector: r.sector || '',
+  bucket: r.bucket || '',
+  rationale: r.rationale || '',
   trend: r.trend || '',
   strength: r.strength || '',
   bias: r.bias || '',
@@ -24,6 +26,8 @@ const stockToRow = (x) => ({
   symbol: (x.symbol || '').trim(),
   name: x.name || null,
   sector: x.sector || null,
+  bucket: x.bucket || null,
+  rationale: x.rationale || null,
   trend: x.trend || null,
   strength: x.strength || null,
   bias: x.bias || null,
@@ -41,6 +45,18 @@ export function useStockStrength() {
 export const addStock = (x) => insertRow('stock_strength', stockToRow(x))
 export const editStock = (x) => updateRow('stock_strength', x.id, stockToRow(x))
 export const removeStock = (id) => deleteRow('stock_strength', id)
+
+/**
+ * Buckets carried over from Swing 50. This list is the master universe now —
+ * adding a stock here does not touch the Swing 50 watchlist.
+ */
+export const BUCKET_OPTIONS = [
+  { value: 'A', label: 'A — Escalation beneficiaries', short: 'A', tone: 'danger' },
+  { value: 'B', label: 'B — Oil-neutral / rupee winners', short: 'B', tone: 'primary' },
+  { value: 'C', label: 'C — De-escalation plays', short: 'C', tone: 'info' },
+  { value: 'H', label: 'H — Gold hedge sleeve', short: 'H', tone: 'warning' },
+]
+export const BUCKET = Object.fromEntries(BUCKET_OPTIONS.map((o) => [o.value, o]))
 
 export const TREND_OPTIONS = [
   { value: 'up', label: 'Uptrend', tone: 'success' },

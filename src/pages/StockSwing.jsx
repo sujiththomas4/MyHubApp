@@ -5,7 +5,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import {
   useSwingConfig, saveSwingConfig, useSwingBuckets,
   useSwingWatchlist, addWatch, editWatch, removeWatch,
-  useSwingTrades, addTrade, editTrade, removeTrade,
+  useSwingTrades, addTrade, editTrade, removeTrade, saveLtps,
   useHaltLog, addHalt, reactivateHalt,
   useSwingEvents, addEvent, removeEvent,
   capitalOf, sizeTrade, rewardRisk, stopQuality, openStats, closedStats, journalAggregates, equityState,
@@ -52,12 +52,28 @@ export default function StockSwing() {
   const [del, setDel] = useState(null)
   const haltRef = useRef(false)
 
+  // LTP editing is explicit and batched: prices are read-only until you enter
+  // edit mode, then every change is written in one go and the grid reloads once.
+  const [ltpDraft, setLtpDraft] = useState(null) // null = not editing
+  const [ltpSaving, setLtpSaving] = useState(false)
+
   const cap = useMemo(() => capitalOf(config), [config])
   const open = useMemo(() => trades.filter((t) => t.state === 'OPEN'), [trades])
   const planned = useMemo(() => trades.filter((t) => t.state === 'PLANNED'), [trades])
   const closed = useMemo(() => trades.filter((t) => t.state === 'CLOSED'), [trades])
   const agg = useMemo(() => journalAggregates(closed), [closed])
   const eq = useMemo(() => equityState(config, open, agg.realized), [config, open, agg.realized])
+
+  const ltpOf = (t) => t.ltp ?? t.actual_entry ?? t.plan_entry ?? ''
+  const startLtpEdit = () => setLtpDraft(Object.fromEntries(open.map((t) => [t.id, String(ltpOf(t))])))
+  const changedLtps = ltpDraft
+    ? open.filter((t) => ltpDraft[t.id] !== undefined && num(ltpDraft[t.id]) !== num(ltpOf(t))).map((t) => ({ id: t.id, ltp: ltpDraft[t.id] }))
+    : []
+  const saveLtpEdits = async () => {
+    if (!changedLtps.length) { setLtpDraft(null); return }
+    setLtpSaving(true)
+    try { await saveLtps(changedLtps); await reloadTrades(); setLtpDraft(null) } finally { setLtpSaving(false) }
+  }
 
   const openCostTotal = open.reduce((s, t) => s + openStats(t).cost, 0)
   const openPnl = open.reduce((s, t) => s + openStats(t).pnl, 0)
@@ -184,7 +200,22 @@ export default function StockSwing() {
 
       {/* Open + planned positions */}
       <div className="card mb-3">
-        <div className="card-header"><h5 className="card-title mb-0">Open positions</h5></div>
+        <div className="card-header d-flex align-items-center gap-2">
+          <h5 className="card-title mb-0 flex-grow-1">Open positions</h5>
+          {ltpDraft ? (
+            <>
+              <span className="text-muted small">{changedLtps.length} changed</span>
+              <button className="btn btn-sm btn-light" onClick={() => setLtpDraft(null)} disabled={ltpSaving}>Cancel</button>
+              <button className="btn btn-sm btn-primary" onClick={saveLtpEdits} disabled={ltpSaving}>
+                <i className="ri-save-line me-1" />{ltpSaving ? 'Saving…' : 'Save LTPs'}
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-sm btn-soft-primary" onClick={startLtpEdit} disabled={open.length === 0}>
+              <i className="ri-pencil-line me-1" />Update LTP
+            </button>
+          )}
+        </div>
         <div className="card-body p-0">
           <div className="table-responsive">
             <table className="table align-middle table-hover mb-0">
@@ -202,7 +233,13 @@ export default function StockSwing() {
                       <td className="text-end">{money(st.entry, 'INR')}</td>
                       <td className="text-end">{money(num(t.stop_price), 'INR')}</td>
                       <td className="text-end">{money(num(t.target_price), 'INR')}</td>
-                      <td className="text-end" style={{ minWidth: 110 }}><LtpInput trade={t} onSave={(v) => editTrade(t.id, { ltp: v }).then(reloadTrades)} /></td>
+                      <td className="text-end" style={{ minWidth: 110 }}>
+                        {ltpDraft ? (
+                          <input type="number" className="form-control form-control-sm text-end" value={ltpDraft[t.id] ?? ''}
+                            onChange={(e) => setLtpDraft((d) => ({ ...d, [t.id]: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === 'Enter') saveLtpEdits(); if (e.key === 'Escape') setLtpDraft(null) }} />
+                        ) : money(st.ltp, 'INR')}
+                      </td>
                       <td className="text-end"><PnL v={st.pnl} /></td>
                       <td className="text-end"><RVal v={st.openR} /></td>
                       <td className="text-end">{days}</td>
@@ -305,17 +342,6 @@ export default function StockSwing() {
   )
 }
 
-// --- Inline LTP editor ------------------------------------------------------
-function LtpInput({ trade, onSave }) {
-  const [v, setV] = useState(trade.ltp ?? trade.actual_entry ?? trade.plan_entry ?? '')
-  useEffect(() => { setV(trade.ltp ?? trade.actual_entry ?? trade.plan_entry ?? '') }, [trade.ltp, trade.actual_entry, trade.plan_entry])
-  return (
-    <input type="number" className="form-control form-control-sm text-end" value={v}
-      onChange={(e) => setV(e.target.value)}
-      onBlur={() => { if (num(v) !== num(trade.ltp)) onSave(num(v)) }} />
-  )
-}
-
 // --- Entry confirmation -----------------------------------------------------
 /**
  * The gate between "this looks good" and money moving. Auto gates are computed
@@ -372,7 +398,7 @@ function NewTradeModal({ cap, config, buckets, watchlist, events, status, violat
   const [setupType, setSetupType] = useState('')
   const [checked, setChecked] = useState({})
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
-  const minRR = num(config.min_rr) || 2
+  const minRR = num(config.min_rr) || 1.5
 
   const pickWatch = (id) => {
     const w = watchlist.find((x) => x.id === id)
@@ -493,7 +519,7 @@ function OpenFillModal({ trade, violationsFor, cap, config, status, onClose, onS
   const violations = size.error ? [size.error] : violationsFor({ bucket: trade.bucket, sector: trade.sector, posValue, excludeId: trade.id })
   // A fill above plan shrinks the stop distance — re-check it against the ATR recorded at planning.
   const sq = stopQuality({ entry, stop: trade.stop_price, atr: trade.atr, minMult: config.atr_mult_min ?? 1.5, maxMult: config.atr_mult_max ?? 3 })
-  const minRR = num(config.min_rr) || 2
+  const minRR = num(config.min_rr) || 1.5
   const minPos = num(config.min_position_value) || 25000
   const rr = rewardRisk(entry, trade.stop_price, trade.target_price)
   const ready = checklistComplete(setupType, checked)

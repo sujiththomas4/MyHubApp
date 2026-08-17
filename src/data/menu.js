@@ -142,6 +142,7 @@ export const menu = [
     badge: { text: 'Imp', variant: 'warning' },
   },
   { id: 'business-swing', label: 'Swing 50', icon: 'ri-stock-line', to: '/business/swing', badge: { text: 'Rules', variant: 'dark' } },
+  { id: 'business-swing-1h', label: 'Swing 1 Hour', icon: 'ri-timer-flash-line', to: '/business/swing-1h', badge: { text: '1H', variant: 'info' } },
   { id: 'business-nifty-gold', label: 'Nifty–Gold Ratio', icon: 'ri-scales-3-line', to: '/business/nifty-gold' },
   { id: 'daily-option-selling', label: 'Daily Option Selling', icon: 'ri-star-line', to: '/business/daily-option-selling' },
 
