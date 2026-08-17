@@ -5,6 +5,8 @@ import { brokerStats, compoundedReturn, money, fmtMonth, fmtDate } from '@/data/
 import { useBrokerAccounts, useBrokerTrades, brokerModuleMeta } from '@/data/brokerRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useCapital } from '@/context/CapitalContext'
+import { useSwingTrades, openStats, closedStats, journalAggregates } from '@/data/swing50Repo'
+import { useSwing1hTrades, openStats1h, closedStats1h, aggregates1h } from '@/data/swing1hRepo'
 
 /**
  * PnL.jsx
@@ -22,6 +24,35 @@ const PERIODS = [
   { id: 'monthly', label: 'Monthly' },
   { id: 'yearly', label: 'Yearly' },
 ]
+
+// Local calendar day of a timestamp, as YYYY-MM-DD (never UTC — a 9pm IST
+// exit must not land on the next day's bar).
+const localDay = (ts) => {
+  if (!ts) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Roll a swing book (Swing 50 or Swing 1 Hour) into the shape this screen
+ * reports in. These books have no accounts, no brokerage and no per-day
+ * aggregation, so they stay out of the broker tables and get their own.
+ */
+function swingBook({ title, basePath, icon, open, closed, openStat, closedStat, agg, dateOf }) {
+  return {
+    title, basePath, icon,
+    deployed: open.reduce((s, t) => s + openStat(t).cost, 0),
+    openPnl: open.reduce((s, t) => s + openStat(t).pnl, 0),
+    openCount: open.length,
+    realised: agg.realized,
+    n: agg.n,
+    winRate: agg.winRate,
+    avgR: agg.avgR,
+    // Realised P&L stamped on the day the trade closed — feeds the time series.
+    daily: closed.map((t) => ({ date: dateOf(t), net: closedStat(t).pnl })).filter((x) => x.date),
+  }
+}
 
 // Monday of the ISO week containing `d`, as YYYY-MM-DD.
 const weekStart = (d) => {
@@ -57,6 +88,8 @@ export default function PnL() {
   const allAccounts = useBrokerAccounts()
   const allTrades = useBrokerTrades()
   const metaById = Object.fromEntries(brokerModuleMeta.map((m) => [m.id, m]))
+  const { trades: swing50All } = useSwingTrades()
+  const { trades: swing1hAll } = useSwing1hTrades()
 
   // Flatten accounts (with stats) and trades (with net) across all modules.
   const accounts = allAccounts.map((a) => {
@@ -80,9 +113,41 @@ export default function PnL() {
   const winTrades = trades.filter((t) => t.net > 0).length
   const winRate = trades.length ? (winTrades / trades.length) * 100 : 0
 
+  // --- Swing books ----------------------------------------------------------
+  const books = [
+    swingBook({
+      title: 'Swing 50', basePath: '/business/swing', icon: 'ri-stock-line',
+      open: swing50All.filter((t) => t.state === 'OPEN'),
+      closed: swing50All.filter((t) => t.state === 'CLOSED'),
+      openStat: openStats, closedStat: closedStats,
+      agg: journalAggregates(swing50All.filter((t) => t.state === 'CLOSED')),
+      dateOf: (t) => t.exit_date || null,
+    }),
+    swingBook({
+      title: 'Swing 1 Hour', basePath: '/business/swing-1h', icon: 'ri-timer-flash-line',
+      open: swing1hAll.filter((t) => t.state === 'OPEN'),
+      closed: swing1hAll.filter((t) => t.state === 'CLOSED'),
+      openStat: openStats1h, closedStat: closedStats1h,
+      agg: aggregates1h(swing1hAll.filter((t) => t.state === 'CLOSED')),
+      dateOf: (t) => localDay(t.exit_at),
+    }),
+  ]
+  const swingRealised = books.reduce((s, b) => s + b.realised, 0)
+  const swingOpenPnl = books.reduce((s, b) => s + b.openPnl, 0)
+  const swingDeployed = books.reduce((s, b) => s + b.deployed, 0)
+  const swingClosedN = books.reduce((s, b) => s + b.n, 0)
+  const swingNet = swingRealised + swingOpenPnl
+  const allInNet = netPnl + swingNet
+
   // Combined P&L per calendar day → best / worst / avg + cumulative.
+  // Broker trades plus swing trades on the day each was closed. Open swing
+  // positions have no close date, so they sit outside the time series.
+  const pnlEvents = [
+    ...trades.map((t) => ({ date: t.date, net: t.net })),
+    ...books.flatMap((b) => b.daily),
+  ]
   const byDay = new Map()
-  trades.forEach((t) => byDay.set(t.date, (byDay.get(t.date) || 0) + t.net))
+  pnlEvents.forEach((t) => byDay.set(t.date, (byDay.get(t.date) || 0) + t.net))
   const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   const best = days.reduce((m, d) => (d[1] > m[1] ? d : m), ['', -Infinity])
   const worst = days.reduce((m, d) => (d[1] < m[1] ? d : m), ['', Infinity])
@@ -156,7 +221,7 @@ export default function PnL() {
     series: [{ name: 'Cumulative P&L', data: cumSeries }],
   }
   // Period bar — same chart, re-bucketed daily / weekly / monthly / yearly.
-  const periodBuckets = bucketByPeriod(trades, period)
+  const periodBuckets = bucketByPeriod(pnlEvents, period)
   const periodBar = {
     options: {
       chart: { toolbar: { show: false }, fontFamily: 'Poppins, sans-serif' },
@@ -186,10 +251,10 @@ export default function PnL() {
       {/* Headline tiles */}
       <div className="row g-3 mb-4">
         <div className="col-xl-3 col-md-6"><div className="card stat-card h-100 mb-0"><div className="card-body">
-          <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Net P&amp;L</span></div>
-            <div className={`stat-icon bg-${netPnl >= 0 ? 'success' : 'danger'}-subtle text-${netPnl >= 0 ? 'success' : 'danger'}`}><i className="ri-line-chart-line" /></div></div>
-          <h4 className={'stat-value mt-3 mb-0 ' + pnlClass(netPnl)}>{money(netPnl, 'INR')}</h4>
-          <span className="text-muted small">Gross {money(grossPnl, 'INR')} · Charges {money(charges, 'INR')}</span>
+          <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Net P&amp;L — all in</span></div>
+            <div className={`stat-icon bg-${allInNet >= 0 ? 'success' : 'danger'}-subtle text-${allInNet >= 0 ? 'success' : 'danger'}`}><i className="ri-line-chart-line" /></div></div>
+          <h4 className={'stat-value mt-3 mb-0 ' + pnlClass(allInNet)}>{money(allInNet, 'INR')}</h4>
+          <span className="text-muted small">Brokers {money(netPnl, 'INR')} · Swing {money(swingNet, 'INR')}</span>
         </div></div></div>
         <div className="col-xl-3 col-md-6"><div className="card stat-card h-100 mb-0"><div className="card-body">
           <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Capital deployed</span></div>
@@ -201,13 +266,14 @@ export default function PnL() {
           <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Overall return</span></div>
             <div className="stat-icon bg-info-subtle text-info"><i className="ri-percent-line" /></div></div>
           <h4 className={'stat-value mt-3 mb-0 ' + pnlClass(netPnl)}>{returnPct.toFixed(2)}%</h4>
-          <span className="text-muted small">on deployed capital</span>
+          <span className="text-muted small">broker capital only</span>
         </div></div></div>
         <div className="col-xl-3 col-md-6"><div className="card stat-card h-100 mb-0"><div className="card-body">
           <div className="d-flex align-items-center"><div className="flex-grow-1"><span className="stat-label">Win rate</span></div>
             <div className="stat-icon bg-warning-subtle text-warning"><i className="ri-trophy-line" /></div></div>
           <h4 className="stat-value mt-3 mb-0">{winRate.toFixed(0)}%</h4>
           <span className="text-muted small">{winTrades}/{trades.length} green days · {orders} orders</span>
+          <div className="text-muted small">broker days only — swing win rates below</div>
         </div></div></div>
       </div>
 
@@ -245,7 +311,7 @@ export default function PnL() {
 
       <div className="card">
         <div className="card-header d-flex align-items-center flex-wrap gap-2">
-          <h5 className="card-title mb-0 flex-grow-1">P&amp;L over time</h5>
+          <h5 className="card-title mb-0 flex-grow-1">P&amp;L over time <span className="text-muted fs-13 fw-normal">(brokers + realised swing)</span></h5>
           <div className="btn-group btn-group-sm" role="group" aria-label="Period">
             {PERIODS.map((p) => (
               <button
@@ -307,6 +373,60 @@ export default function PnL() {
               </tfoot>
             </table>
           </div>
+        </div>
+      </div>
+
+      {/* Swing books — position-based, no accounts or brokerage */}
+      <div className="card">
+        <div className="card-header d-flex align-items-center flex-wrap gap-2">
+          <h5 className="card-title mb-0 flex-grow-1">Swing books</h5>
+          <span className="text-muted small">own capital · sized per position, not per account</span>
+        </div>
+        <div className="card-body p-0">
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th>Book</th><th className="text-end">Deployed</th><th className="text-end">Realised</th>
+                  <th className="text-end">Open P&amp;L</th><th className="text-end">Total</th>
+                  <th className="text-center">Closed</th><th className="text-center">Win rate</th><th className="text-end">Avg R</th>
+                </tr>
+              </thead>
+              <tbody>
+                {books.map((b) => (
+                  <tr key={b.title}>
+                    <td>
+                      <Link to={b.basePath} className="text-reset fw-medium"><i className={b.icon + ' me-2 text-muted'} />{b.title}</Link>
+                      {b.openCount > 0 && <span className="text-muted small ms-1">· {b.openCount} open</span>}
+                    </td>
+                    <td className="text-end">{money(b.deployed, 'INR')}</td>
+                    <td className={'text-end ' + pnlClass(b.realised)}>{money(b.realised, 'INR')}</td>
+                    <td className={'text-end ' + pnlClass(b.openPnl)}>{money(b.openPnl, 'INR')}</td>
+                    <td className={'text-end fw-semibold ' + pnlClass(b.realised + b.openPnl)}>{money(b.realised + b.openPnl, 'INR')}</td>
+                    <td className="text-center">{b.n || '—'}</td>
+                    <td className="text-center">{b.n ? `${(b.winRate * 100).toFixed(0)}%` : '—'}</td>
+                    <td className={'text-end ' + pnlClass(b.avgR)}>{b.n ? `${b.avgR.toFixed(2)}R` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="fw-semibold border-top">
+                  <td>Swing total</td>
+                  <td className="text-end">{money(swingDeployed, 'INR')}</td>
+                  <td className={'text-end ' + pnlClass(swingRealised)}>{money(swingRealised, 'INR')}</td>
+                  <td className={'text-end ' + pnlClass(swingOpenPnl)}>{money(swingOpenPnl, 'INR')}</td>
+                  <td className={'text-end ' + pnlClass(swingNet)}>{money(swingNet, 'INR')}</td>
+                  <td className="text-center">{swingClosedN || '—'}</td>
+                  <td className="text-center">—</td>
+                  <td className="text-end">—</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div className="card-footer text-muted small">
+          Swing P&amp;L is per position, so there are no brokerage or charge columns — figures are gross.
+          Only <strong>realised</strong> swing P&amp;L appears in the charts above, since open positions have no close date.
         </div>
       </div>
 
