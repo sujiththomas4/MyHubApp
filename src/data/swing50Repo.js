@@ -18,6 +18,39 @@ export const EXIT_REASONS = [
   { value: 'CIRCUIT', label: 'Circuit breaker' },
 ]
 
+// ---- Entry confirmation ----------------------------------------------------
+// Asked at OPEN time, not at planning time: when a trade is planned the setup
+// has not triggered, so none of these can be answered truthfully yet.
+export const SETUP_TYPES = [
+  { value: 'PULLBACK', label: 'Pullback continuation', hint: 'Uptrend pulls back to a rising 20 EMA, then reclaims the prior day’s high.' },
+  { value: 'BREAKOUT', label: 'Base breakout', hint: 'Five weeks or more of tightening range, broken on expanding volume.' },
+]
+
+const SETUP_CHECKS = {
+  PULLBACK: [
+    { key: 'trend', label: 'Trend intact — above a rising 20 EMA, higher highs and lows for 4+ weeks' },
+    { key: 'held', label: 'The pullback held the EMA — no decisive close below it' },
+    { key: 'trigger', label: 'Triggered — price closed above the prior day’s high' },
+  ],
+  BREAKOUT: [
+    { key: 'base_tall', label: 'Base is at least 4 ATRs tall', hint: 'Below that a measured-move target cannot clear a 2.0 reward:risk.' },
+    { key: 'volume', label: 'Breakout volume is 1.5x the 20-day average or better' },
+    { key: 'not_chasing', label: 'Entry is within 2% of the breakout level — not chasing' },
+  ],
+}
+
+const COMMON_CHECKS = [
+  { key: 'structure', label: 'The stop sits below a structural level', hint: 'A swing low or base floor — not a round number, not a percentage I picked.' },
+  { key: 'no_event', label: 'No earnings or known event in the next 2 sessions', hint: 'A stop does not work across a gap.' },
+  { key: 'fresh', label: 'A fresh setup — not an average-down, not a revenge trade' },
+]
+
+export const checklistFor = (setupType) => (SETUP_CHECKS[setupType] ? [...SETUP_CHECKS[setupType], ...COMMON_CHECKS] : [])
+export const checklistComplete = (setupType, checked) => {
+  const items = checklistFor(setupType)
+  return items.length > 0 && items.every((c) => checked?.[c.key])
+}
+
 // ---- Config (single 'main' row) -------------------------------------------
 export function useSwingConfig() {
   const { data, loading, error, reload } = useCollection('swing50_config', [])
@@ -38,7 +71,7 @@ export function useSwingWatchlist() {
   const { data, loading, error, reload } = useCollection('swing50_watchlist', [], { orderBy: 'ticker', ascending: true })
   return { watchlist: data, loading, error, reload }
 }
-export const addWatch = (x) => insertRow('swing50_watchlist', { id: 'wl-' + rid(), ticker: (x.ticker || '').trim().toUpperCase(), name: x.name || '', bucket: x.bucket || 'B', sector: x.sector || '', active: x.active !== false })
+export const addWatch = (x) => insertRow('swing50_watchlist', { id: 'wl-' + rid(), ticker: (x.ticker || '').trim().toUpperCase(), name: x.name || '', bucket: x.bucket || 'B', sector: x.sector || '', rationale: x.rationale || null, active: x.active !== false })
 export const editWatch = (id, patch) => updateRow('swing50_watchlist', id, patch)
 export const removeWatch = (id) => deleteRow('swing50_watchlist', id)
 
@@ -50,7 +83,9 @@ export function useSwingTrades() {
 export const addTrade = (x) => insertRow('swing50_trades', {
   id: 'sw-' + rid(), ticker: (x.ticker || '').trim().toUpperCase(), bucket: x.bucket || 'B', sector: x.sector || '',
   state: x.state || 'PLANNED', plan_entry: num(x.plan_entry), stop_price: num(x.stop_price), target_price: num(x.target_price),
-  setup_reason: x.setup_reason || '', qty: num(x.qty), ltp: x.ltp == null || x.ltp === '' ? num(x.actual_entry ?? x.plan_entry) : num(x.ltp),
+  setup_reason: x.setup_reason || '', qty: num(x.qty), atr: x.atr == null || x.atr === '' ? null : num(x.atr),
+  setup_type: x.setup_type || null, entry_checks: x.entry_checks || null,
+  ltp: x.ltp == null || x.ltp === '' ? num(x.actual_entry ?? x.plan_entry) : num(x.ltp),
   actual_entry: x.actual_entry == null || x.actual_entry === '' ? null : num(x.actual_entry),
   entry_date: x.entry_date || null, created_at: iso(),
 })
@@ -102,6 +137,24 @@ export function sizeTrade({ entry, stop, riskPerTrade, maxPositionValue }) {
   let capped = false
   if (posValue > maxPositionValue && e > 0) { qty = Math.floor(maxPositionValue / e); posValue = qty * e; capped = true }
   return { riskPerShare, qty, posValue, rupeeRisk: qty * riskPerShare, capped }
+}
+
+/**
+ * Is the stop placed outside the noise but not so wide you're chasing?
+ * TIGHT  — inside the daily range, you'll be stopped on nothing.
+ * WIDE   — you're too far from the level; wait for a pullback.
+ * Returns null when ATR is unknown (the check is advisory, never a gate).
+ */
+export function stopQuality({ entry, stop, atr, minMult = 1.5, maxMult = 3 }) {
+  const d = num(entry) - num(stop)
+  const a = num(atr)
+  if (a <= 0 || d <= 0) return null
+  const mult = d / a
+  return {
+    mult,
+    stopPct: num(entry) > 0 ? d / num(entry) : 0,
+    verdict: mult < num(minMult) ? 'TIGHT' : mult > num(maxMult) ? 'WIDE' : 'OK',
+  }
 }
 
 export const rewardRisk = (entry, stop, target) => {

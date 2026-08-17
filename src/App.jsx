@@ -41,6 +41,7 @@ import PlantationPepperBooked from '@/pages/PlantationPepperBooked'
 import PlantationPropagation from '@/pages/PlantationPropagation'
 import PlantationPlannedCrops from '@/pages/PlantationPlannedCrops'
 import PlantationPlannedCropDetail from '@/pages/PlantationPlannedCropDetail'
+import PlantationFlowerDetail from '@/pages/PlantationFlowerDetail'
 import PlantationFertilizers from '@/pages/PlantationFertilizers'
 import PlantationFertilizerDetail from '@/pages/PlantationFertilizerDetail'
 import PlantationProcedures from '@/pages/PlantationProcedures'
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/business/plantations/propagation" element={<PlantationPropagation />} />
         <Route path="/business/plantations/planned-crops" element={<PlantationPlannedCrops />} />
         <Route path="/business/plantations/planned-crops/:cropId" element={<PlantationPlannedCropDetail />} />
+        <Route path="/business/plantations/flowers/:flowerId" element={<PlantationFlowerDetail />} />
         <Route path="/business/plantations/health-center" element={<PlantationFertilizers />} />
         <Route path="/business/plantations/health-center/:fertId" element={<PlantationFertilizerDetail />} />
         <Route path="/business/plantations/records" element={<PlantationProcedures />} />

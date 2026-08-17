@@ -8,7 +8,8 @@ import {
   useSwingTrades, addTrade, editTrade, removeTrade,
   useHaltLog, addHalt, reactivateHalt,
   useSwingEvents, addEvent, removeEvent,
-  capitalOf, sizeTrade, rewardRisk, openStats, closedStats, journalAggregates, equityState,
+  capitalOf, sizeTrade, rewardRisk, stopQuality, openStats, closedStats, journalAggregates, equityState,
+  SETUP_TYPES, checklistFor, checklistComplete,
   EXIT_REASONS,
 } from '@/data/swing50Repo'
 
@@ -315,20 +316,72 @@ function LtpInput({ trade, onSave }) {
   )
 }
 
+// --- Entry confirmation -----------------------------------------------------
+/**
+ * The gate between "this looks good" and money moving. Auto gates are computed
+ * and shown for information; the manual checks must be ticked by hand, because
+ * nothing in the database knows whether the setup actually triggered.
+ */
+function EntryChecklist({ setupType, onSetup, checked, onCheck, autoGates }) {
+  const items = checklistFor(setupType)
+  const done = items.filter((c) => checked[c.key]).length
+  return (
+    <div className="border rounded p-3 mt-3">
+      <div className="d-flex justify-content-between align-items-center mb-2">
+        <h6 className="mb-0"><i className="ri-checkbox-multiple-line me-1 text-primary" />Entry confirmation</h6>
+        {items.length > 0 && <span className={'badge ' + (done === items.length ? 'bg-success' : 'bg-warning')}>{done}/{items.length}</span>}
+      </div>
+
+      <ul className="list-unstyled small mb-3">
+        {autoGates.map((g) => (
+          <li key={g.label} className={g.ok ? 'text-success' : 'text-danger'}>
+            <i className={'me-1 ' + (g.ok ? 'ri-check-line' : 'ri-close-line')} />{g.label}
+            {g.note ? <span className="text-muted ms-1">— {g.note}</span> : null}
+          </li>
+        ))}
+      </ul>
+
+      <label className="form-label small mb-1">Which setup is this?</label>
+      <div className="d-flex flex-wrap gap-3 mb-2">
+        {SETUP_TYPES.map((s) => (
+          <div className="form-check" key={s.value}>
+            <input className="form-check-input" type="radio" id={`st-${s.value}`} checked={setupType === s.value} onChange={() => onSetup(s.value)} />
+            <label className="form-check-label small" htmlFor={`st-${s.value}`} title={s.hint}>{s.label}</label>
+          </div>
+        ))}
+      </div>
+      {!setupType && <div className="text-muted small fst-italic">Pick a setup — if neither fits, there is no trade here.</div>}
+
+      {items.map((c) => (
+        <div className="form-check" key={c.key}>
+          <input className="form-check-input" type="checkbox" id={`chk-${c.key}`} checked={!!checked[c.key]} onChange={(e) => onCheck(c.key, e.target.checked)} />
+          <label className="form-check-label small" htmlFor={`chk-${c.key}`}>
+            {c.label}{c.hint ? <span className="text-muted d-block" style={{ fontSize: '.75rem' }}>{c.hint}</span> : null}
+          </label>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // --- New Trade (calculator) -------------------------------------------------
 function NewTradeModal({ cap, config, buckets, watchlist, events, status, violationsFor, onClose, onSaved }) {
-  const [f, setF] = useState({ ticker: '', sector: '', bucket: 'B', entry: '', stop: '', target: '', reason: '' })
+  const [f, setF] = useState({ ticker: '', sector: '', bucket: 'B', entry: '', stop: '', target: '', atr: '', reason: '' })
   const [err, setErr] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [setupType, setSetupType] = useState('')
+  const [checked, setChecked] = useState({})
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
+  const minRR = num(config.min_rr) || 2
 
   const pickWatch = (id) => {
     const w = watchlist.find((x) => x.id === id)
-    if (w) setF((s) => ({ ...s, ticker: w.ticker, sector: w.sector, bucket: w.bucket }))
+    if (w) setF((s) => ({ ...s, ticker: w.ticker, sector: w.sector, bucket: w.bucket, thesis: w.rationale || '' }))
   }
 
   const size = useMemo(() => sizeTrade({ entry: f.entry, stop: f.stop, riskPerTrade: cap.riskPerTrade, maxPositionValue: num(config.max_position_value) }), [f.entry, f.stop, cap.riskPerTrade, config.max_position_value])
   const rr = rewardRisk(f.entry, f.stop, f.target)
+  const sq = stopQuality({ entry: f.entry, stop: f.stop, atr: f.atr, minMult: config.atr_mult_min ?? 1.5, maxMult: config.atr_mult_max ?? 3 })
   const posValue = size.error ? 0 : size.posValue
   const violations = size.error ? [] : violationsFor({ bucket: f.bucket, sector: f.sector, posValue, excludeId: null })
   // Event within 1 day of today.
@@ -336,14 +389,23 @@ function NewTradeModal({ cap, config, buckets, watchlist, events, status, violat
 
   const build = () => ({
     ticker: f.ticker, sector: f.sector, bucket: f.bucket, plan_entry: num(f.entry), stop_price: num(f.stop),
-    target_price: num(f.target), setup_reason: f.reason.trim(), qty: size.qty || 0,
+    target_price: num(f.target), setup_reason: f.reason.trim(), qty: size.qty || 0, atr: f.atr,
   })
+  const minPos = num(config.min_position_value) || 25000
+  const ready = checklistComplete(setupType, checked)
+  const autoGates = [
+    { label: `Stop ÷ ATR inside ${config.atr_mult_min ?? 1.5}–${config.atr_mult_max ?? 3}`, ok: sq?.verdict === 'OK', note: sq ? `${sq.mult.toFixed(2)}×` : 'ATR not entered' },
+    { label: `Reward:risk at least ${minRR}`, ok: rr >= minRR, note: rr ? rr.toFixed(2) : null },
+    { label: `Position at least ${money(minPos, 'INR')}`, ok: !size.error && size.posValue >= minPos, note: size.error ? null : money(size.posValue, 'INR') },
+    { label: 'Portfolio limits clear', ok: violations.length === 0, note: violations.length ? `${violations.length} blocking` : null },
+  ]
   const validateBase = () => {
     if (!f.ticker.trim()) return 'Stock is required.'
     if (!f.reason.trim()) return 'Setup reason is mandatory — write why this trade.'
     if (size.error) return size.error
     if (!size.qty) return 'Quantity works out to 0 — check entry/stop or position cap.'
     if (num(f.target) <= num(f.entry)) return 'Target must be above entry.'
+    if (rr < minRR) return `Reward:risk is ${rr.toFixed(2)} — minimum is ${minRR}. Move the target to a real level or wait for a better entry.`
     return null
   }
   const savePlanned = async () => {
@@ -354,8 +416,9 @@ function NewTradeModal({ cap, config, buckets, watchlist, events, status, violat
   const saveOpen = async () => {
     const e = validateBase(); if (e) { setErr(e); return }
     if (violations.length) { setErr(violations[0]); return }
+    if (!ready) { setErr('Complete the entry confirmation before opening — every box, honestly.'); return }
     setErr(null); setSaving(true)
-    try { await addTrade({ ...build(), state: 'OPEN', actual_entry: num(f.entry), entry_date: todayISO(), ltp: num(f.entry) }); await onSaved() } catch (ex) { setErr(ex.message); setSaving(false) }
+    try { await addTrade({ ...build(), state: 'OPEN', setup_type: setupType, entry_checks: checked, actual_entry: num(f.entry), entry_date: todayISO(), ltp: num(f.entry) }); await onSaved() } catch (ex) { setErr(ex.message); setSaving(false) }
   }
 
   return (
@@ -364,15 +427,24 @@ function NewTradeModal({ cap, config, buckets, watchlist, events, status, violat
         <div className="col-md-5"><label className="form-label small mb-1">From watchlist</label>
           <select className="form-select" defaultValue="" onChange={(e) => pickWatch(e.target.value)}>
             <option value="">— pick / or type below —</option>
-            {watchlist.filter((w) => w.active !== false).map((w) => <option key={w.id} value={w.id}>{w.ticker} · {w.bucket} · {w.sector}</option>)}
+            {buckets.map((b) => {
+              const names = watchlist.filter((w) => w.active !== false && w.bucket === b.code)
+              return names.length ? (
+                <optgroup key={b.code} label={`${b.code} — ${b.name}`}>
+                  {names.map((w) => <option key={w.id} value={w.id}>{w.ticker} · {w.sector}</option>)}
+                </optgroup>
+              ) : null
+            })}
           </select>
+          {f.thesis ? <div className="form-text text-muted mt-1"><i className="ri-lightbulb-line me-1" />{f.thesis}</div> : null}
         </div>
         <div className="col-md-3"><label className="form-label small mb-1">Ticker</label><input className="form-control text-uppercase" value={f.ticker} onChange={(e) => set('ticker', e.target.value)} /></div>
         <div className="col-md-2"><label className="form-label small mb-1">Bucket</label><select className="form-select" value={f.bucket} onChange={(e) => set('bucket', e.target.value)}>{buckets.map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</select></div>
         <div className="col-md-2"><label className="form-label small mb-1">Sector</label><input className="form-control" value={f.sector} onChange={(e) => set('sector', e.target.value)} /></div>
-        <div className="col-md-4"><label className="form-label small mb-1">Entry price</label><input type="number" className="form-control" value={f.entry} onChange={(e) => set('entry', e.target.value)} /></div>
-        <div className="col-md-4"><label className="form-label small mb-1">Stop price</label><input type="number" className="form-control" value={f.stop} onChange={(e) => set('stop', e.target.value)} /></div>
-        <div className="col-md-4"><label className="form-label small mb-1">Target price</label><input type="number" className="form-control" value={f.target} onChange={(e) => set('target', e.target.value)} /></div>
+        <div className="col-md-3"><label className="form-label small mb-1">Entry price</label><input type="number" className="form-control" value={f.entry} onChange={(e) => set('entry', e.target.value)} /></div>
+        <div className="col-md-3"><label className="form-label small mb-1">Stop price</label><input type="number" className="form-control" value={f.stop} onChange={(e) => set('stop', e.target.value)} /></div>
+        <div className="col-md-3"><label className="form-label small mb-1">Target price</label><input type="number" className="form-control" value={f.target} onChange={(e) => set('target', e.target.value)} /></div>
+        <div className="col-md-3"><label className="form-label small mb-1">ATR(14) <span className="text-muted">— in ₹</span></label><input type="number" className="form-control" placeholder="optional" value={f.atr} onChange={(e) => set('atr', e.target.value)} /></div>
         <div className="col-12"><label className="form-label small mb-1">Setup reason <span className="text-danger">*</span> — why this trade</label><textarea className="form-control" rows={2} value={f.reason} onChange={(e) => set('reason', e.target.value)} /></div>
       </div>
 
@@ -381,19 +453,28 @@ function NewTradeModal({ cap, config, buckets, watchlist, events, status, violat
         <div className="col"><div className="border rounded p-2"><div className="text-muted small">Quantity</div><h5 className="mb-0 text-primary">{size.error ? '—' : size.qty}</h5></div></div>
         <div className="col"><div className="border rounded p-2"><div className="text-muted small">Position value</div><div className="fw-semibold mt-1">{size.error ? '—' : money(size.posValue, 'INR')}</div></div></div>
         <div className="col"><div className="border rounded p-2"><div className="text-muted small">Rupee risk</div><div className="fw-semibold mt-1">{size.error ? '—' : money(size.rupeeRisk, 'INR')}</div></div></div>
-        <div className="col"><div className="border rounded p-2"><div className="text-muted small">Reward:Risk</div><div className={'fw-semibold mt-1 ' + (rr && rr < 1.5 ? 'text-warning' : '')}>{rr ? rr.toFixed(2) : '—'}</div></div></div>
+        <div className="col"><div className="border rounded p-2"><div className="text-muted small">Reward:Risk</div><div className={'fw-semibold mt-1 ' + (rr && rr < minRR ? 'text-danger' : '')}>{rr ? rr.toFixed(2) : '—'}</div></div></div>
+        <div className="col"><div className="border rounded p-2"><div className="text-muted small">Stop ÷ ATR</div>
+          <div className={'fw-semibold mt-1 ' + (sq ? (sq.verdict === 'OK' ? 'text-success' : 'text-warning') : '')}>{sq ? `${sq.mult.toFixed(2)}×` : '—'}</div>
+        </div></div>
       </div>
 
-      {size.capped && <div className="alert alert-info py-2 mt-2 mb-0"><i className="ri-information-line me-1" />Capped at max position value {money(num(config.max_position_value), 'INR')} — actual risk drops below 1%.</div>}
-      {rr > 0 && rr < 1.5 && <div className="alert alert-warning py-2 mt-2 mb-0"><i className="ri-alert-line me-1" />Reward:risk below 1.5 — thin edge.</div>}
+      {size.capped && <div className="alert alert-info py-2 mt-2 mb-0"><i className="ri-information-line me-1" />Capped at max position value {money(num(config.max_position_value), 'INR')} — real risk is {money(size.rupeeRisk, 'INR')}, not {money(cap.riskPerTrade, 'INR')}. Normal for a stop tighter than 7.5%.</div>}
+      {sq?.verdict === 'TIGHT' && <div className="alert alert-warning py-2 mt-2 mb-0"><i className="ri-contract-left-right-line me-1" />Stop is {sq.mult.toFixed(2)}× ATR — inside the daily noise. Below {config.atr_mult_min ?? 1.5}× you get stopped out by nothing.</div>}
+      {sq?.verdict === 'WIDE' && <div className="alert alert-warning py-2 mt-2 mb-0"><i className="ri-expand-left-right-line me-1" />Stop is {sq.mult.toFixed(2)}× ATR — above {config.atr_mult_max ?? 3}×. You're too far from the level; wait for a pullback.</div>}
+      {rr > 0 && rr < minRR && <div className="alert alert-danger py-2 mt-2 mb-0"><i className="ri-alert-line me-1" />Reward:risk {rr.toFixed(2)} is below the {minRR} floor — this trade is blocked.</div>}
       {soonEvent && <div className="alert alert-warning py-2 mt-2 mb-0"><i className="ri-calendar-event-line me-1" />Event within 1 day: <strong>{soonEvent.title}</strong> ({soonEvent.event_date}). Consider sizing down.</div>}
       {violations.length > 0 && <div className="alert alert-danger py-2 mt-2 mb-0"><i className="ri-close-circle-line me-1" />{violations.map((v, i) => <div key={i}>{v}</div>)}</div>}
       {err && <div className="alert alert-danger py-2 mt-2 mb-0">{err}</div>}
 
+      <EntryChecklist setupType={setupType} onSetup={setSetupType} checked={checked}
+        onCheck={(k, v) => setChecked((s) => ({ ...s, [k]: v }))} autoGates={autoGates} />
+      <div className="form-text mt-1">Only needed to open now — <strong>Save as planned</strong> skips it, since none of this can be answered before the setup triggers.</div>
+
       <div className="d-flex justify-content-end gap-2 mt-3">
         <button className="btn btn-light" onClick={onClose} disabled={saving}>Cancel</button>
         <button className="btn btn-soft-secondary" onClick={savePlanned} disabled={saving}><i className="ri-draft-line me-1" />Save as planned</button>
-        <button className="btn btn-primary" onClick={saveOpen} disabled={saving || status === 'HALTED' || violations.length > 0}><i className="ri-check-line me-1" />Mark open</button>
+        <button className="btn btn-primary" onClick={saveOpen} disabled={saving || status === 'HALTED' || violations.length > 0 || !ready}><i className="ri-check-line me-1" />Mark open</button>
       </div>
     </Modal>
   )
@@ -405,30 +486,49 @@ function OpenFillModal({ trade, violationsFor, cap, config, status, onClose, onS
   const [date, setDate] = useState(todayISO())
   const [err, setErr] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [setupType, setSetupType] = useState(trade.setup_type || '')
+  const [checked, setChecked] = useState(trade.entry_checks || {})
   const size = sizeTrade({ entry, stop: trade.stop_price, riskPerTrade: cap.riskPerTrade, maxPositionValue: num(config.max_position_value) })
   const posValue = size.error ? 0 : size.posValue
   const violations = size.error ? [size.error] : violationsFor({ bucket: trade.bucket, sector: trade.sector, posValue, excludeId: trade.id })
+  // A fill above plan shrinks the stop distance — re-check it against the ATR recorded at planning.
+  const sq = stopQuality({ entry, stop: trade.stop_price, atr: trade.atr, minMult: config.atr_mult_min ?? 1.5, maxMult: config.atr_mult_max ?? 3 })
+  const minRR = num(config.min_rr) || 2
+  const minPos = num(config.min_position_value) || 25000
+  const rr = rewardRisk(entry, trade.stop_price, trade.target_price)
+  const ready = checklistComplete(setupType, checked)
+  const autoGates = [
+    { label: `Stop ÷ ATR inside ${config.atr_mult_min ?? 1.5}–${config.atr_mult_max ?? 3}`, ok: sq?.verdict === 'OK', note: sq ? `${sq.mult.toFixed(2)}×` : 'ATR not recorded' },
+    { label: `Reward:risk at least ${minRR} at this fill`, ok: rr >= minRR, note: rr ? rr.toFixed(2) : null },
+    { label: `Position at least ${money(minPos, 'INR')}`, ok: !size.error && size.posValue >= minPos, note: size.error ? null : money(size.posValue, 'INR') },
+    { label: 'Portfolio limits clear', ok: violations.length === 0, note: violations.length ? `${violations.length} blocking` : null },
+  ]
 
   const save = async () => {
     if (status === 'HALTED') { setErr('Status is HALTED — cannot open.'); return }
     if (size.error) { setErr(size.error); return }
     if (violations.length) { setErr(violations[0]); return }
+    if (rr < minRR) { setErr(`Reward:risk is ${rr.toFixed(2)} at this fill — minimum is ${minRR}. The plan no longer holds at this price.`); return }
+    if (!ready) { setErr('Complete the entry confirmation before opening — every box, honestly.'); return }
     setErr(null); setSaving(true)
-    try { await editTrade(trade.id, { state: 'OPEN', actual_entry: num(entry), entry_date: date, qty: size.qty, ltp: num(entry) }); await onSaved() } catch (e) { setErr(e.message); setSaving(false) }
+    try { await editTrade(trade.id, { state: 'OPEN', actual_entry: num(entry), entry_date: date, qty: size.qty, ltp: num(entry), setup_type: setupType, entry_checks: checked }); await onSaved() } catch (e) { setErr(e.message); setSaving(false) }
   }
   return (
-    <Modal open title={<><i className="ri-play-circle-line me-2 text-primary" />Open {trade.ticker}</>} onClose={onClose}>
+    <Modal open size="lg" title={<><i className="ri-play-circle-line me-2 text-primary" />Open {trade.ticker}</>} onClose={onClose}>
       <div className="border rounded p-2 mb-3 bg-light small">Plan: entry {money(num(trade.plan_entry), 'INR')} · stop {money(num(trade.stop_price), 'INR')} · target {money(num(trade.target_price), 'INR')}</div>
       <div className="row g-2">
         <div className="col-6"><label className="form-label small mb-1">Actual entry</label><input type="number" className="form-control" value={entry} onChange={(e) => setEntry(e.target.value)} autoFocus /></div>
         <div className="col-6"><label className="form-label small mb-1">Entry date</label><input type="date" className="form-control" value={date} onChange={(e) => setDate(e.target.value)} /></div>
       </div>
-      <div className="mt-2 small text-muted">Qty {size.error ? '—' : size.qty} · value {size.error ? '—' : money(size.posValue, 'INR')} · risk {size.error ? '—' : money(size.rupeeRisk, 'INR')}{size.capped ? ' (capped)' : ''}</div>
+      <div className="mt-2 small text-muted">Qty {size.error ? '—' : size.qty} · value {size.error ? '—' : money(size.posValue, 'INR')} · risk {size.error ? '—' : money(size.rupeeRisk, 'INR')}{size.capped ? ' (capped)' : ''}{sq ? ` · stop ${sq.mult.toFixed(2)}× ATR` : ''}</div>
+      {sq && sq.verdict !== 'OK' && <div className="alert alert-warning py-2 mt-2 mb-0"><i className="ri-alert-line me-1" />At this fill the stop is {sq.mult.toFixed(2)}× ATR ({sq.verdict === 'TIGHT' ? 'inside the noise' : 'too far from the level'}). Chasing the entry has changed the trade.</div>}
       {violations.length > 0 && <div className="alert alert-danger py-2 mt-2 mb-0">{violations.map((v, i) => <div key={i}>{v}</div>)}</div>}
       {err && <div className="alert alert-danger py-2 mt-2 mb-0">{err}</div>}
+      <EntryChecklist setupType={setupType} onSetup={setSetupType} checked={checked}
+        onCheck={(k, v) => setChecked((s) => ({ ...s, [k]: v }))} autoGates={autoGates} />
       <div className="d-flex justify-content-end gap-2 mt-3">
         <button className="btn btn-light" onClick={onClose} disabled={saving}>Cancel</button>
-        <button className="btn btn-primary" onClick={save} disabled={saving || violations.length > 0}><i className="ri-check-line me-1" />Open position</button>
+        <button className="btn btn-primary" onClick={save} disabled={saving || violations.length > 0 || !ready}><i className="ri-check-line me-1" />Open position</button>
       </div>
     </Modal>
   )
@@ -495,21 +595,23 @@ function CloseModal({ trade, onClose, onSaved }) {
 
 // --- Watchlist manager ------------------------------------------------------
 function WatchlistModal({ watchlist, buckets, onClose, reload }) {
-  const [f, setF] = useState({ ticker: '', name: '', bucket: 'B', sector: '' })
+  const blank = { ticker: '', name: '', bucket: 'B', sector: '', rationale: '' }
+  const [f, setF] = useState(blank)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
-  const add = async () => { if (!f.ticker.trim()) return; await addWatch(f); setF({ ticker: '', name: '', bucket: 'B', sector: '' }); await reload() }
+  const add = async () => { if (!f.ticker.trim()) return; await addWatch(f); setF(blank); await reload() }
   return (
     <Modal open size="lg" title={<><i className="ri-eye-line me-2 text-primary" />Watchlist</>} onClose={onClose}>
       <div className="row g-2 align-items-end mb-3">
         <div className="col-md-2"><label className="form-label small mb-1">Ticker</label><input className="form-control form-control-sm text-uppercase" value={f.ticker} onChange={(e) => set('ticker', e.target.value)} /></div>
-        <div className="col-md-4"><label className="form-label small mb-1">Name</label><input className="form-control form-control-sm" value={f.name} onChange={(e) => set('name', e.target.value)} /></div>
-        <div className="col-md-2"><label className="form-label small mb-1">Bucket</label><select className="form-select form-select-sm" value={f.bucket} onChange={(e) => set('bucket', e.target.value)}>{buckets.map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</select></div>
-        <div className="col-md-3"><label className="form-label small mb-1">Sector</label><input className="form-control form-control-sm" value={f.sector} onChange={(e) => set('sector', e.target.value)} /></div>
+        <div className="col-md-3"><label className="form-label small mb-1">Name</label><input className="form-control form-control-sm" value={f.name} onChange={(e) => set('name', e.target.value)} /></div>
+        <div className="col-md-1"><label className="form-label small mb-1">Bucket</label><select className="form-select form-select-sm" value={f.bucket} onChange={(e) => set('bucket', e.target.value)}>{buckets.map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</select></div>
+        <div className="col-md-2"><label className="form-label small mb-1">Sector</label><input className="form-control form-control-sm" value={f.sector} onChange={(e) => set('sector', e.target.value)} /></div>
+        <div className="col-md-3"><label className="form-label small mb-1">Why this bucket</label><input className="form-control form-control-sm" value={f.rationale} onChange={(e) => set('rationale', e.target.value)} /></div>
         <div className="col-md-1"><button className="btn btn-primary btn-sm w-100" onClick={add}><i className="ri-add-line" /></button></div>
       </div>
       <div className="table-responsive" style={{ maxHeight: 360 }}>
         <table className="table table-sm align-middle mb-0">
-          <thead className="table-light"><tr><th>Ticker</th><th>Name</th><th>Bucket</th><th>Sector</th><th /></tr></thead>
+          <thead className="table-light"><tr><th>Ticker</th><th>Name</th><th>Bucket</th><th>Sector</th><th>Why</th><th /></tr></thead>
           <tbody>
             {watchlist.map((w) => (
               <tr key={w.id}>
@@ -517,6 +619,10 @@ function WatchlistModal({ watchlist, buckets, onClose, reload }) {
                 <td className="small">{w.name}</td>
                 <td><select className="form-select form-select-sm" style={{ width: 70 }} value={w.bucket} onChange={(e) => editWatch(w.id, { bucket: e.target.value }).then(reload)}>{buckets.map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</select></td>
                 <td className="small">{w.sector}</td>
+                <td className="small text-muted" style={{ minWidth: 220 }}>
+                  <input className="form-control form-control-sm border-0 px-1" defaultValue={w.rationale || ''} placeholder="—"
+                    onBlur={(e) => { const v = e.target.value.trim(); if (v !== (w.rationale || '')) editWatch(w.id, { rationale: v || null }).then(reload) }} />
+                </td>
                 <td className="text-end"><button className="btn btn-sm btn-ghost-danger px-1" onClick={() => removeWatch(w.id).then(reload)}><i className="ri-delete-bin-line" /></button></td>
               </tr>
             ))}
@@ -566,6 +672,10 @@ const SETTINGS_FIELDS = [
   { key: 'dd_halt_pct', label: 'Drawdown halt (fraction)', step: 0.01 },
   { key: 'halt_days', label: 'Halt cooling-off (days)', step: 1 },
   { key: 'gold_sleeve_pct', label: 'Gold sleeve (fraction of deployed)', step: 0.01 },
+  { key: 'min_rr', label: 'Minimum reward:risk (blocks entry)', step: 0.1 },
+  { key: 'min_position_value', label: 'Minimum position value (₹)', step: 1 },
+  { key: 'atr_mult_min', label: 'Stop ÷ ATR — minimum (warn below)', step: 0.1 },
+  { key: 'atr_mult_max', label: 'Stop ÷ ATR — maximum (warn above)', step: 0.1 },
 ]
 function SettingsModal({ config, onClose, onSaved }) {
   const [f, setF] = useState(() => Object.fromEntries(SETTINGS_FIELDS.map((x) => [x.key, config[x.key] ?? ''])))

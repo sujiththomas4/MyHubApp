@@ -4,6 +4,7 @@ import { fmtDate } from '@/data/AppData'
 import CrudCard from '@/components/plantation/CrudCard'
 import { usePropagation, addPropagation, editPropagation, removePropagation } from '@/data/propagationRepo'
 import { PlannedCropsPanel } from '@/pages/PlantationPlannedCrops'
+import { FlowersPanel } from '@/pages/PlantationFlowers'
 import { useProfiles, personName } from '@/data/profilesRepo'
 import { usePlants, usePoles, useVerticals, useZones, useLands, landLabel, editPlant } from '@/data/plantationLandRepo'
 import HierarchyFilter, { MultiSelect } from '@/components/plantation/HierarchyFilter'
@@ -34,6 +35,7 @@ const STATUS_BADGE = {
 const STATUS_LABEL = Object.fromEntries(STATUS.map((s) => [s.value, s.label]))
 const TABS = [
   { id: 'plants', label: 'Plants', icon: 'ri-plant-fill' },
+  { id: 'flowers', label: 'Flowers', icon: 'ri-flower-line' },
   { id: 'mothers', label: 'Mother Plants', icon: 'ri-plant-line' },
   { id: 'thippali', label: 'Thippali Nursery', method: 'Thippali Nursery', icon: 'ri-seedling-line' },
   { id: 'layering', label: 'Layering Unit', method: 'Layering Unit', icon: 'ri-git-branch-line' },
@@ -129,6 +131,7 @@ export default function PlantationPropagation() {
 
       {active.method && <BatchTracker lockType={active.method} matchBatch={matchBatch} />}
       {tab === 'plants' && <PlannedCropsPanel />}
+      {tab === 'flowers' && <FlowersPanel />}
       {tab === 'mothers' && <MotherPlants plantVisible={plantVisible} motherSel={motherSel} data={data} />}
       {tab === 'inventory' && <NurseryInventory matchBatch={matchBatch} />}
       {tab === 'reports' && <Reports matchBatch={matchBatch} />}
