@@ -77,7 +77,7 @@ export default function Focus25() {
   const reviewStr = nextReviewMonth().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 
   const saveLtps = async () => {
-    for (const s of active) { const v = editLtp[s.id]; if (v != null && num(v) !== num(s.ltp)) await setFocusLtp(s.id, num(v)) }
+    for (const s of active) { const v = editLtp[s.id]; if (v != null && num(v) !== num(s.ltp)) await setFocusLtp(s.id, num(v), s.symbol) }
     setEditLtp(null); await reloadStocks()
   }
   const confirmRemove = async (reason) => {

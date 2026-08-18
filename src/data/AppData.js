@@ -94,6 +94,16 @@ export const money = (n, currency) => {
   const r = Math.round(n)
   return currency === 'AED' ? 'AED ' + r.toLocaleString('en-AE') : '₹' + r.toLocaleString('en-IN')
 }
+/**
+ * A per-share price, always to 2 decimals. Distinct from money(), which rounds
+ * to whole rupees — right for totals, wrong for a quote you enter by hand.
+ */
+export const price = (n, currency) => {
+  const v = Number(n) || 0
+  const locale = currency === 'AED' ? 'en-AE' : 'en-IN'
+  const s = v.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return currency === 'AED' ? 'AED ' + s : '₹' + s
+}
 export const fmtMonth = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 export const fmtDate = (iso) =>

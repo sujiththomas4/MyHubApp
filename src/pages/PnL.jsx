@@ -5,7 +5,6 @@ import { brokerStats, compoundedReturn, money, fmtMonth, fmtDate } from '@/data/
 import { useBrokerAccounts, useBrokerTrades, brokerModuleMeta } from '@/data/brokerRepo'
 import { useChartColors } from '@/components/dashboard/useChartColors'
 import { useCapital } from '@/context/CapitalContext'
-import { useSwingTrades, openStats, closedStats, journalAggregates } from '@/data/swing50Repo'
 import { useSwing1hTrades, openStats1h, closedStats1h, aggregates1h } from '@/data/swing1hRepo'
 
 /**
@@ -35,9 +34,9 @@ const localDay = (ts) => {
 }
 
 /**
- * Roll a swing book (Swing 50 or Swing 1 Hour) into the shape this screen
- * reports in. These books have no accounts, no brokerage and no per-day
- * aggregation, so they stay out of the broker tables and get their own.
+ * Roll a swing book into the shape this screen reports in. These books have no
+ * accounts, no brokerage and no per-day aggregation, so they stay out of the
+ * broker tables and get their own.
  */
 function swingBook({ title, basePath, icon, open, closed, openStat, closedStat, agg, dateOf }) {
   return {
@@ -88,8 +87,7 @@ export default function PnL() {
   const allAccounts = useBrokerAccounts()
   const allTrades = useBrokerTrades()
   const metaById = Object.fromEntries(brokerModuleMeta.map((m) => [m.id, m]))
-  const { trades: swing50All } = useSwingTrades()
-  const { trades: swing1hAll } = useSwing1hTrades()
+  const { trades: swingWeeklyAll } = useSwing1hTrades()
 
   // Flatten accounts (with stats) and trades (with net) across all modules.
   const accounts = allAccounts.map((a) => {
@@ -116,19 +114,11 @@ export default function PnL() {
   // --- Swing books ----------------------------------------------------------
   const books = [
     swingBook({
-      title: 'Swing 50', basePath: '/business/swing', icon: 'ri-stock-line',
-      open: swing50All.filter((t) => t.state === 'OPEN'),
-      closed: swing50All.filter((t) => t.state === 'CLOSED'),
-      openStat: openStats, closedStat: closedStats,
-      agg: journalAggregates(swing50All.filter((t) => t.state === 'CLOSED')),
-      dateOf: (t) => t.exit_date || null,
-    }),
-    swingBook({
-      title: 'Swing 1 Hour', basePath: '/business/swing-1h', icon: 'ri-timer-flash-line',
-      open: swing1hAll.filter((t) => t.state === 'OPEN'),
-      closed: swing1hAll.filter((t) => t.state === 'CLOSED'),
+      title: 'Swing Weekly', basePath: '/business/swing-weekly', icon: 'ri-calendar-week-line',
+      open: swingWeeklyAll.filter((t) => t.state === 'OPEN'),
+      closed: swingWeeklyAll.filter((t) => t.state === 'CLOSED'),
       openStat: openStats1h, closedStat: closedStats1h,
-      agg: aggregates1h(swing1hAll.filter((t) => t.state === 'CLOSED')),
+      agg: aggregates1h(swingWeeklyAll.filter((t) => t.state === 'CLOSED')),
       dateOf: (t) => localDay(t.exit_at),
     }),
   ]
@@ -379,7 +369,7 @@ export default function PnL() {
       {/* Swing books — position-based, no accounts or brokerage */}
       <div className="card">
         <div className="card-header d-flex align-items-center flex-wrap gap-2">
-          <h5 className="card-title mb-0 flex-grow-1">Swing books</h5>
+          <h5 className="card-title mb-0 flex-grow-1">Swing book</h5>
           <span className="text-muted small">own capital · sized per position, not per account</span>
         </div>
         <div className="card-body p-0">

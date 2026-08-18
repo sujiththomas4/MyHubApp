@@ -14,8 +14,7 @@ import { optionBuyingModule, intradayStocksModule, optionSellingModule } from '@
 import PnL from '@/pages/PnL'
 import Capital from '@/pages/Capital'
 import TradingStrategies from '@/pages/TradingStrategies'
-import StockSwing from '@/pages/StockSwing'
-import SwingOneHour from '@/pages/SwingOneHour'
+import SwingWeekly from '@/pages/SwingWeekly'
 import NiftyGold from '@/pages/NiftyGold'
 import RoadMap from '@/pages/RoadMap'
 import DailyOptionSelling from '@/pages/DailyOptionSelling'
@@ -55,6 +54,7 @@ import StrategiesHub from '@/pages/StrategiesHub'
 import Steady25 from '@/pages/Steady25'
 import Focus25 from '@/pages/Focus25'
 import Metal25 from '@/pages/Metal25'
+import EmaSupport from '@/pages/EmaSupport'
 import EeNiftyGold from '@/pages/EeNiftyGold'
 import Savings from '@/pages/Savings'
 import SavingsCategory from '@/pages/SavingsCategory'
@@ -118,6 +118,7 @@ export default function App() {
           <Route path="/wealth/eva-ezaak/steady-25" element={<Steady25 />} />
           <Route path="/wealth/eva-ezaak/focus-25" element={<Focus25 />} />
           <Route path="/wealth/eva-ezaak/metal-25" element={<Metal25 />} />
+          <Route path="/wealth/eva-ezaak/ema-support" element={<EmaSupport />} />
           <Route path="/wealth/eva-ezaak/nifty-gold" element={<EeNiftyGold />} />
           {/* Legacy routes → redirect to the new hub */}
           <Route path="/wealth/eva-ezaak/top-stocks" element={<Navigate to="/wealth/eva-ezaak" replace />} />
@@ -144,8 +145,7 @@ export default function App() {
           <Route path="/trading/pnl" element={<PnL />} />
           <Route path="/business/capital" element={<Capital />} />
           <Route path="/business/strategies" element={<TradingStrategies />} />
-          <Route path="/business/swing" element={<StockSwing />} />
-          <Route path="/business/swing-1h" element={<SwingOneHour />} />
+          <Route path="/business/swing-weekly" element={<SwingWeekly />} />
           <Route path="/business/nifty-gold" element={<NiftyGold />} />
           <Route path="/business/daily-option-selling" element={<DailyOptionSelling />} />
           <Route path="/personal/daily-routines" element={<DailyRoutines />} />

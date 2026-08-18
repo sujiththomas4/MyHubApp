@@ -8,6 +8,7 @@ import { useFunds, useFundAllotments } from '@/data/steady25Repo'
 import { useFocusStocks, useStockAllotments } from '@/data/focus25Repo'
 import { useEtfHoldings } from '@/data/metal25Repo'
 import { useEeNgTrades, useEeNgSettings, eeAssetStats } from '@/data/eeNgRepo'
+import { useEmaPositions, useEmaLots, bookTotals, ADD_DROP } from '@/data/emaSupportRepo'
 
 /**
  * StrategiesHub.jsx — Investment Strategies hub (route /wealth/eva-ezaak).
@@ -40,6 +41,8 @@ export default function StrategiesHub() {
   const { state: metalState } = usePlanState('METAL25')
   const { trades: ngTrades } = useEeNgTrades()
   const { settings: ngSettings } = useEeNgSettings()
+  const { positions: emaPositions } = useEmaPositions()
+  const { lots: emaLots } = useEmaLots()
 
   const thisMonth = monthKey(new Date())
   const today = isoOf(new Date())
@@ -89,6 +92,9 @@ export default function StrategiesHub() {
     realised: ngNifty.realised + ngGold.realised,
     unrealised: ngNifty.unrealised + ngGold.unrealised,
   }
+
+  // 50 & 200 EMA Support — accumulation book, no monthly cycle.
+  const ema = useMemo(() => bookTotals(emaPositions, emaLots), [emaPositions, emaLots])
 
   // Allocation monitor --------------------------------------------------------
   const fundCur = (code) => num(funds.find((f) => f.code === code)?.current_value)
@@ -205,9 +211,34 @@ export default function StrategiesHub() {
         })}
       </div>
 
-      {/* Signal-based strategy (not a monthly SIP) */}
-      <h5 className="mt-4 mb-2">Tactical</h5>
+      {/* Beyond the monthly SIPs — signal-based and accumulation books */}
+      <h5 className="mt-4 mb-2">Tactical &amp; accumulation</h5>
       <div className="row g-3">
+        <div className="col-md-6 col-lg-4">
+          <div className="card h-100 border-start border-3 border-success">
+            <div className="card-body d-flex flex-column">
+              <div className="d-flex align-items-center mb-2">
+                <div className="avatar-sm rounded bg-success-subtle text-success d-flex align-items-center justify-content-center me-2" style={{ width: 40, height: 40 }}><i className="ri-stack-line fs-18" /></div>
+                <div className="flex-grow-1">
+                  <h5 className="mb-0">50 &amp; 200 EMA Support</h5>
+                  <small className="text-muted">Accumulation · add {(ADD_DROP * 100).toFixed(0)}% below last buy</small>
+                </div>
+                {ema.dueToAdd > 0 && <span className="badge bg-warning-subtle text-warning">{ema.dueToAdd} due to add</span>}
+              </div>
+              <div className="row g-2 text-center my-2">
+                <div className="col-4"><div className="text-muted small">Invested</div><div className="fw-semibold">{money(ema.invested, 'INR')}</div></div>
+                <div className="col-4"><div className="text-muted small">Current</div><div className="fw-semibold">{money(ema.value, 'INR')}</div></div>
+                <div className="col-4"><div className="text-muted small">Realised</div><div className="fw-semibold"><PnL v={ema.realised} /></div></div>
+              </div>
+              <div className="text-center mb-3">
+                {ema.n > 0
+                  ? <span className="text-muted small">Unrealised <PnL v={ema.unrealised} /> · {ema.held} of {ema.n} held</span>
+                  : <span className="text-muted small">No stocks yet</span>}
+              </div>
+              <div className="mt-auto"><a className="btn btn-soft-success w-100" href="/wealth/eva-ezaak/ema-support"><i className="ri-external-link-line me-1" />Open</a></div>
+            </div>
+          </div>
+        </div>
         <div className="col-md-6 col-lg-4">
           <div className="card h-100 border-start border-3 border-info">
             <div className="card-body d-flex flex-column">

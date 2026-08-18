@@ -17,6 +17,26 @@ export function useFunds() {
 export const setFundValues = (id, invested, currentValue) =>
   updateRow('ee_funds', id, { invested: num(invested), current_value: num(currentValue), values_updated_at: iso() })
 
+/**
+ * What the holding actually is, and where it sits. `name` stays the slot
+ * ("Nifty 50 Index Fund"); fundName is the scheme actually bought, and
+ * brokerSlug/brokerHolder point at the capital account holding it.
+ */
+export const setFundDetails = (id, { fundName, brokerSlug, brokerHolder }) =>
+  updateRow('ee_funds', id, {
+    fund_name: (fundName || '').trim() || null,
+    broker_slug: brokerSlug || null,
+    broker_holder: brokerSlug ? (brokerHolder || '') : null,
+  })
+
+/** Label for a fund's capital account, e.g. "Dhan · Mummy". */
+export const brokerLabel = (accounts, fund) => {
+  if (!fund || !fund.broker_slug) return null
+  const a = accounts.find((x) => x.slug === fund.broker_slug && (x.holder || '') === (fund.broker_holder || ''))
+  if (!a) return fund.broker_holder ? `${fund.broker_slug} · ${fund.broker_holder}` : fund.broker_slug
+  return a.holder ? `${a.name} · ${a.holder}` : a.name
+}
+
 // ---- Allotments ------------------------------------------------------------
 export function useFundAllotments() {
   const { data, loading, error, reload } = useCollection('ee_fund_allotments', [], { orderBy: 'invest_date', ascending: false })

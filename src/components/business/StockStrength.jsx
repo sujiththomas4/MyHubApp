@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fmtDate } from '@/data/AppData'
+import { fmtDate, price } from '@/data/AppData'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import {
   useStockStrength, addStock, editStock, removeStock,
   TREND_OPTIONS, STRENGTH_OPTIONS, BIAS_OPTIONS, BUCKET_OPTIONS, TREND, STRENGTH, BIAS, BUCKET,
+  useHoldingsBySymbol, saveMasterLtps,
 } from '@/data/stockStrengthRepo'
 
 /**
@@ -14,7 +15,7 @@ import {
  */
 const rid = () => Math.random().toString(36).slice(2, 8)
 const todayISO = () => new Date().toISOString().slice(0, 10)
-const makeBlank = (order) => ({ symbol: '', name: '', sector: '', bucket: '', rationale: '', trend: '', strength: '', bias: '', rating: '', observation: '', updatedDate: todayISO(), sortOrder: order })
+const makeBlank = (order) => ({ symbol: '', name: '', sector: '', bucket: '', rationale: '', fundamentallyStrong: false, trend: '', strength: '', bias: '', rating: '', observation: '', updatedDate: todayISO(), sortOrder: order })
 
 const Tone = ({ map, value }) => {
   const o = map[value]
@@ -130,6 +131,17 @@ function StockForm({ initial, onSave, onCancel, sectorSuggestions }) {
           <input type="number" min="1" max="5" step="0.5" className="form-control" value={f.rating} onChange={(e) => set('rating', e.target.value)} />
         </div>
 
+        <div className="col-md-12">
+          <div className="form-check">
+            <input className="form-check-input" type="checkbox" id="fund-strong"
+              checked={Boolean(f.fundamentallyStrong)} onChange={(e) => set('fundamentallyStrong', e.target.checked)} />
+            <label className="form-check-label" htmlFor="fund-strong">
+              Fundamentally strong
+              <span className="text-muted small d-block">The slow judgement under the chart read. Flagged names sort to the top.</span>
+            </label>
+          </div>
+        </div>
+
         <div className="col-md-8">
           <label className="form-label small mb-1">Observation</label>
           <textarea className="form-control" rows={2} placeholder="What you see — support/resistance, volume, pattern…" value={f.observation} onChange={(e) => set('observation', e.target.value)} />
@@ -164,7 +176,12 @@ function Th({ label, sortKey, sort, setSort, className }) {
 
 export default function StockStrength() {
   const { stocks, reload } = useStockStrength()
+  const { forStock } = useHoldingsBySymbol()
   const [search, setSearch] = useState('')
+  const [onlyStrong, setOnlyStrong] = useState(false)
+  const [onlyHeld, setOnlyHeld] = useState(false)
+  const [ltpDraft, setLtpDraft] = useState(null)
+  const [ltpSaving, setLtpSaving] = useState(false)
   const [fSector, setFSector] = useState(new Set())
   const [fBucket, setFBucket] = useState(new Set())
   const [fTrend, setFTrend] = useState(new Set())
@@ -180,6 +197,8 @@ export default function StockStrength() {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
     let out = stocks.filter((s) => {
+      if (onlyStrong && !s.fundamentallyStrong) return false
+      if (onlyHeld && forStock(s).qty <= 0) return false
       if (fSector.size && !fSector.has(s.sector)) return false
       if (fBucket.size && !fBucket.has(s.bucket)) return false
       if (fTrend.size && !fTrend.has(s.trend)) return false
@@ -192,16 +211,38 @@ export default function StockStrength() {
       return true
     })
     const dir = sort.dir === 'asc' ? 1 : -1
+    // Fundamentally strong always floats to the top, whatever column is sorted.
     out = [...out].sort((a, b) => {
+      const fa = a.fundamentallyStrong ? 1 : 0
+      const fb = b.fundamentallyStrong ? 1 : 0
+      if (fa !== fb) return fb - fa
+      if (sort.key === 'holdings') return (forStock(b).qty - forStock(a).qty) * dir
+      if (sort.key === 'ltp') return ((Number(a.ltp) || 0) - (Number(b.ltp) || 0)) * dir
       const av = a[sort.key] ?? ''; const bv = b[sort.key] ?? ''
       if (sort.key === 'rating') return ((Number(av) || 0) - (Number(bv) || 0)) * dir
       return String(av).localeCompare(String(bv)) * dir
     })
     return out
-  }, [stocks, search, fSector, fBucket, fTrend, fStrength, fBias, sort])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stocks, search, fSector, fBucket, fTrend, fStrength, fBias, sort, onlyStrong, onlyHeld])
 
   const activeFilters = fSector.size + fBucket.size + fTrend.size + fStrength.size + fBias.size
-  const clearAll = () => { setFSector(new Set()); setFBucket(new Set()); setFTrend(new Set()); setFStrength(new Set()); setFBias(new Set()); setSearch('') }
+  const clearAll = () => { setFSector(new Set()); setFBucket(new Set()); setFTrend(new Set()); setFStrength(new Set()); setFBias(new Set()); setSearch(''); setOnlyStrong(false); setOnlyHeld(false) }
+  // Batched LTP editing — nothing hits the network until Save, and saving also
+  // pushes each price down into the books that hold the stock.
+  const startLtpEdit = () => setLtpDraft(Object.fromEntries(stocks.map((s) => [s.id, String(s.ltp ?? '')])))
+  const changedLtps = ltpDraft
+    ? stocks.filter((s) => ltpDraft[s.id] !== undefined && Number(ltpDraft[s.id] || 0) !== Number(s.ltp || 0))
+        .map((s) => ({ id: s.id, ltp: ltpDraft[s.id], symbol: s.symbol }))
+    : []
+  const saveLtpEdits = async () => {
+    if (!changedLtps.length) { setLtpDraft(null); return }
+    setLtpSaving(true)
+    try { await saveMasterLtps(changedLtps); await reload(); setLtpDraft(null) } finally { setLtpSaving(false) }
+  }
+
+  const strongCount = stocks.filter((s) => s.fundamentallyStrong).length
+  const heldCount = stocks.filter((s) => forStock(s).qty > 0).length
 
   const openAdd = () => setEditing(makeBlank(stocks.length))
   const openEdit = (s) => setEditing({ ...s })
@@ -225,7 +266,22 @@ export default function StockStrength() {
           <MultiFilter label="Trend" icon="ri-line-chart-line" options={TREND_OPTIONS} selected={fTrend} onChange={setFTrend} />
           <MultiFilter label="Strength" icon="ri-flashlight-line" options={STRENGTH_OPTIONS} selected={fStrength} onChange={setFStrength} />
           <MultiFilter label="Bias" icon="ri-scales-3-line" options={BIAS_OPTIONS} selected={fBias} onChange={setFBias} />
-          {(activeFilters > 0 || search) && <button className="btn btn-sm btn-link text-danger p-0" onClick={clearAll}>Clear all</button>}
+          {ltpDraft ? (
+            <>
+              <span className="text-muted small">{changedLtps.length} changed</span>
+              <button className="btn btn-sm btn-light" onClick={() => setLtpDraft(null)} disabled={ltpSaving}>Cancel</button>
+              <button className="btn btn-sm btn-primary" onClick={saveLtpEdits} disabled={ltpSaving}><i className="ri-save-line me-1" />{ltpSaving ? 'Saving…' : 'Save LTPs'}</button>
+            </>
+          ) : (
+            <button className="btn btn-sm btn-soft-primary" onClick={startLtpEdit} disabled={stocks.length === 0}><i className="ri-price-tag-3-line me-1" />Update LTP</button>
+          )}
+          <button className={'btn btn-sm ' + (onlyStrong ? 'btn-success' : 'btn-soft-secondary')} onClick={() => setOnlyStrong((v) => !v)}>
+            <i className="ri-shield-star-line me-1" />Fundamentally strong<span className="badge bg-white text-dark ms-1">{strongCount}</span>
+          </button>
+          <button className={'btn btn-sm ' + (onlyHeld ? 'btn-primary' : 'btn-soft-secondary')} onClick={() => setOnlyHeld((v) => !v)}>
+            <i className="ri-briefcase-line me-1" />Held<span className="badge bg-white text-dark ms-1">{heldCount}</span>
+          </button>
+          {(activeFilters > 0 || search || onlyStrong || onlyHeld) && <button className="btn btn-sm btn-link text-danger p-0" onClick={clearAll}>Clear all</button>}
           <span className="flex-grow-1" />
           <span className="text-muted small">{rows.length} of {stocks.length}</span>
           <button className="btn btn-primary btn-sm" onClick={openAdd}><i className="ri-add-line me-1" />Add stock</button>
@@ -248,6 +304,8 @@ export default function StockStrength() {
                   <Th label="Strength" sortKey="strength" sort={sort} setSort={setSort} />
                   <Th label="Bias" sortKey="bias" sort={sort} setSort={setSort} />
                   <Th label="Rating" sortKey="rating" sort={sort} setSort={setSort} className="text-center" />
+                  <Th label="LTP" sortKey="ltp" sort={sort} setSort={setSort} className="text-end" />
+                  <Th label="Holdings" sortKey="holdings" sort={sort} setSort={setSort} className="text-center" />
                   <th>Observation</th>
                   <Th label="Updated" sortKey="updatedDate" sort={sort} setSort={setSort} />
                   <th className="text-end">Actions</th>
@@ -256,7 +314,13 @@ export default function StockStrength() {
               <tbody>
                 {rows.map((s) => (
                   <tr key={s.id}>
-                    <td><div className="fw-medium">{s.symbol}</div>{s.name && <div className="text-muted small">{s.name}</div>}</td>
+                    <td>
+                      <div className="fw-medium">
+                        {s.fundamentallyStrong && <i className="ri-shield-star-fill text-success me-1" title="Fundamentally strong" />}
+                        {s.symbol}
+                      </div>
+                      {s.name && <div className="text-muted small">{s.name}</div>}
+                    </td>
                     <td>{s.sector ? <span className="badge bg-light text-body">{s.sector}</span> : <span className="text-muted">—</span>}</td>
                     <td className="text-center">{s.bucket
                       ? <span className={`badge bg-${(BUCKET[s.bucket] || {}).tone || 'secondary'}-subtle text-${(BUCKET[s.bucket] || {}).tone || 'secondary'}`} title={s.rationale || (BUCKET[s.bucket] || {}).label}>{s.bucket}</span>
@@ -265,6 +329,32 @@ export default function StockStrength() {
                     <td><Tone map={STRENGTH} value={s.strength} /></td>
                     <td><Tone map={BIAS} value={s.bias} /></td>
                     <td className="text-center">{s.rating !== '' && s.rating != null ? <span className={`badge bg-${ratingTone(Number(s.rating))}-subtle text-${ratingTone(Number(s.rating))}`}>{s.rating}/5</span> : <span className="text-muted">—</span>}</td>
+                    <td className="text-end" style={{ minWidth: 110 }}>
+                      {ltpDraft ? (
+                        <input type="number" step="0.01" className="form-control form-control-sm text-end" value={ltpDraft[s.id] ?? ''}
+                          onChange={(e) => setLtpDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveLtpEdits(); if (e.key === 'Escape') setLtpDraft(null) }} />
+                      ) : (s.ltp !== '' && s.ltp != null
+                        ? <>{price(Number(s.ltp), 'INR')}{s.ltpUpdatedAt && <div className="text-muted small">{fmtDate(String(s.ltpUpdatedAt).slice(0, 10))}</div>}</>
+                        : <span className="text-muted">—</span>)}
+                    </td>
+                    <td className="text-center">
+                      {(() => {
+                        const h = forStock(s)
+                        if (h.qty <= 0) return <span className="text-muted">—</span>
+                        return (
+                          <>
+                            <span className="badge bg-primary-subtle text-primary">{h.qty}</span>
+                            <div className="text-muted small mt-1" style={{ whiteSpace: 'nowrap' }}>
+                              in {h.holders} place{h.holders === 1 ? '' : 's'}
+                            </div>
+                            <div className="text-muted small" style={{ whiteSpace: 'nowrap' }}>
+                              {h.lines.map((l) => `${l.source} ${l.qty}`).join(' · ')}
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </td>
                     <td className="small" style={{ maxWidth: 260, whiteSpace: 'normal' }}>{s.observation || <span className="text-muted">—</span>}</td>
                     <td className="text-nowrap small text-muted">{s.updatedDate ? fmtDate(s.updatedDate) : '—'}</td>
                     <td className="text-end text-nowrap">

@@ -1,5 +1,6 @@
 import { useCollection, insertRow, updateRow, deleteRow, listRows } from '@/lib/api'
 import { rid, setPlanCash } from './investCommonRepo'
+import { syncMasterLtp } from './masterLtp'
 
 /**
  * focus25Repo.js — Focus 25 Stocks: up to 25 equal-weight stocks bought in
@@ -27,7 +28,10 @@ export const editFocusStock = (id, patch) => updateRow('ee_focus_stocks', id, {
 })
 export const softRemoveFocusStock = (id) => updateRow('ee_focus_stocks', id, { active: false })
 export const removeFocusStock = (id) => deleteRow('ee_focus_stocks', id)
-export const setFocusLtp = (id, ltp) => updateRow('ee_focus_stocks', id, { ltp: num(ltp), ltp_updated_at: iso() })
+export const setFocusLtp = async (id, ltp, symbol) => {
+  await updateRow('ee_focus_stocks', id, { ltp: num(ltp), ltp_updated_at: iso() })
+  if (symbol) await syncMasterLtp([{ symbol, ltp }])
+}
 
 // ---- Allotments (shared with Metal 25) ------------------------------------
 export function useStockAllotments(planCode) {

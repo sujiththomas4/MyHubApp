@@ -7,8 +7,9 @@ import { rebalanceTopUp } from '@/data/allocation'
 import { xirr, xirrReady } from '@/data/xirr'
 import { monthKey, isoOf, nextInvestmentDate } from '@/data/investCalendar'
 import { useMarketHolidays } from '@/data/investCommonRepo'
+import { useCapital } from '@/context/CapitalContext'
 import {
-  useFunds, setFundValues,
+  useFunds, setFundValues, setFundDetails, brokerLabel,
   useFundAllotments, useFundAllotmentLines, recordFundAllotment, deleteFundAllotment,
 } from '@/data/steady25Repo'
 
@@ -35,7 +36,9 @@ export default function Steady25() {
   const { funds, reload: reloadFunds } = useFunds()
   const { allotments, reload: reloadAllots } = useFundAllotments()
   const { lines, reload: reloadLines } = useFundAllotmentLines()
+  const { accounts } = useCapital()
   const [editVals, setEditVals] = useState(null)   // {[id]: currentValue}
+  const [editFund, setEditFund] = useState(null)   // fund row being described
   const [allotOpen, setAllotOpen] = useState(() => new URLSearchParams(window.location.search).get('allot') === '1')
   const [delAllot, setDelAllot] = useState(null)
 
@@ -113,7 +116,7 @@ export default function Steady25() {
           <div className="table-responsive">
             <table className="table align-middle table-hover mb-0">
               <thead className="table-light">
-                <tr><th>Fund</th><th className="text-end">Target %</th><th className="text-end">Invested</th><th className="text-end">Current</th><th className="text-end">P&L</th><th className="text-end">P&L %</th><th className="text-end">Weight %</th></tr>
+                <tr><th>Fund</th><th>Where</th><th className="text-end">Target %</th><th className="text-end">Invested</th><th className="text-end">Current</th><th className="text-end">P&L</th><th className="text-end">P&L %</th><th className="text-end">Weight %</th></tr>
               </thead>
               <tbody>
                 {ordered.map((f) => {
@@ -121,9 +124,23 @@ export default function Steady25() {
                   const fp = cur - inv; const fpp = inv > 0 ? (fp / inv) * 100 : null
                   const wt = totalCurrent > 0 ? (cur / totalCurrent) * 100 : 0
                   const tgt = num(f.target_weight) * 100
+                  const where = brokerLabel(accounts, f)
                   return (
                     <tr key={f.id}>
-                      <td><div className="fw-semibold">{f.name}</div><div className="text-muted small">{f.code}</div></td>
+                      <td>
+                        <div className="fw-semibold">{f.name}</div>
+                        {f.fund_name
+                          ? <div className="text-muted small">{f.fund_name}</div>
+                          : <div className="text-muted small fst-italic">scheme not set</div>}
+                        <span className="badge bg-light text-muted mt-1">{f.code}</span>
+                      </td>
+                      <td style={{ minWidth: 150 }}>
+                        {where
+                          ? <span className="badge bg-primary-subtle text-primary"><i className="ri-bank-line me-1" />{where}</span>
+                          : <span className="text-muted small">—</span>}
+                        <button className="btn btn-sm btn-ghost-secondary px-1 ms-1" title="Edit fund details"
+                          onClick={() => setEditFund(f)}><i className="ri-pencil-line" /></button>
+                      </td>
                       <td className="text-end">{tgt.toFixed(0)}%</td>
                       <td className="text-end">{money(inv, 'INR')}</td>
                       <td className="text-end" style={{ minWidth: 130 }}>
@@ -139,7 +156,7 @@ export default function Steady25() {
                 })}
               </tbody>
               <tfoot className="table-light">
-                <tr className="fw-semibold"><td>Total</td><td className="text-end">100%</td><td className="text-end">{money(totalInvested, 'INR')}</td><td className="text-end">{money(totalCurrent, 'INR')}</td><td className="text-end"><PnL v={pnl} /></td><td className="text-end">{pnlPct == null ? '—' : `${pnlPct.toFixed(1)}%`}</td><td /></tr>
+                <tr className="fw-semibold"><td>Total</td><td /><td className="text-end">100%</td><td className="text-end">{money(totalInvested, 'INR')}</td><td className="text-end">{money(totalCurrent, 'INR')}</td><td className="text-end"><PnL v={pnl} /></td><td className="text-end">{pnlPct == null ? '—' : `${pnlPct.toFixed(1)}%`}</td><td /></tr>
               </tfoot>
             </table>
           </div>
@@ -178,6 +195,12 @@ export default function Steady25() {
         <AllotmentModal funds={ordered} holidays={holidays} monthRecorded={monthRecorded} lastAmount={num(allotments[0]?.total_amount) || 50000}
           onClose={() => setAllotOpen(false)}
           onConfirm={async (payload) => { await recordFundAllotment(payload); setAllotOpen(false); await Promise.all([reloadFunds(), reloadAllots(), reloadLines()]) }} />
+      )}
+
+      {editFund && (
+        <FundDetailsModal fund={editFund} accounts={accounts}
+          onClose={() => setEditFund(null)}
+          onSaved={async () => { setEditFund(null); await reloadFunds() }} />
       )}
 
       <ConfirmDialog open={!!delAllot} title="Delete allotment?" message="This reverses each fund's invested total for that month." confirmLabel="Delete" tone="danger" onConfirm={confirmDelete} onCancel={() => setDelAllot(null)} />
@@ -249,6 +272,56 @@ function AllotmentModal({ funds, holidays, monthRecorded, lastAmount, onClose, o
       <div className="d-flex justify-content-end gap-2 mt-3">
         <button className="btn btn-light" onClick={onClose} disabled={saving}>Cancel</button>
         <button className="btn btn-primary" onClick={save} disabled={saving || !result}><i className="ri-check-line me-1" />{saving ? 'Saving…' : 'Confirm allotment'}</button>
+      </div>
+    </Modal>
+  )
+}
+
+// --- What this holding is, and where it sits --------------------------------
+/**
+ * `name` is the slot the allocation model cares about and stays fixed. This
+ * edits the two things the model does not know: which scheme you actually
+ * bought, and which capital account is holding it.
+ */
+function FundDetailsModal({ fund, accounts, onClose, onSaved }) {
+  const [fundName, setFundName] = useState(fund.fund_name || '')
+  const [acct, setAcct] = useState(fund.broker_slug ? `${fund.broker_slug}|${fund.broker_holder || ''}` : '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const save = async () => {
+    setErr(null); setSaving(true)
+    const [brokerSlug, brokerHolder] = acct ? acct.split('|') : ['', '']
+    try { await setFundDetails(fund.id, { fundName, brokerSlug, brokerHolder }); await onSaved() }
+    catch (e) { setErr(e.message || 'Could not save.'); setSaving(false) }
+  }
+
+  return (
+    <Modal open title={<><i className="ri-information-line me-2 text-primary" />{fund.name}</>} onClose={onClose}>
+      <div className="row g-3">
+        <div className="col-12">
+          <label className="form-label small mb-1">Fund name</label>
+          <input className="form-control" placeholder="e.g. UTI Nifty 50 Index Fund - Direct Growth"
+            value={fundName} onChange={(e) => setFundName(e.target.value)} autoFocus />
+          <div className="form-text">The actual scheme you bought into the <strong>{fund.name}</strong> slot.</div>
+        </div>
+        <div className="col-12">
+          <label className="form-label small mb-1">Broker / account</label>
+          <select className="form-select" value={acct} onChange={(e) => setAcct(e.target.value)}>
+            <option value="">— not set —</option>
+            {accounts.map((a) => (
+              <option key={`${a.slug}|${a.holder || ''}`} value={`${a.slug}|${a.holder || ''}`}>
+                {a.holder ? `${a.name} · ${a.holder}` : a.name}
+              </option>
+            ))}
+          </select>
+          <div className="form-text">Where this holding actually sits. Accounts come from Capital.</div>
+        </div>
+      </div>
+      {err && <div className="alert alert-danger py-2 mt-3 mb-0">{err}</div>}
+      <div className="d-flex justify-content-end gap-2 mt-3">
+        <button className="btn btn-light" onClick={onClose} disabled={saving}>Cancel</button>
+        <button className="btn btn-primary" onClick={save} disabled={saving}><i className="ri-save-3-line me-1" />{saving ? 'Saving…' : 'Save'}</button>
       </div>
     </Modal>
   )

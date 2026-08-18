@@ -1,13 +1,17 @@
 import { useCollection, insertRow, updateRow, deleteRow, upsertRow } from '@/lib/api'
+import { syncMasterLtp } from './masterLtp'
 
 /**
- * swing1hRepo.js — Swing 1 Hour. A discretionary book for opportunities found
- * on the 1-hour chart. Deliberately ungated: no entry checklist, no stop rules,
- * no portfolio caps — you decide, the screen records.
+ * swing1hRepo.js — backs the Swing Weekly screen. A discretionary book for
+ * opportunities found on the weekly chart. Deliberately ungated: no entry
+ * checklist, no stop rules, no portfolio caps — you decide, the screen records.
  *
- * ATR(14) on the 1-hour chart is captured on every trade for one reason: so the
+ * ATR(14) on the weekly chart is captured on every trade for one reason: so the
  * screen can show afterwards which stop distances actually worked. Nothing here
  * blocks a trade because of ATR; it only reports.
+ *
+ * Table names keep the swing1h_ prefix from when this book was hourly; renaming
+ * live tables buys nothing and risks the data.
  */
 const iso = () => new Date().toISOString()
 export const rid = () => Math.random().toString(36).slice(2, 8)
@@ -16,6 +20,13 @@ const orNull = (v) => (v === '' || v == null ? null : Number(v))
 
 /** Soft target — shown and flagged, never enforced. */
 export const TARGET_RR = 1.5
+
+/** The two ways into this book. Recorded per trade so they can be compared. */
+export const ENTRY_TYPES = [
+  { value: 'STRENGTH', label: 'Weekly Strength', tone: 'success' },
+  { value: 'PULLBACK20W', label: 'Pullback to 20W EMA', tone: 'info' },
+]
+export const ENTRY_TYPE = Object.fromEntries(ENTRY_TYPES.map((o) => [o.value, o]))
 
 export const EXIT_REASONS = [
   { value: 'TARGET', label: 'Target hit' },
@@ -26,7 +37,7 @@ export const EXIT_REASONS = [
 ]
 
 // ---- Config: the amount deployed per trade ---------------------------------
-export const DEFAULT_DEPLOY = 100000
+export const DEFAULT_DEPLOY = 200000
 export function useSwing1hConfig() {
   const { data, loading, error, reload } = useCollection('swing1h_config', [])
   const config = data.find((r) => r.id === 'main') || {}
@@ -38,6 +49,21 @@ export const saveDeployAmount = (amount) => upsertRow('swing1h_config', { id: 'm
  * Capital-based sizing: how many shares a given rupee amount buys.
  * Whole shares only, so the deployed value lands at or under the amount.
  */
+/**
+ * Split one amount equally across N stocks. Each gets amount/N to spend, and
+ * buys whole shares with it — so a pricier stock simply buys fewer, and the
+ * leftover per row is the rounding remainder.
+ */
+export function splitEqually(amount, entries) {
+  const n = entries.length
+  const per = n > 0 ? num(amount) / n : 0
+  return entries.map((e) => {
+    const price = num(e)
+    const qty = price > 0 ? Math.floor(per / price) : 0
+    return { per, qty, value: qty * price }
+  })
+}
+
 export function sizeFromAmount(amount, entry) {
   const a = num(amount); const e = num(entry)
   if (a <= 0 || e <= 0) return { qty: 0, deployed: 0, leftover: 0 }
@@ -56,9 +82,10 @@ export const addTrade1h = (x) => insertRow('swing1h_trades', {
   symbol: (x.symbol || '').trim().toUpperCase(),
   bucket: x.bucket || null,
   sector: x.sector || null,
+  entry_type: x.entryType || null,
   state: 'OPEN',
   entry: num(x.entry),
-  stop_price: num(x.stop),
+  stop_price: orNull(x.stop),
   target_price: orNull(x.target),
   atr: orNull(x.atr),
   qty: num(x.qty),
@@ -67,30 +94,59 @@ export const addTrade1h = (x) => insertRow('swing1h_trades', {
   note: x.note || null,
   created_at: iso(),
 })
+/** Add a whole basket at once. Rows are independent, so one bad row fails alone. */
+export const addTradesBatch = (rows) => Promise.all(rows.map(addTrade1h))
+
 export const editTrade1h = (id, patch) => updateRow('swing1h_trades', id, patch)
 export const removeTrade1h = (id) => deleteRow('swing1h_trades', id)
-/** Batch LTP write — one call per changed row, then a single reload. */
-export const saveLtps1h = (entries) => Promise.all(entries.map(({ id, ltp }) => updateRow('swing1h_trades', id, { ltp: num(ltp) })))
+/** Batch LTP write, then push the prices up to the master stock list. */
+export const saveLtps1h = async (entries) => {
+  await Promise.all(entries.map(({ id, ltp }) => updateRow('swing1h_trades', id, { ltp: num(ltp) })))
+  await syncMasterLtp(entries)
+}
+
+// ---- Weekly backtest notes -------------------------------------------------
+// A manual scratchpad: jot candidates through the week, verify against the
+// real screener at the weekend.
+export function useBacktestNotes() {
+  const { data, loading, error, reload } = useCollection('swing1h_backtest_notes', [], { orderBy: 'note_date', ascending: false })
+  return { notes: data, loading, error, reload }
+}
+export const addBacktestNote = (x) => insertRow('swing1h_backtest_notes', {
+  id: 'bt-' + rid(),
+  note_date: x.noteDate,
+  symbol: (x.symbol || '').trim(),
+  note: x.note || null,
+  checked: false,
+  created_at: iso(),
+})
+export const setNoteChecked = (id, checked) => updateRow('swing1h_backtest_notes', id, { checked: Boolean(checked) })
+export const removeBacktestNote = (id) => deleteRow('swing1h_backtest_notes', id)
 
 // ===========================================================================
 // Pure calculations
 // ===========================================================================
 
+/** A stop of null/'' means none was set — never treat that as a stop at zero. */
+export const hasStop = (stop) => stop != null && stop !== '' && num(stop) > 0
+/** Risk per share, or 0 when no stop is set. */
+export const riskPerShare = (entry, stop) => (hasStop(stop) ? Math.max(0, num(entry) - num(stop)) : 0)
+
 export const rewardRisk = (entry, stop, target) => {
-  const risk = num(entry) - num(stop)
+  const risk = riskPerShare(entry, stop)
   return risk > 0 && num(target) > 0 ? (num(target) - num(entry)) / risk : 0
 }
 
 /**
- * Both ATR readings that matter on a 1-hour chart:
- *   stopMult   — is the stop outside the hourly noise?
- *   targetMult — how many hourly ranges must price travel to pay me?
- * A target 6+ ATRs away is a multi-day move, not a 1-hour idea.
+ * Both ATR readings that matter on a weekly chart:
+ *   stopMult   — is the stop outside the weekly noise?
+ *   targetMult — how many weekly ranges must price travel to pay me?
+ * A target 6+ ATRs away is a multi-month move, not a swing idea.
  */
 export function atrView({ entry, stop, target, atr }) {
   const a = num(atr)
   if (a <= 0) return null
-  const risk = num(entry) - num(stop)
+  const risk = riskPerShare(entry, stop)
   const reward = num(target) > 0 ? num(target) - num(entry) : 0
   return {
     atr: a,
@@ -104,7 +160,7 @@ export function openStats1h(t) {
   const entry = num(t.entry)
   const ltp = num(t.ltp) || entry
   const qty = num(t.qty)
-  const risk = entry - num(t.stop_price)
+  const risk = riskPerShare(entry, t.stop_price)
   return {
     entry, ltp, qty,
     value: qty * ltp,
@@ -119,7 +175,7 @@ export function closedStats1h(t) {
   const entry = num(t.entry)
   const exit = num(t.exit_price)
   const qty = num(t.qty)
-  const risk = entry - num(t.stop_price)
+  const risk = riskPerShare(entry, t.stop_price)
   const hours = t.entry_at && t.exit_at
     ? Math.max(0, (new Date(t.exit_at) - new Date(t.entry_at)) / 3600000)
     : null
@@ -142,13 +198,13 @@ export function aggregates1h(closed) {
 }
 
 // ---- "Is ATR helping?" -----------------------------------------------------
-/** Stop-distance bands, in multiples of the 1-hour ATR. */
+/** Stop-distance bands, in multiples of the weekly ATR. */
 export const ATR_BANDS = [
-  { key: 'tight', label: 'Under 1.0x', min: 0, max: 1, hint: 'inside the hourly candle' },
+  { key: 'tight', label: 'Under 1.0x', min: 0, max: 1, hint: 'inside the weekly candle' },
   { key: 'snug', label: '1.0 - 1.5x', min: 1, max: 1.5 },
   { key: 'mid', label: '1.5 - 2.5x', min: 1.5, max: 2.5 },
   { key: 'wide', label: '2.5 - 4.0x', min: 2.5, max: 4 },
-  { key: 'xwide', label: 'Over 4.0x', min: 4, max: Infinity, hint: 'multi-session risk' },
+  { key: 'xwide', label: 'Over 4.0x', min: 4, max: Infinity, hint: 'multi-month risk' },
 ]
 
 /**
@@ -180,7 +236,7 @@ export function atrBandPerformance(closed) {
 }
 
 /**
- * How often a stop was hit, split by whether it sat inside the hourly noise.
+ * How often a stop was hit, split by whether it sat inside the weekly noise.
  * The clearest single readout of what ATR buys you.
  */
 export function noiseStopRate(closed) {
